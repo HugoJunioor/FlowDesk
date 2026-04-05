@@ -6,9 +6,12 @@ import {
   BarChart3, 
   Settings,
   ChevronLeft,
-  Menu
+  Menu,
+  LogOut,
+  UserCircle
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -20,6 +23,7 @@ const navItems = [
 const AppSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { username, logout } = useAuth();
 
   return (
     <aside
@@ -63,8 +67,20 @@ const AppSidebar = () => {
         })}
       </nav>
 
+      {/* User info */}
+      <div className="px-2 py-3 border-t border-sidebar-border">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <UserCircle size={20} className="text-sidebar-primary shrink-0" />
+          {!collapsed && (
+            <span className="text-sm font-medium text-sidebar-foreground truncate">
+              {username}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Footer */}
-      <div className="p-2 border-t border-sidebar-border">
+      <div className="p-2 border-t border-sidebar-border space-y-1">
         <NavLink
           to="/configuracoes"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
@@ -72,6 +88,13 @@ const AppSidebar = () => {
           <Settings size={20} />
           {!collapsed && <span>Configurações</span>}
         </NavLink>
+        <button
+          onClick={logout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-destructive transition-colors w-full"
+        >
+          <LogOut size={20} />
+          {!collapsed && <span>Sair</span>}
+        </button>
       </div>
     </aside>
   );
