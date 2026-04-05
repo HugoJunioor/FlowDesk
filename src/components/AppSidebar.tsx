@@ -23,6 +23,7 @@ const navItems = [
 const AppSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { username, logout } = useAuth();
 
   return (
     <aside
