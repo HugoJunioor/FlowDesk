@@ -6,9 +6,12 @@ import {
   BarChart3, 
   Settings,
   ChevronLeft,
-  Menu
+  Menu,
+  LogOut,
+  UserCircle
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
