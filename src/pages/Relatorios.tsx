@@ -26,14 +26,14 @@ const Relatorios = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Relatórios</h1>
-            <p className="text-muted-foreground text-sm mt-1">Análise e métricas do sistema</p>
+            <h1 className="text-2xl font-semibold text-foreground">Relatorios</h1>
+            <p className="text-muted-foreground text-sm mt-1">Analise e metricas do sistema</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
-              <Calendar size={16} className="mr-2" /> Período
+              <Calendar size={16} className="mr-2" /> Periodo
             </Button>
             <Button variant="outline" size="sm">
               <Download size={16} className="mr-2" /> Exportar
@@ -45,23 +45,25 @@ const Relatorios = () => {
           {/* Bar Chart */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Tarefas por Mês</CardTitle>
+              <CardTitle className="text-base font-semibold">Tarefas por Mes</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(215, 14%, 50%)" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "hsl(215, 14%, 50%)" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                   <Tooltip
                     contentStyle={{
                       borderRadius: "8px",
-                      border: "1px solid hsl(214, 20%, 90%)",
+                      border: "1px solid hsl(var(--border))",
+                      backgroundColor: "hsl(var(--card))",
+                      color: "hsl(var(--foreground))",
                       boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                     }}
                   />
-                  <Bar dataKey="tarefas" fill="hsl(215, 60%, 42%)" radius={[4, 4, 0, 0]} name="Total" />
-                  <Bar dataKey="concluidas" fill="hsl(152, 55%, 42%)" radius={[4, 4, 0, 0]} name="Concluídas" />
+                  <Bar dataKey="tarefas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Total" />
+                  <Bar dataKey="concluidas" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} name="Concluidas" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -75,22 +77,24 @@ const Relatorios = () => {
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={cadastrosData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(215, 14%, 50%)" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "hsl(215, 14%, 50%)" }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                   <Tooltip
                     contentStyle={{
                       borderRadius: "8px",
-                      border: "1px solid hsl(214, 20%, 90%)",
+                      border: "1px solid hsl(var(--border))",
+                      backgroundColor: "hsl(var(--card))",
+                      color: "hsl(var(--foreground))",
                       boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                     }}
                   />
                   <Line
                     type="monotone"
                     dataKey="novos"
-                    stroke="hsl(200, 80%, 50%)"
+                    stroke="hsl(var(--info))"
                     strokeWidth={2}
-                    dot={{ fill: "hsl(200, 80%, 50%)", r: 4 }}
+                    dot={{ fill: "hsl(var(--info))", r: 4 }}
                     name="Novos"
                   />
                 </LineChart>

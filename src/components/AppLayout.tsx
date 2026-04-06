@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Menu, Workflow } from "lucide-react";
 import AppSidebar from "./AppSidebar";
 
 interface AppLayoutProps {
@@ -5,10 +7,35 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar />
-      <main className="ml-60 p-8 animate-fade-in">
+      <AppSidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
+
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border flex items-center px-4 z-30">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-2 -ml-2 text-muted-foreground hover:text-foreground rounded-lg"
+        >
+          <Menu size={20} />
+        </button>
+        <Workflow size={18} className="ml-3 text-primary" />
+        <span className="ml-1.5 font-semibold text-foreground">FlowDesk</span>
+      </div>
+
+      <main
+        className={`transition-all duration-300 p-6 pt-20 lg:pt-8 animate-fade-in ${
+          collapsed ? "lg:ml-16" : "lg:ml-60"
+        }`}
+      >
         {children}
       </main>
     </div>
