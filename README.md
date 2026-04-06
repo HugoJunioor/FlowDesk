@@ -1,3 +1,19 @@
-# Welcome to your Lovable project
+# FlowDesk
 
-TODO: Document your project here
+Sistema de gerenciamento interno.
+
+## Stack
+
+- React 18 + TypeScript
+- Vite
+- Tailwind CSS + shadcn/ui
+- React Router
+- React Query
+- Recharts
+
+## Desenvolvimento
+
+```bash
+npm install
+npm run dev
+```
