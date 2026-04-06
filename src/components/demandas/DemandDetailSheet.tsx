@@ -15,9 +15,10 @@ interface DemandDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   assignees: string[];
   onAssigneeChange: (demandId: string, assignee: string | null) => void;
+  onStatusChange: (demandId: string, status: string) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange }: DemandDetailSheetProps) => {
   if (!demand) return null;
 
   const priority = PRIORITY_CONFIG[demand.priority];
@@ -84,6 +85,24 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               {assignees.map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Status - editavel */}
+          <div className="p-4 rounded-lg border border-border">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Clock size={14} className="text-primary" />
+              <p className="text-xs text-muted-foreground font-medium">Status</p>
+            </div>
+            <select
+              className={`w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-medium ${status.color}`}
+              value={demand.status}
+              onChange={(e) => onStatusChange(demand.id, e.target.value)}
+            >
+              <option value="aberta">Aberta</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="concluida">Concluida</option>
+              <option value="expirada">Expirada</option>
             </select>
           </div>
 

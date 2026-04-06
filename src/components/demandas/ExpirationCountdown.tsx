@@ -35,6 +35,7 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = f
 
   const info = getBusinessTimeInfo(createdAt, effectiveDueDate);
 
+  // SLA expirado: badge sem barra
   if (info.isExpired || status === "expirada") {
     return (
       <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse">
@@ -59,6 +60,7 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = f
     );
   }
 
+  // Dentro do prazo: mostra barra
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">

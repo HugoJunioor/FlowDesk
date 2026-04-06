@@ -58,6 +58,22 @@ const Demandas = () => {
     );
   }, []);
 
+  const handleStatusChange = useCallback((demandId: string, newStatus: string) => {
+    const now = new Date().toISOString();
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId
+          ? { ...d, status: newStatus as any, completedAt: newStatus === "concluida" ? now : d.completedAt }
+          : d
+      )
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId
+        ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? now : prev.completedAt }
+        : prev
+    );
+  }, []);
+
   const handleStatClick = useCallback((statKey: string) => {
     setFilters((prev) => ({
       ...EMPTY_FILTERS,
@@ -198,6 +214,7 @@ const Demandas = () => {
           onOpenChange={(open) => !open && setSelected(null)}
           assignees={assignees}
           onAssigneeChange={handleAssigneeChange}
+          onStatusChange={handleStatusChange}
         />
       </div>
     </AppLayout>
