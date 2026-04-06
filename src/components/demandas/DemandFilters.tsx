@@ -43,10 +43,9 @@ const DemandFilters = ({ filters, onChange, assignees }: DemandFiltersProps) => 
         onChange={(e) => update({ priority: e.target.value as DemandPriority | "all" })}
       >
         <option value="all">Prioridade</option>
-        <option value="urgente">Urgente</option>
-        <option value="alta">Alta</option>
-        <option value="media">Media</option>
-        <option value="baixa">Baixa</option>
+        <option value="p1">P1 - Critico</option>
+        <option value="p2">P2 - Alta</option>
+        <option value="p3">P3 - Media</option>
       </select>
 
       {/* Status */}

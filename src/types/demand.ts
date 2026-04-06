@@ -1,4 +1,4 @@
-export type DemandPriority = "urgente" | "alta" | "media" | "baixa";
+export type DemandPriority = "p1" | "p2" | "p3";
 export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada";
 
 export interface SlackUser {
@@ -23,10 +23,30 @@ export interface SlackDemand {
 }
 
 export const PRIORITY_CONFIG = {
-  urgente: { label: "Urgente", color: "text-destructive", bg: "bg-destructive/10", border: "border-l-destructive" },
-  alta: { label: "Alta", color: "text-warning", bg: "bg-warning/10", border: "border-l-warning" },
-  media: { label: "Media", color: "text-info", bg: "bg-info/10", border: "border-l-info" },
-  baixa: { label: "Baixa", color: "text-muted-foreground", bg: "bg-muted", border: "border-l-muted-foreground" },
+  p1: {
+    label: "P1 - Critico",
+    shortLabel: "P1",
+    color: "text-destructive",
+    bg: "bg-destructive/10",
+    border: "border-l-destructive",
+    sla: { response: "15 min", resolution: "4 horas", resolutionHours: 4 },
+  },
+  p2: {
+    label: "P2 - Alta",
+    shortLabel: "P2",
+    color: "text-warning",
+    bg: "bg-warning/10",
+    border: "border-l-warning",
+    sla: { response: "1 hora", resolution: "8 horas", resolutionHours: 8 },
+  },
+  p3: {
+    label: "P3 - Media",
+    shortLabel: "P3",
+    color: "text-info",
+    bg: "bg-info/10",
+    border: "border-l-info",
+    sla: { response: "4 horas", resolution: "24 horas", resolutionHours: 24 },
+  },
 } as const;
 
 export const STATUS_CONFIG = {

@@ -98,6 +98,27 @@ const DemandDetailSheet = ({ demand, open, onOpenChange }: DemandDetailSheetProp
 
           <Separator />
 
+          {/* SLA */}
+          <div className="p-4 rounded-lg border border-border">
+            <p className="text-xs text-muted-foreground font-medium mb-3">SLA - {priority.label}</p>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-xs text-muted-foreground">Resposta</p>
+                <p className="text-sm font-semibold text-foreground">{priority.sla.response}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Resolucao</p>
+                <p className="text-sm font-semibold text-foreground">{priority.sla.resolution}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Horario</p>
+                <p className="text-sm font-semibold text-foreground">8h-18h</p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Tags */}
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-2">Tags</p>
