@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import Tarefas from "./pages/Tarefas.tsx";
 import Cadastros from "./pages/Cadastros.tsx";
 import Relatorios from "./pages/Relatorios.tsx";
+import Demandas from "./pages/Demandas.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -27,6 +28,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Index />} />
       <Route path="/tarefas" element={<Tarefas />} />
       <Route path="/cadastros" element={<Cadastros />} />
+      <Route path="/demandas" element={<Demandas />} />
       <Route path="/relatorios" element={<Relatorios />} />
       <Route path="/configuracoes" element={<Configuracoes />} />
       <Route path="*" element={<NotFound />} />
