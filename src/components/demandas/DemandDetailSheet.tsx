@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG } from "@/types/demand";
@@ -12,9 +12,11 @@ interface DemandDetailSheetProps {
   demand: SlackDemand | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  assignees: string[];
+  onAssigneeChange: (demandId: string, assignee: string | null) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange }: DemandDetailSheetProps) => {
   if (!demand) return null;
 
   const priority = PRIORITY_CONFIG[demand.priority];
@@ -43,12 +45,30 @@ const DemandDetailSheet = ({ demand, open, onOpenChange }: DemandDetailSheetProp
         <div className="space-y-5">
           {/* Countdown */}
           <div className="p-4 rounded-lg bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante</p>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
             <ExpirationCountdown
               dueDate={demand.dueDate}
               createdAt={demand.createdAt}
               status={demand.status}
             />
+          </div>
+
+          {/* Responsavel - editavel */}
+          <div className="p-4 rounded-lg border border-border">
+            <div className="flex items-center gap-1.5 mb-2">
+              <UserCog size={14} className="text-primary" />
+              <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
+            </div>
+            <select
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              value={demand.assignee?.name || ""}
+              onChange={(e) => onAssigneeChange(demand.id, e.target.value || null)}
+            >
+              <option value="">Sem responsavel</option>
+              {assignees.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
           </div>
 
           {/* Descricao */}
@@ -63,17 +83,17 @@ const DemandDetailSheet = ({ demand, open, onOpenChange }: DemandDetailSheetProp
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <User size={12} /> Responsavel
+                <MessageSquare size={12} /> Solicitante
+              </p>
+              <p className="text-sm font-medium text-foreground">{demand.requester.name}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <User size={12} /> Responsavel atual
               </p>
               <p className="text-sm font-medium text-foreground">
                 {demand.assignee?.name || "Nao atribuido"}
               </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <MessageSquare size={12} /> Solicitante
-              </p>
-              <p className="text-sm font-medium text-foreground">{demand.requester.name}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -112,7 +132,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange }: DemandDetailSheetProp
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Horario</p>
-                <p className="text-sm font-semibold text-foreground">8h-18h</p>
+                <p className="text-sm font-semibold text-foreground">Seg-Sex 8-18h</p>
               </div>
             </div>
           </div>
