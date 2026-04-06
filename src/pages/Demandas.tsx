@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
@@ -13,7 +13,15 @@ import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
+const TEAM_MEMBERS = [
+  "Maria S.",
+  "Joao P.",
+  "Ana L.",
+  "Carlos R.",
+];
+
 const Demandas = () => {
+  const [demands, setDemands] = useState<SlackDemand[]>(mockDemands);
   const [filters, setFilters] = useState<DemandFilterState>({
     search: "",
     priority: "all",
@@ -23,15 +31,31 @@ const Demandas = () => {
   const [selected, setSelected] = useState<SlackDemand | null>(null);
 
   const assignees = useMemo(() => {
-    const set = new Set<string>();
-    mockDemands.forEach((d) => {
+    const set = new Set<string>(TEAM_MEMBERS);
+    demands.forEach((d) => {
       if (d.assignee) set.add(d.assignee.name);
     });
     return Array.from(set).sort();
+  }, [demands]);
+
+  const handleAssigneeChange = useCallback((demandId: string, newAssignee: string | null) => {
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId
+          ? { ...d, assignee: newAssignee ? { name: newAssignee, avatar: "" } : null }
+          : d
+      )
+    );
+    // Update selected if open
+    setSelected((prev) =>
+      prev && prev.id === demandId
+        ? { ...prev, assignee: newAssignee ? { name: newAssignee, avatar: "" } : null }
+        : prev
+    );
   }, []);
 
   const filtered = useMemo(() => {
-    return mockDemands.filter((d) => {
+    return demands.filter((d) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
         const match =
@@ -46,7 +70,7 @@ const Demandas = () => {
       if (filters.assignee && d.assignee?.name !== filters.assignee) return false;
       return true;
     });
-  }, [filters]);
+  }, [filters, demands]);
 
   return (
     <AppLayout>
@@ -61,7 +85,7 @@ const Demandas = () => {
         </div>
 
         {/* Stats */}
-        <DemandStats demands={mockDemands} />
+        <DemandStats demands={demands} />
 
         {/* Filters */}
         <DemandFilters filters={filters} onChange={setFilters} assignees={assignees} />
@@ -102,6 +126,8 @@ const Demandas = () => {
           demand={selected}
           open={!!selected}
           onOpenChange={(open) => !open && setSelected(null)}
+          assignees={assignees}
+          onAssigneeChange={handleAssigneeChange}
         />
       </div>
     </AppLayout>

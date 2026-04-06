@@ -1,7 +1,7 @@
-import { differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle } from "lucide-react";
+import { getBusinessTimeInfo } from "@/lib/businessHours";
 
 interface ExpirationCountdownProps {
   dueDate: string;
@@ -19,40 +19,20 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, compact = false }: Ex
     );
   }
 
-  const now = new Date();
-  const due = new Date(dueDate);
-  const created = new Date(createdAt);
-  const totalMinutes = differenceInMinutes(due, created);
-  const elapsedMinutes = differenceInMinutes(now, created);
-  const progress = Math.min(100, Math.max(0, (elapsedMinutes / totalMinutes) * 100));
+  const info = getBusinessTimeInfo(createdAt, dueDate);
 
-  const minutesLeft = differenceInMinutes(due, now);
-  const hoursLeft = differenceInHours(due, now);
-  const daysLeft = differenceInDays(due, now);
-
-  const isExpired = minutesLeft <= 0;
-  const isCritical = !isExpired && hoursLeft < 4;
-  const isWarning = !isExpired && !isCritical && hoursLeft < 24;
-
-  if (isExpired || status === "expirada") {
+  if (info.isExpired || status === "expirada") {
     return (
       <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse">
         <AlertTriangle size={10} className="mr-1" />
-        Expirada
+        SLA Expirado
       </Badge>
     );
   }
 
-  const timeText =
-    daysLeft > 0
-      ? `${daysLeft}d ${hoursLeft % 24}h`
-      : hoursLeft > 0
-      ? `${hoursLeft}h ${minutesLeft % 60}m`
-      : `${minutesLeft}m`;
-
-  const colorClass = isCritical
+  const colorClass = info.isCritical
     ? "text-destructive"
-    : isWarning
+    : info.isWarning
     ? "text-warning"
     : "text-success";
 
@@ -60,21 +40,21 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, compact = false }: Ex
     return (
       <span className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
         <Clock size={12} />
-        {timeText}
+        {info.timeText}
       </span>
     );
   }
 
   return (
     <div className="space-y-1.5">
-      <div className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
-        <Clock size={12} className={isCritical ? "animate-pulse" : ""} />
-        <span>{timeText} restantes</span>
+      <div className="flex items-center justify-between">
+        <div className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
+          <Clock size={12} className={info.isCritical ? "animate-pulse" : ""} />
+          <span>{info.timeText} restantes</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">horario util</span>
       </div>
-      <Progress
-        value={progress}
-        className="h-1.5"
-      />
+      <Progress value={info.progress} className="h-1.5" />
     </div>
   );
 };
