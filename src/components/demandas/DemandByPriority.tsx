@@ -7,7 +7,7 @@ interface DemandByPriorityProps {
   onSelect: (demand: SlackDemand) => void;
 }
 
-const priorities: DemandPriority[] = ["urgente", "alta", "media", "baixa"];
+const priorities: DemandPriority[] = ["p1", "p2", "p3"];
 
 const DemandByPriority = ({ demands, onSelect }: DemandByPriorityProps) => {
   return (
