@@ -5,13 +5,15 @@ import { differenceInHours } from "date-fns";
 
 interface DemandStatsProps {
   demands: SlackDemand[];
+  activeFilter: string;
+  onFilterClick: (filter: string) => void;
 }
 
-const DemandStats = ({ demands }: DemandStatsProps) => {
+const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps) => {
   const now = new Date();
 
   const open = demands.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
-  const urgent = demands.filter((d) => d.priority === "urgente" && d.status !== "concluida").length;
+  const urgent = demands.filter((d) => d.priority === "p1" && d.status !== "concluida").length;
   const dueSoon = demands.filter((d) => {
     if (d.status === "concluida" || d.status === "expirada") return false;
     const hoursLeft = differenceInHours(new Date(d.dueDate), now);
@@ -24,27 +26,36 @@ const DemandStats = ({ demands }: DemandStatsProps) => {
   }).length;
 
   const stats = [
-    { title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10" },
-    { title: "Urgentes", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
-    { title: "Vencendo Hoje", value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10" },
-    { title: "Concluidas (7d)", value: completedWeek, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
+    { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
+    { key: "urgentes", title: "P1 Criticos", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
+    { key: "vencendo", title: "Vencendo Hoje", value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
+    { key: "concluidas", title: "Concluidas (7d)", value: completedWeek, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat) => (
-        <Card key={stat.title} className="border border-border shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${stat.bg} shrink-0`}>
-              <stat.icon size={18} className={stat.color} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-              <p className="text-xs text-muted-foreground">{stat.title}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {stats.map((stat) => {
+        const isActive = activeFilter === stat.key;
+        return (
+          <Card
+            key={stat.key}
+            className={`border border-border shadow-sm cursor-pointer transition-all hover:shadow-md ${
+              isActive ? `ring-2 ${stat.ring} shadow-md` : ""
+            }`}
+            onClick={() => onFilterClick(isActive ? "" : stat.key)}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${stat.bg} shrink-0`}>
+                <stat.icon size={18} className={stat.color} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.title}</p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 };

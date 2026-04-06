@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Hash } from "lucide-react";
+import { ExternalLink, Hash, Building2 } from "lucide-react";
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG } from "@/types/demand";
+import { extractClientName } from "@/data/mockDemands";
 import ExpirationCountdown from "./ExpirationCountdown";
 
 interface DemandCardProps {
@@ -61,9 +62,15 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
           />
         </div>
 
-        {/* Assignee + channel */}
+        {/* Assignee + client + channel */}
         <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
-          <span>{demand.assignee?.name || "Sem responsavel"}</span>
+          <div className="flex items-center gap-2">
+            <span>{demand.assignee?.name || "Sem responsavel"}</span>
+            <span className="flex items-center gap-0.5 text-primary/70">
+              <Building2 size={9} />
+              {extractClientName(demand.slackChannel)}
+            </span>
+          </div>
           <a
             href={demand.slackPermalink}
             target="_blank"
