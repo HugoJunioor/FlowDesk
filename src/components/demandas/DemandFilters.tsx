@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, X, CalendarDays } from "lucide-react";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { DemandPriority, DemandStatus } from "@/types/demand";
+
+export type PeriodPreset = "hoje" | "semanal" | "mensal" | "personalizado" | "";
 
 export interface DemandFilterState {
   search: string;
@@ -12,6 +19,7 @@ export interface DemandFilterState {
   dateFrom: string;
   dateTo: string;
   statFilter: string;
+  periodPreset: PeriodPreset;
 }
 
 export const EMPTY_FILTERS: DemandFilterState = {
@@ -23,6 +31,7 @@ export const EMPTY_FILTERS: DemandFilterState = {
   dateFrom: "",
   dateTo: "",
   statFilter: "",
+  periodPreset: "",
 };
 
 interface DemandFiltersProps {
@@ -32,9 +41,50 @@ interface DemandFiltersProps {
   clients: string[];
 }
 
+function getPeriodDates(preset: PeriodPreset): { from: string; to: string } {
+  const now = new Date();
+  switch (preset) {
+    case "hoje":
+      return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
+    case "semanal":
+      return { from: startOfWeek(now, { weekStartsOn: 1 }).toISOString(), to: endOfWeek(now, { weekStartsOn: 1 }).toISOString() };
+    case "mensal":
+      return { from: startOfMonth(now).toISOString(), to: endOfMonth(now).toISOString() };
+    default:
+      return { from: "", to: "" };
+  }
+}
+
 const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersProps) => {
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+
   const update = (partial: Partial<DemandFilterState>) =>
     onChange({ ...filters, ...partial });
+
+  const handlePeriodClick = (preset: PeriodPreset) => {
+    if (filters.periodPreset === preset) {
+      // Toggle off
+      update({ periodPreset: "", dateFrom: "", dateTo: "" });
+    } else if (preset === "personalizado") {
+      update({ periodPreset: "personalizado" });
+    } else {
+      const dates = getPeriodDates(preset);
+      update({ periodPreset: preset, dateFrom: dates.from, dateTo: dates.to });
+    }
+  };
+
+  const handleDateFromSelect = (date: Date | undefined) => {
+    if (!date) return;
+    update({ dateFrom: startOfDay(date).toISOString(), periodPreset: "personalizado" });
+    setFromOpen(false);
+  };
+
+  const handleDateToSelect = (date: Date | undefined) => {
+    if (!date) return;
+    update({ dateTo: endOfDay(date).toISOString(), periodPreset: "personalizado" });
+    setToOpen(false);
+  };
 
   const hasFilters =
     filters.search ||
@@ -44,17 +94,88 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
     filters.client ||
     filters.dateFrom ||
     filters.dateTo ||
-    filters.statFilter;
+    filters.statFilter ||
+    filters.periodPreset;
+
+  const formatDateDisplay = (iso: string) => {
+    if (!iso) return "";
+    return format(new Date(iso), "dd/MM/yyyy", { locale: ptBR });
+  };
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+      {/* Period quick filters */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: "hoje" as PeriodPreset, label: "Hoje" },
+          { key: "semanal" as PeriodPreset, label: "Semanal" },
+          { key: "mensal" as PeriodPreset, label: "Mensal" },
+          { key: "personalizado" as PeriodPreset, label: "Personalizado" },
+        ]).map((p) => (
+          <Button
+            key={p.key}
+            variant={filters.periodPreset === p.key ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => handlePeriodClick(p.key)}
+          >
+            {p.key === "personalizado" && <CalendarDays size={13} className="mr-1" />}
+            {p.label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Custom date pickers - shown when personalizado is active */}
+      {filters.periodPreset === "personalizado" && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <span className="text-xs text-muted-foreground shrink-0">De:</span>
+          <Popover open={fromOpen} onOpenChange={setFromOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-start text-xs font-normal">
+                <CalendarDays size={14} className="mr-2 text-muted-foreground" />
+                {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : "Selecionar"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
+                onSelect={handleDateFromSelect}
+                locale={ptBR}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <span className="text-xs text-muted-foreground shrink-0">Ate:</span>
+          <Popover open={toOpen} onOpenChange={setToOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-start text-xs font-normal">
+                <CalendarDays size={14} className="mr-2 text-muted-foreground" />
+                {filters.dateTo ? formatDateDisplay(filters.dateTo) : "Selecionar"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.dateTo ? new Date(filters.dateTo) : undefined}
+                onSelect={handleDateToSelect}
+                locale={ptBR}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+
+      {/* Main filters row */}
+      <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar demandas..."
-            className="pl-9"
+            className="pl-9 h-9"
             value={filters.search}
             onChange={(e) => update({ search: e.target.value })}
           />
@@ -122,25 +243,6 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <span className="text-xs">Limpar</span>
           </Button>
         )}
-      </div>
-
-      {/* Date range row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-        <CalendarDays size={14} className="text-muted-foreground shrink-0 hidden sm:block" />
-        <span className="text-xs text-muted-foreground shrink-0">Periodo:</span>
-        <Input
-          type="date"
-          className="h-9 w-auto text-sm"
-          value={filters.dateFrom}
-          onChange={(e) => update({ dateFrom: e.target.value })}
-        />
-        <span className="text-xs text-muted-foreground">ate</span>
-        <Input
-          type="date"
-          className="h-9 w-auto text-sm"
-          value={filters.dateTo}
-          onChange={(e) => update({ dateTo: e.target.value })}
-        />
       </div>
 
       {/* Active stat filter indicator */}
