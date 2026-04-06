@@ -12,6 +12,7 @@ import {
   Sun,
   X,
   Workflow,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -19,6 +20,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/tarefas", icon: CheckSquare, label: "Tarefas" },
+  { to: "/demandas", icon: MessageSquare, label: "Demandas" },
   { to: "/cadastros", icon: Database, label: "Cadastros" },
   { to: "/relatorios", icon: BarChart3, label: "Relatorios" },
 ];
