@@ -82,6 +82,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
           <option value="p1">P1 - Critico</option>
           <option value="p2">P2 - Alta</option>
           <option value="p3">P3 - Media</option>
+          <option value="sem_classificacao">Sem classificacao</option>
         </select>
 
         {/* Status */}

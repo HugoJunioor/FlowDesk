@@ -1,16 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle } from "lucide-react";
+import { DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { getBusinessTimeInfo } from "@/lib/businessHours";
 
 interface ExpirationCountdownProps {
   dueDate: string;
   createdAt: string;
   status: string;
+  priority?: DemandPriority;
   compact?: boolean;
 }
 
-const ExpirationCountdown = ({ dueDate, createdAt, status, compact = false }: ExpirationCountdownProps) => {
+const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = false }: ExpirationCountdownProps) => {
   if (status === "concluida") {
     return (
       <Badge variant="secondary" className="bg-success/10 text-success text-[10px]">
@@ -19,7 +21,19 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, compact = false }: Ex
     );
   }
 
-  const info = getBusinessTimeInfo(createdAt, dueDate);
+  // Calculate dueDate from SLA if not provided
+  let effectiveDueDate = dueDate;
+  if (!effectiveDueDate && priority && priority !== "sem_classificacao") {
+    const config = PRIORITY_CONFIG[priority];
+    if (config.sla) {
+      const created = new Date(createdAt);
+      effectiveDueDate = new Date(created.getTime() + config.sla.resolutionHours * 3600000).toISOString();
+    }
+  }
+
+  if (!effectiveDueDate) return null;
+
+  const info = getBusinessTimeInfo(createdAt, effectiveDueDate);
 
   if (info.isExpired || status === "expirada") {
     return (

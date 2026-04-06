@@ -1,5 +1,6 @@
-export type DemandPriority = "p1" | "p2" | "p3";
+export type DemandPriority = "p1" | "p2" | "p3" | "sem_classificacao";
 export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada";
+export type DemandType = "Tarefa/Ajuda" | "Problema/Bug" | "Update" | "Remessa" | "Outro";
 
 export interface SlackUser {
   name: string;
@@ -12,14 +13,21 @@ export interface SlackDemand {
   description: string;
   priority: DemandPriority;
   status: DemandStatus;
+  demandType: DemandType;
+  workflow: string;
+  product: string;
   requester: SlackUser;
   assignee: SlackUser | null;
+  cc: string[];
   createdAt: string;
-  dueDate: string;
+  dueDate: string | null;
   completedAt: string | null;
+  hasTask: boolean;
+  taskLink: string;
   tags: string[];
   slackChannel: string;
   slackPermalink: string;
+  replies: number;
 }
 
 export const PRIORITY_CONFIG = {
@@ -46,6 +54,14 @@ export const PRIORITY_CONFIG = {
     bg: "bg-info/10",
     border: "border-l-info",
     sla: { response: "4 horas", resolution: "24 horas", resolutionHours: 24 },
+  },
+  sem_classificacao: {
+    label: "Sem classificacao",
+    shortLabel: "—",
+    color: "text-muted-foreground",
+    bg: "bg-muted",
+    border: "border-l-muted-foreground",
+    sla: null,
   },
 } as const;
 
