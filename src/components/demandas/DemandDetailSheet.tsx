@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority } from "@/types/demand";
@@ -20,16 +20,22 @@ interface DemandDetailSheetProps {
   onAssigneeChange: (demandId: string, assignee: string | null) => void;
   onStatusChange: (demandId: string, status: string, completedAt?: string) => void;
   onPriorityChange: (demandId: string, priority: DemandPriority) => void;
+  onAddAssignee: (name: string) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee }: DemandDetailSheetProps) => {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
+  const [showAddAssignee, setShowAddAssignee] = useState(false);
+  const [newAssigneeName, setNewAssigneeName] = useState("");
+  const newAssigneeRef = useRef<HTMLInputElement>(null);
 
-  // Reset form when demand changes
+  // Reset forms when demand changes
   useEffect(() => {
     setShowCompleteForm(false);
+    setShowAddAssignee(false);
+    setNewAssigneeName("");
     if (demand) {
       const now = new Date();
       setCompleteDate(format(now, "yyyy-MM-dd"));
@@ -129,13 +135,66 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             <select
               className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
               value={demand.assignee?.name || ""}
-              onChange={(e) => onAssigneeChange(demand.id, e.target.value || null)}
+              onChange={(e) => {
+                if (e.target.value === "__add_new__") {
+                  setShowAddAssignee(true);
+                  setTimeout(() => newAssigneeRef.current?.focus(), 100);
+                } else {
+                  onAssigneeChange(demand.id, e.target.value || null);
+                }
+              }}
             >
               <option value="">Sem responsavel</option>
               {assignees.map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
+              <option value="__add_new__">+ Adicionar responsavel...</option>
             </select>
+
+            {showAddAssignee && (
+              <div className="mt-2 flex gap-2">
+                <Input
+                  ref={newAssigneeRef}
+                  placeholder="Nome do responsavel"
+                  className="h-9 flex-1"
+                  value={newAssigneeName}
+                  onChange={(e) => setNewAssigneeName(e.target.value)}
+                  maxLength={50}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newAssigneeName.trim()) {
+                      onAddAssignee(newAssigneeName.trim());
+                      onAssigneeChange(demand.id, newAssigneeName.trim());
+                      setNewAssigneeName("");
+                      setShowAddAssignee(false);
+                    }
+                    if (e.key === "Escape") setShowAddAssignee(false);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-9 text-xs"
+                  disabled={!newAssigneeName.trim()}
+                  onClick={() => {
+                    if (newAssigneeName.trim()) {
+                      onAddAssignee(newAssigneeName.trim());
+                      onAssigneeChange(demand.id, newAssigneeName.trim());
+                      setNewAssigneeName("");
+                      setShowAddAssignee(false);
+                    }
+                  }}
+                >
+                  Adicionar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => setShowAddAssignee(false)}
+                >
+                  <X size={14} />
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Prioridade - editavel */}

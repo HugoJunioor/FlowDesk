@@ -16,7 +16,19 @@ import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
-const TEAM_MEMBERS: string[] = [];
+// Load custom assignees from localStorage
+function loadCustomAssignees(): string[] {
+  try {
+    const stored = localStorage.getItem("fd_custom_assignees");
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomAssignees(assignees: string[]) {
+  localStorage.setItem("fd_custom_assignees", JSON.stringify(assignees));
+}
 
 // Auto-verify and reclassify demands that already have priority (P1/P2/P3)
 // Demands "sem_classificacao" are left untouched
@@ -55,14 +67,24 @@ const Demandas = () => {
   });
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
+  const [customAssignees, setCustomAssignees] = useState<string[]>(loadCustomAssignees);
 
   const assignees = useMemo(() => {
-    const set = new Set<string>(TEAM_MEMBERS);
+    const set = new Set<string>(customAssignees);
     demands.forEach((d) => {
       if (d.assignee) set.add(d.assignee.name);
     });
     return Array.from(set).sort();
-  }, [demands]);
+  }, [demands, customAssignees]);
+
+  const handleAddAssignee = useCallback((name: string) => {
+    setCustomAssignees((prev) => {
+      if (prev.includes(name)) return prev;
+      const updated = [...prev, name];
+      saveCustomAssignees(updated);
+      return updated;
+    });
+  }, []);
 
   const clients = useMemo(() => {
     const set = new Set<string>();
@@ -255,6 +277,7 @@ const Demandas = () => {
           onAssigneeChange={handleAssigneeChange}
           onStatusChange={handleStatusChange}
           onPriorityChange={handlePriorityChange}
+          onAddAssignee={handleAddAssignee}
         />
       </div>
     </AppLayout>
