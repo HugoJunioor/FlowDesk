@@ -25,7 +25,7 @@ const DemandKanban = ({ demands, onSelect }: DemandKanbanProps) => {
             </div>
 
             {/* Cards */}
-            <ScrollArea className="h-[calc(100vh-340px)] pr-1">
+            <ScrollArea className="h-auto max-h-[calc(100vh-340px)] lg:h-[calc(100vh-340px)] pr-1">
               <div className="space-y-3">
                 {items.map((demand) => (
                   <DemandCard key={demand.id} demand={demand} onClick={() => onSelect(demand)} />

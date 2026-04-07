@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle } from "lucide-react";
 import { DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
-import { getBusinessTimeInfo } from "@/lib/businessHours";
+import { getBusinessTimeInfo, addBusinessHours } from "@/lib/businessHours";
 
 interface ExpirationCountdownProps {
   dueDate: string;
@@ -21,13 +21,14 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = f
     );
   }
 
-  // Calculate dueDate from SLA if not provided
+  // Calculate dueDate from SLA using BUSINESS HOURS
   let effectiveDueDate = dueDate;
   if (!effectiveDueDate && priority && priority !== "sem_classificacao") {
     const config = PRIORITY_CONFIG[priority];
     if (config.sla) {
       const created = new Date(createdAt);
-      effectiveDueDate = new Date(created.getTime() + config.sla.resolutionHours * 3600000).toISOString();
+      const businessDue = addBusinessHours(created, config.sla.resolutionHours);
+      effectiveDueDate = businessDue.toISOString();
     }
   }
 
@@ -60,7 +61,6 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = f
     );
   }
 
-  // Dentro do prazo: mostra barra
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
