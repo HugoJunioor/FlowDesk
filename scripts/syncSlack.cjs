@@ -85,12 +85,16 @@ async function fetchChannelMessages(channelId, channelName) {
     });
 
     for (const msg of result.messages) {
-      // Skip non-bot messages at top level (we want workflow messages)
-      // Also include regular messages that look like demands
-      const isWorkflow = msg.subtype === 'bot_message' || msg.bot_id;
       const hasText = msg.text && msg.text.length > 20;
-
       if (!hasText) continue;
+
+      // Skip system/join/leave messages
+      const skipSubtypes = ['channel_join', 'channel_leave', 'channel_topic', 'channel_purpose', 'channel_name', 'channel_archive', 'group_join', 'group_leave'];
+      if (skipSubtypes.includes(msg.subtype)) continue;
+
+      // Skip "entrou no canal" / "joined" messages
+      const textLower = (msg.text || '').toLowerCase();
+      if (textLower.includes('entrou no canal') || textLower.includes('has joined the channel') || textLower.includes('was added to') || textLower.includes('set the channel')) continue;
 
       const resolvedText = await resolveUserMentions(msg.text || '');
       const fields = parseWorkflowMessage(resolvedText, '');
@@ -181,6 +185,7 @@ async function fetchChannelMessages(channelId, channelName) {
       }
 
       // Workflow name from bot name
+      const isWorkflow = msg.subtype === 'bot_message' || !!msg.bot_id;
       const workflow = msg.username || (isWorkflow ? 'Fluxo de Trabalho' : 'Mensagem');
 
       // Product
