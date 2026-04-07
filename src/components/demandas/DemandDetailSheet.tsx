@@ -1,12 +1,15 @@
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2 } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG } from "@/types/demand";
+import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
+import { addBusinessHours } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
 
 interface DemandDetailSheetProps {
@@ -15,18 +18,58 @@ interface DemandDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   assignees: string[];
   onAssigneeChange: (demandId: string, assignee: string | null) => void;
-  onStatusChange: (demandId: string, status: string) => void;
+  onStatusChange: (demandId: string, status: string, completedAt?: string) => void;
 }
 
 const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange }: DemandDetailSheetProps) => {
+  const [showCompleteForm, setShowCompleteForm] = useState(false);
+  const [completeDate, setCompleteDate] = useState("");
+  const [completeTime, setCompleteTime] = useState("");
+
+  // Reset form when demand changes
+  useEffect(() => {
+    setShowCompleteForm(false);
+    if (demand) {
+      const now = new Date();
+      setCompleteDate(format(now, "yyyy-MM-dd"));
+      setCompleteTime(format(now, "HH:mm"));
+    }
+  }, [demand?.id]);
+
   if (!demand) return null;
 
   const priority = PRIORITY_CONFIG[demand.priority];
   const status = STATUS_CONFIG[demand.status];
   const client = extractClientName(demand.slackChannel);
 
+  // Check if SLA is expired automatically
+  const isSlaBreach = (() => {
+    if (demand.priority === "sem_classificacao") return false;
+    if (demand.status === "concluida") return false;
+    const config = PRIORITY_CONFIG[demand.priority];
+    if (!config.sla) return false;
+    const due = addBusinessHours(new Date(demand.createdAt), config.sla.resolutionHours);
+    return new Date() > due;
+  })();
+
   const formatDate = (iso: string) =>
     format(new Date(iso), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
+
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === "concluida") {
+      setShowCompleteForm(true);
+      return;
+    }
+    setShowCompleteForm(false);
+    onStatusChange(demand.id, newStatus);
+  };
+
+  const handleConfirmComplete = () => {
+    if (!completeDate || !completeTime) return;
+    const completedAt = new Date(`${completeDate}T${completeTime}:00`).toISOString();
+    onStatusChange(demand.id, "concluida", completedAt);
+    setShowCompleteForm(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -42,6 +85,12 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             <Badge variant="secondary" className="text-[10px]">
               {demand.demandType}
             </Badge>
+            {isSlaBreach && demand.status !== "expirada" && (
+              <Badge variant="secondary" className="text-[10px] bg-destructive/10 text-destructive animate-pulse">
+                <AlertTriangle size={10} className="mr-0.5" />
+                SLA Estourado
+              </Badge>
+            )}
           </div>
           <SheetTitle className="text-lg leading-snug mt-2">
             {demand.title}
@@ -57,7 +106,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
         </SheetHeader>
 
         <div className="space-y-5">
-          {/* Countdown - only if has SLA */}
+          {/* Countdown */}
           {demand.priority !== "sem_classificacao" && demand.status !== "concluida" && (
             <div className="p-4 rounded-lg bg-muted/50">
               <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
@@ -70,7 +119,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             </div>
           )}
 
-          {/* Responsavel - editavel */}
+          {/* Responsavel */}
           <div className="p-4 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <UserCog size={14} className="text-primary" />
@@ -88,7 +137,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             </select>
           </div>
 
-          {/* Status - editavel */}
+          {/* Status */}
           <div className="p-4 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <Clock size={14} className="text-primary" />
@@ -96,14 +145,53 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             </div>
             <select
               className={`w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-medium ${status.color}`}
-              value={demand.status}
-              onChange={(e) => onStatusChange(demand.id, e.target.value)}
+              value={showCompleteForm ? "concluida" : demand.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
             >
               <option value="aberta">Aberta</option>
               <option value="em_andamento">Em andamento</option>
               <option value="concluida">Concluida</option>
               <option value="expirada">Expirada</option>
             </select>
+
+            {/* Formulario de conclusao */}
+            {showCompleteForm && (
+              <div className="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                <p className="text-xs font-medium text-success flex items-center gap-1">
+                  <CheckCircle2 size={12} />
+                  Informe a data e horario da conclusao
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[11px] text-muted-foreground">Data</label>
+                    <Input
+                      type="date"
+                      className="h-9 mt-1"
+                      value={completeDate}
+                      onChange={(e) => setCompleteDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <label className="text-[11px] text-muted-foreground">Horario</label>
+                    <Input
+                      type="time"
+                      className="h-9 mt-1"
+                      value={completeTime}
+                      onChange={(e) => setCompleteTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-8 text-xs flex-1" onClick={handleConfirmComplete}>
+                    <CheckCircle2 size={13} className="mr-1" />
+                    Confirmar Conclusao
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCompleteForm(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Descricao */}
@@ -163,7 +251,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
           </div>
 
           {demand.completedAt && (
-            <div className="space-y-1">
+            <div className="p-3 rounded-lg bg-success/5 border border-success/20">
               <p className="text-xs text-muted-foreground">Concluido em</p>
               <p className="text-sm font-medium text-success">{formatDate(demand.completedAt)}</p>
             </div>
@@ -171,7 +259,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
 
           <Separator />
 
-          {/* SLA - only if classified */}
+          {/* SLA */}
           {demand.priority !== "sem_classificacao" && priority.sla && (
             <>
               <div className="p-4 rounded-lg border border-border">
@@ -199,12 +287,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
           {demand.hasTask && demand.taskLink && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
               <Link2 size={14} className="text-muted-foreground" />
-              <a
-                href={demand.taskLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline truncate"
-              >
+              <a href={demand.taskLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate">
                 Task vinculada
               </a>
             </div>
