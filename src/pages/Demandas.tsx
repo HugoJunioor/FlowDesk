@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { mockDemands, extractClientName } from "@/data/mockDemands";
-import { SlackDemand } from "@/types/demand";
+import { SlackDemand, DemandPriority } from "@/types/demand";
+import { classifyDemand } from "@/lib/priorityClassifier";
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
@@ -21,8 +22,21 @@ const TEAM_MEMBERS = [
   "Carlos R.",
 ];
 
+// Auto-classify demands on load
+function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
+  return demands.map((d) => {
+    const classification = classifyDemand(d.title, d.description);
+    const autoClassified = { ...d, autoClassification: classification };
+    // If demand has no priority or is "sem_classificacao", apply the auto classification
+    if (d.priority === "sem_classificacao" && classification.priority !== "sem_classificacao") {
+      autoClassified.priority = classification.priority;
+    }
+    return autoClassified;
+  });
+}
+
 const Demandas = () => {
-  const [demands, setDemands] = useState<SlackDemand[]>(mockDemands);
+  const [demands, setDemands] = useState<SlackDemand[]>(() => autoClassifyDemands(mockDemands));
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
 
@@ -55,6 +69,15 @@ const Demandas = () => {
       prev && prev.id === demandId
         ? { ...prev, assignee: newAssignee ? { name: newAssignee, avatar: "" } : null }
         : prev
+    );
+  }, []);
+
+  const handlePriorityChange = useCallback((demandId: string, newPriority: DemandPriority) => {
+    setDemands((prev) =>
+      prev.map((d) => d.id === demandId ? { ...d, priority: newPriority } : d)
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId ? { ...prev, priority: newPriority } : prev
     );
   }, []);
 
@@ -215,6 +238,7 @@ const Demandas = () => {
           assignees={assignees}
           onAssigneeChange={handleAssigneeChange}
           onStatusChange={handleStatusChange}
+          onPriorityChange={handlePriorityChange}
         />
       </div>
     </AppLayout>

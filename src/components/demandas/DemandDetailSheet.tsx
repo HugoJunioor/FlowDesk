@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus } from "@/types/demand";
+import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
 import { addBusinessHours } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
@@ -19,9 +19,10 @@ interface DemandDetailSheetProps {
   assignees: string[];
   onAssigneeChange: (demandId: string, assignee: string | null) => void;
   onStatusChange: (demandId: string, status: string, completedAt?: string) => void;
+  onPriorityChange: (demandId: string, priority: DemandPriority) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange }: DemandDetailSheetProps) => {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
@@ -135,6 +136,50 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
+          </div>
+
+          {/* Prioridade - editavel */}
+          <div className="p-4 rounded-lg border border-border">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Signal size={14} className="text-primary" />
+              <p className="text-xs text-muted-foreground font-medium">Prioridade</p>
+            </div>
+            <select
+              className={`w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-medium ${priority.color}`}
+              value={demand.priority}
+              onChange={(e) => onPriorityChange(demand.id, e.target.value as DemandPriority)}
+            >
+              <option value="p1">P1 - Critico</option>
+              <option value="p2">P2 - Alta</option>
+              <option value="p3">P3 - Media</option>
+              <option value="sem_classificacao">Sem classificacao</option>
+            </select>
+
+            {/* Auto classification info */}
+            {demand.autoClassification && (
+              <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Sparkles size={12} className="text-primary" />
+                  <span className="text-[11px] font-semibold text-primary">Classificacao automatica</span>
+                  <Badge variant="secondary" className="text-[9px] ml-auto">
+                    {demand.autoClassification.confidence === "alta" ? "Alta confianca" :
+                     demand.autoClassification.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {demand.autoClassification.reason}
+                </p>
+                {demand.autoClassification.matchedKeywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {demand.autoClassification.matchedKeywords.slice(0, 5).map((kw) => (
+                      <span key={kw} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Status */}
