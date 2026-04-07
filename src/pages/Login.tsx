@@ -18,8 +18,7 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    const result = login(username, password);
+    const result = await login(username, password);
     setIsLoading(false);
     if (!result.success) {
       toast({
@@ -118,6 +117,8 @@ const Login = () => {
                         className="pl-10"
                         autoFocus
                         disabled={isLoading}
+                        maxLength={50}
+                        autoComplete="username"
                       />
                     </div>
                   </div>
@@ -133,6 +134,8 @@ const Login = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 pr-10"
                         disabled={isLoading}
+                        maxLength={100}
+                        autoComplete="current-password"
                       />
                       <button
                         type="button"

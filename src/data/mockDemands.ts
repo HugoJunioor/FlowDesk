@@ -25,7 +25,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["beneficios", "relatorio"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p1",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p1",
     replies: 4,
   },
   {
@@ -47,7 +47,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["cadastro", "cartao"],
     slackChannel: "#cliente-vspay",
-    slackPermalink: "https://wearejust-it.slack.com/archives/vspay/p5",
+    slackPermalink: "https://slack.com/app/archives/vspay/p5",
     replies: 2,
   },
   {
@@ -69,7 +69,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["beneficios", "processamento"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p8",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p8",
     replies: 7,
   },
   {
@@ -91,7 +91,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["seguranca", "fraude"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p13",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p13",
     replies: 5,
   },
 
@@ -115,7 +115,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["beneficios", "financeiro"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p2",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p2",
     replies: 2,
   },
   {
@@ -137,7 +137,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["beneficios", "bug"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p3",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p3",
     replies: 2,
   },
   {
@@ -159,7 +159,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["financeiro", "contrato"],
     slackChannel: "#cliente-vspay",
-    slackPermalink: "https://wearejust-it.slack.com/archives/vspay/p11",
+    slackPermalink: "https://slack.com/app/archives/vspay/p11",
     replies: 4,
   },
   {
@@ -181,7 +181,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["integracao", "api"],
     slackChannel: "#cliente-logimax",
-    slackPermalink: "https://wearejust-it.slack.com/archives/logimax/p14",
+    slackPermalink: "https://slack.com/app/archives/logimax/p14",
     replies: 6,
   },
 
@@ -205,7 +205,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["cadastro", "cpf"],
     slackChannel: "#cliente-vspay",
-    slackPermalink: "https://wearejust-it.slack.com/archives/vspay/p4",
+    slackPermalink: "https://slack.com/app/archives/vspay/p4",
     replies: 2,
   },
   {
@@ -227,7 +227,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["cadastro", "rede"],
     slackChannel: "#cliente-kpi",
-    slackPermalink: "https://wearejust-it.slack.com/archives/kpi/p9",
+    slackPermalink: "https://slack.com/app/archives/kpi/p9",
     replies: 3,
   },
   {
@@ -249,7 +249,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["relatorio", "financeiro"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p10",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p10",
     replies: 2,
   },
   {
@@ -271,7 +271,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["dados", "exportacao"],
     slackChannel: "#cliente-smartvale",
-    slackPermalink: "https://wearejust-it.slack.com/archives/smartvale/p15",
+    slackPermalink: "https://slack.com/app/archives/smartvale/p15",
     replies: 1,
   },
 
@@ -292,10 +292,10 @@ export const mockDemands: SlackDemand[] = [
     dueDate: null,
     completedAt: null,
     hasTask: false,
-    taskLink: "https://wearejust-it.slack.com/archives/C06UJJE47EX/p1775151702947219",
+    taskLink: "https://slack.com/app/archives/C06UJJE47EX/p1775151702947219",
     tags: ["sql", "banco"],
     slackChannel: "#cliente-vspay",
-    slackPermalink: "https://wearejust-it.slack.com/archives/vspay/p6",
+    slackPermalink: "https://slack.com/app/archives/vspay/p6",
     replies: 0,
   },
   {
@@ -314,10 +314,10 @@ export const mockDemands: SlackDemand[] = [
     dueDate: h(48),
     completedAt: null,
     hasTask: true,
-    taskLink: "https://wearejust-it.slack.com/archives/C0702V6FE2E/p1775497313802659",
+    taskLink: "https://slack.com/app/archives/C0702V6FE2E/p1775497313802659",
     tags: ["remessa", "sitef"],
     slackChannel: "#cliente-kpi",
-    slackPermalink: "https://wearejust-it.slack.com/archives/kpi/p7",
+    slackPermalink: "https://slack.com/app/archives/kpi/p7",
     replies: 2,
   },
   {
@@ -339,7 +339,7 @@ export const mockDemands: SlackDemand[] = [
     taskLink: "",
     tags: ["remessa", "sitef"],
     slackChannel: "#cliente-kpi",
-    slackPermalink: "https://wearejust-it.slack.com/archives/kpi/p12",
+    slackPermalink: "https://slack.com/app/archives/kpi/p12",
     replies: 1,
   },
 ];
