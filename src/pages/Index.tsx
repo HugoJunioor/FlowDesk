@@ -8,18 +8,60 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import {
   AlertTriangle, CheckCircle2, Clock, Inbox, Building2,
-  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle,
+  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { mockDemands, extractClientName } from "@/data/mockDemands";
-import { PRIORITY_CONFIG, SlackDemand } from "@/types/demand";
+import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween } from "@/lib/businessHours";
 
 type Period = "hoje" | "semanal" | "mensal" | "personalizado";
+type PieFilter = "all" | "p1" | "p2" | "p3";
+type BarStatusFilter = "all" | "abertas" | "concluidas" | "expiradas";
 
-const COLORS = ["hsl(var(--destructive))", "hsl(var(--warning))", "hsl(var(--info))", "hsl(var(--muted-foreground))"];
+const PIE_COLORS: Record<string, string> = { P1: "#ef4444", P2: "#f59e0b", P3: "#3b82f6" };
+const BAR_COLORS = { abertas: "#3b82f6", concluidas: "#22c55e", expiradas: "#ef4444" };
+
+const tooltipStyle: React.CSSProperties = {
+  borderRadius: "10px",
+  border: "1px solid hsl(var(--border))",
+  backgroundColor: "hsl(var(--card))",
+  color: "hsl(var(--foreground))",
+  fontSize: "12px",
+  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+  padding: "8px 12px",
+};
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  const data = payload[0];
+  return (
+    <div style={tooltipStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: data.payload.fill, display: "inline-block" }} />
+        <span style={{ fontWeight: 600 }}>{data.name}</span>
+        <span style={{ marginLeft: 4 }}>{data.value}</span>
+      </div>
+    </div>
+  );
+};
+
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={tooltipStyle}>
+      <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: 2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: p.fill, display: "inline-block" }} />
+          <span>{p.name}: {p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const [period, setPeriod] = useState<Period>("mensal");
@@ -28,6 +70,10 @@ const Dashboard = () => {
   const [toOpen, setToOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
+
+  // Chart local filters
+  const [pieFilter, setPieFilter] = useState<PieFilter>("all");
+  const [barStatusFilter, setBarStatusFilter] = useState<BarStatusFilter>("all");
 
   const clients = useMemo(() => {
     const set = new Set<string>();
@@ -51,6 +97,7 @@ const Dashboard = () => {
     }
   };
 
+  // Global filter: period + client
   const filtered = useMemo(() => {
     const range = getDateRange();
     return mockDemands.filter((d) => {
@@ -61,97 +108,104 @@ const Dashboard = () => {
     });
   }, [period, client, customFrom, customTo]);
 
-  // === METRICS ===
+  // === METRICS (from global filtered) ===
   const total = filtered.length;
   const abertas = filtered.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
   const concluidas = filtered.filter((d) => d.status === "concluida").length;
   const expiradas = filtered.filter((d) => d.status === "expirada").length;
   const p1Count = filtered.filter((d) => d.priority === "p1").length;
 
-  // SLA compliance
   const withSla = filtered.filter((d) => d.priority !== "sem_classificacao");
   const slaCompliant = withSla.filter((d) => {
+    const config = PRIORITY_CONFIG[d.priority];
+    if (!config.sla) return true;
     if (d.status === "concluida" && d.completedAt) {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config.sla) return true;
       const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
       return new Date(d.completedAt) <= due;
     }
     if (d.status === "expirada") return false;
-    if (d.status === "aberta" || d.status === "em_andamento") {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config.sla) return true;
-      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-      return new Date() <= due;
-    }
-    return true;
+    const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+    return new Date() <= due;
   });
   const slaRate = withSla.length > 0 ? Math.round((slaCompliant.length / withSla.length) * 100) : 100;
 
-  // Avg first response (mock: using replies > 0 as proxy)
   const withReplies = filtered.filter((d) => d.replies > 0);
   const avgFirstResponse = withReplies.length > 0
     ? Math.round(withReplies.reduce((sum, d) => {
         const config = PRIORITY_CONFIG[d.priority];
         if (d.priority === "sem_classificacao" || !config.sla) return sum + 30;
-        // Simulated: response time proportional to SLA
         return sum + Math.min(config.sla.resolutionHours * 60 * 0.1, 60);
       }, 0) / withReplies.length)
     : 0;
 
-  // === CHART DATA ===
-  const priorityData = [
-    { name: "P1", value: filtered.filter((d) => d.priority === "p1").length },
-    { name: "P2", value: filtered.filter((d) => d.priority === "p2").length },
-    { name: "P3", value: filtered.filter((d) => d.priority === "p3").length },
-    { name: "N/C", value: filtered.filter((d) => d.priority === "sem_classificacao").length },
-  ].filter((d) => d.value > 0);
+  // === PIE CHART DATA (exclude sem_classificacao, apply local filter) ===
+  const pieData = useMemo(() => {
+    const priorities: PieFilter[] = pieFilter === "all" ? ["p1", "p2", "p3"] : [pieFilter];
+    return priorities.map((p) => ({
+      name: p.toUpperCase(),
+      value: filtered.filter((d) => d.priority === p).length,
+      fill: PIE_COLORS[p.toUpperCase()] || "#94a3b8",
+    })).filter((d) => d.value > 0);
+  }, [filtered, pieFilter]);
 
-  const clientData = clients.map((c) => ({
-    name: c,
-    abertas: filtered.filter((d) => extractClientName(d.slackChannel) === c && (d.status === "aberta" || d.status === "em_andamento")).length,
-    concluidas: filtered.filter((d) => extractClientName(d.slackChannel) === c && d.status === "concluida").length,
-    expiradas: filtered.filter((d) => extractClientName(d.slackChannel) === c && d.status === "expirada").length,
-  })).filter((c) => c.abertas + c.concluidas + c.expiradas > 0);
+  // === BAR CHART DATA (apply local status filter) ===
+  const clientChartData = useMemo(() => {
+    return clients.map((c) => {
+      const clientDemands = filtered.filter((d) => extractClientName(d.slackChannel) === c);
+      const ab = clientDemands.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
+      const co = clientDemands.filter((d) => d.status === "concluida").length;
+      const ex = clientDemands.filter((d) => d.status === "expirada").length;
+      return {
+        name: c,
+        abertas: barStatusFilter === "all" || barStatusFilter === "abertas" ? ab : 0,
+        concluidas: barStatusFilter === "all" || barStatusFilter === "concluidas" ? co : 0,
+        expiradas: barStatusFilter === "all" || barStatusFilter === "expiradas" ? ex : 0,
+      };
+    }).filter((c) => c.abertas + c.concluidas + c.expiradas > 0);
+  }, [filtered, clients, barStatusFilter]);
 
   // SLA per client
-  const clientSlaData = clients.map((c) => {
-    const clientDemands = filtered.filter((d) => extractClientName(d.slackChannel) === c && d.priority !== "sem_classificacao");
-    const compliant = clientDemands.filter((d) => {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config.sla) return true;
-      if (d.status === "concluida" && d.completedAt) {
+  const clientSlaData = useMemo(() => {
+    return clients.map((c) => {
+      const clientDemands = filtered.filter((d) => extractClientName(d.slackChannel) === c && d.priority !== "sem_classificacao");
+      const compliant = clientDemands.filter((d) => {
+        const config = PRIORITY_CONFIG[d.priority];
+        if (!config.sla) return true;
+        if (d.status === "concluida" && d.completedAt) {
+          const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+          return new Date(d.completedAt) <= due;
+        }
+        if (d.status === "expirada") return false;
         const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-        return new Date(d.completedAt) <= due;
-      }
-      if (d.status === "expirada") return false;
-      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-      return new Date() <= due;
-    });
-    const rate = clientDemands.length > 0 ? Math.round((compliant.length / clientDemands.length) * 100) : 100;
-    return { name: c, rate, total: clientDemands.length };
-  }).filter((c) => c.total > 0);
+        return new Date() <= due;
+      });
+      const rate = clientDemands.length > 0 ? Math.round((compliant.length / clientDemands.length) * 100) : 100;
+      return { name: c, rate, total: clientDemands.length };
+    }).filter((c) => c.total > 0);
+  }, [filtered, clients]);
 
-  // Critical demands needing attention
-  const criticalDemands = filtered.filter((d) => {
-    if (d.status === "concluida") return false;
-    if (d.status === "expirada") return true;
-    if (d.priority === "p1" && (d.status === "aberta" || d.status === "em_andamento")) return true;
-    if (d.priority !== "sem_classificacao") {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (config.sla) {
-        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-        const remaining = getBusinessMinutesBetween(new Date(), due);
-        return remaining < 120; // menos de 2h uteis
+  // Critical demands
+  const criticalDemands = useMemo(() => {
+    return filtered.filter((d) => {
+      if (d.status === "concluida") return false;
+      if (d.status === "expirada") return true;
+      if (d.priority === "p1" && (d.status === "aberta" || d.status === "em_andamento")) return true;
+      if (d.priority !== "sem_classificacao") {
+        const config = PRIORITY_CONFIG[d.priority];
+        if (config.sla) {
+          const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+          const remaining = getBusinessMinutesBetween(new Date(), due);
+          return remaining < 120;
+        }
       }
-    }
-    return false;
-  }).slice(0, 5);
+      return false;
+    }).slice(0, 5);
+  }, [filtered]);
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header + filters */}
+        {/* Header + global filters */}
         <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
@@ -173,7 +227,7 @@ const Dashboard = () => {
             ))}
 
             {period === "personalizado" && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Popover open={fromOpen} onOpenChange={setFromOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 text-xs">
@@ -238,80 +292,120 @@ const Dashboard = () => {
 
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Demandas por cliente */}
+          {/* Demandas por cliente + local status filter */}
           <Card className="border border-border shadow-sm lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Building2 size={16} className="text-primary" />
-                Demandas por Cliente
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Building2 size={16} className="text-primary" />
+                  Demandas por Cliente
+                </CardTitle>
+                <div className="flex gap-1">
+                  {(["all", "abertas", "concluidas", "expiradas"] as BarStatusFilter[]).map((s) => (
+                    <Button
+                      key={s}
+                      variant={barStatusFilter === s ? "default" : "ghost"}
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={() => setBarStatusFilter(s)}
+                    >
+                      {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={clientData} barCategoryGap="15%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid hsl(var(--border))",
-                      backgroundColor: "hsl(var(--card))",
-                      color: "hsl(var(--foreground))",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="abertas" fill="hsl(var(--info))" radius={[3, 3, 0, 0]} name="Abertas" stackId="a" />
-                  <Bar dataKey="concluidas" fill="hsl(var(--success))" radius={[0, 0, 0, 0]} name="Concluidas" stackId="a" />
-                  <Bar dataKey="expiradas" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} name="Expiradas" stackId="a" />
-                </BarChart>
-              </ResponsiveContainer>
+              {clientChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={clientChartData} barCategoryGap="15%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
+                    {(barStatusFilter === "all" || barStatusFilter === "abertas") && (
+                      <Bar dataKey="abertas" fill={BAR_COLORS.abertas} radius={[3, 3, 0, 0]} name="Abertas" stackId="a" />
+                    )}
+                    {(barStatusFilter === "all" || barStatusFilter === "concluidas") && (
+                      <Bar dataKey="concluidas" fill={BAR_COLORS.concluidas} radius={[0, 0, 0, 0]} name="Concluidas" stackId="a" />
+                    )}
+                    {(barStatusFilter === "all" || barStatusFilter === "expiradas") && (
+                      <Bar dataKey="expiradas" fill={BAR_COLORS.expiradas} radius={[3, 3, 0, 0]} name="Expiradas" stackId="a" />
+                    )}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-12">Sem dados no periodo</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Distribuicao por prioridade */}
+          {/* Distribuicao por prioridade + local filter */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertTriangle size={16} className="text-warning" />
-                Por Prioridade
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-warning" />
+                  Por Prioridade
+                </CardTitle>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Filter size={14} className={pieFilter !== "all" ? "text-primary" : "text-muted-foreground"} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-36 p-2" align="end">
+                    <div className="space-y-1">
+                      {(["all", "p1", "p2", "p3"] as PieFilter[]).map((f) => (
+                        <button
+                          key={f}
+                          className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                            pieFilter === f ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
+                          }`}
+                          onClick={() => setPieFilter(f)}
+                        >
+                          {f === "all" ? "Todas" : f === "p1" ? "P1 - Critico" : f === "p2" ? "P2 - Alta" : "P3 - Media"}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={priorityData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {priorityData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              {pieData.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={75}
+                        paddingAngle={3}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {pieData.map((d, i) => (
+                          <Cell key={i} fill={d.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomPieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-wrap justify-center gap-3 mt-2">
+                    {pieData.map((d) => (
+                      <div key={d.name} className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+                        <span className="text-[11px] text-muted-foreground">{d.name}: {d.value}</span>
+                      </div>
                     ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "8px",
-                      border: "1px solid hsl(var(--border))",
-                      backgroundColor: "hsl(var(--card))",
-                      color: "hsl(var(--foreground))",
-                      fontSize: "12px",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap justify-center gap-3 mt-2">
-                {priorityData.map((d, i) => (
-                  <div key={d.name} className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                    <span className="text-[11px] text-muted-foreground">{d.name}: {d.value}</span>
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-12">Sem dados</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -364,7 +458,7 @@ const Dashboard = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="secondary" className={`text-[10px] ${pConfig.bg} ${pConfig.color}`}>
                             {pConfig.shortLabel}
                           </Badge>
@@ -399,8 +493,8 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* First response + summary row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Summary metrics row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <MessageCircle size={20} className="text-info mx-auto mb-2" />
