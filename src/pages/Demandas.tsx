@@ -58,18 +58,18 @@ const Demandas = () => {
     );
   }, []);
 
-  const handleStatusChange = useCallback((demandId: string, newStatus: string) => {
-    const now = new Date().toISOString();
+  const handleStatusChange = useCallback((demandId: string, newStatus: string, completedAt?: string) => {
+    const resolvedCompletedAt = newStatus === "concluida" ? (completedAt || new Date().toISOString()) : null;
     setDemands((prev) =>
       prev.map((d) =>
         d.id === demandId
-          ? { ...d, status: newStatus as any, completedAt: newStatus === "concluida" ? now : d.completedAt }
+          ? { ...d, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : d.completedAt }
           : d
       )
     );
     setSelected((prev) =>
       prev && prev.id === demandId
-        ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? now : prev.completedAt }
+        ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : prev.completedAt }
         : prev
     );
   }, []);
