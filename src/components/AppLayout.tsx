@@ -11,7 +11,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <AppSidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -32,7 +32,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
 
       <main
-        className={`transition-all duration-300 p-6 pt-20 lg:pt-8 animate-fade-in ${
+        className={`transition-all duration-300 p-4 sm:p-6 pt-18 lg:pt-8 animate-fade-in overflow-x-hidden ${
           collapsed ? "lg:ml-16" : "lg:ml-60"
         }`}
       >

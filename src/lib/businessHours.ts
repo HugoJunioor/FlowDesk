@@ -9,15 +9,7 @@ const MINUTES_PER_DAY = (END_HOUR - START_HOUR) * 60; // 600
 
 function isBusinessDay(date: Date): boolean {
   const day = date.getDay();
-  return day >= 1 && day <= 5; // seg=1 ... sex=5
-}
-
-function clampToBusinessHours(date: Date): Date {
-  const d = new Date(date);
-  if (!isBusinessDay(d)) return d;
-  if (d.getHours() < START_HOUR) { d.setHours(START_HOUR, 0, 0, 0); }
-  if (d.getHours() >= END_HOUR) { d.setHours(END_HOUR, 0, 0, 0); }
-  return d;
+  return day >= 1 && day <= 5;
 }
 
 function getBusinessMinutesInDay(date: Date, fromMinute: number, toMinute: number): number {
@@ -50,7 +42,7 @@ export function getBusinessMinutesBetween(start: Date, end: Date): number {
 
   let total = 0;
 
-  // First day: from start time to end of business
+  // First day
   total += getBusinessMinutesInDay(s, s.getHours() * 60 + s.getMinutes(), END_HOUR * 60);
 
   // Full days in between
@@ -69,10 +61,57 @@ export function getBusinessMinutesBetween(start: Date, end: Date): number {
     current.setDate(current.getDate() + 1);
   }
 
-  // Last day: from start of business to end time
+  // Last day
   total += getBusinessMinutesInDay(e, START_HOUR * 60, e.getHours() * 60 + e.getMinutes());
 
   return total;
+}
+
+/**
+ * Adiciona N horas UTEIS a uma data.
+ * Ex: addBusinessHours("2026-04-06T17:00", 24) = 2026-04-09T11:00
+ * (1h seg 17-18 + 10h ter + 10h qua + 3h qui 8-11 = 24h)
+ */
+export function addBusinessHours(startDate: Date, hours: number): Date {
+  let remainingMinutes = hours * 60;
+  const d = new Date(startDate);
+
+  // If outside business hours, move to next business start
+  if (!isBusinessDay(d) || d.getHours() >= END_HOUR) {
+    // Move to next day
+    d.setDate(d.getDate() + 1);
+    d.setHours(START_HOUR, 0, 0, 0);
+    while (!isBusinessDay(d)) {
+      d.setDate(d.getDate() + 1);
+    }
+  } else if (d.getHours() < START_HOUR) {
+    d.setHours(START_HOUR, 0, 0, 0);
+  }
+
+  while (remainingMinutes > 0) {
+    if (!isBusinessDay(d)) {
+      d.setDate(d.getDate() + 1);
+      d.setHours(START_HOUR, 0, 0, 0);
+      continue;
+    }
+
+    const currentMinute = d.getHours() * 60 + d.getMinutes();
+    const endOfDayMinute = END_HOUR * 60;
+    const availableToday = endOfDayMinute - currentMinute;
+
+    if (remainingMinutes <= availableToday) {
+      // Fits in today
+      d.setMinutes(d.getMinutes() + remainingMinutes);
+      remainingMinutes = 0;
+    } else {
+      // Consume rest of today, move to next day
+      remainingMinutes -= availableToday;
+      d.setDate(d.getDate() + 1);
+      d.setHours(START_HOUR, 0, 0, 0);
+    }
+  }
+
+  return d;
 }
 
 export function formatBusinessTime(minutes: number): string {
@@ -81,10 +120,12 @@ export function formatBusinessTime(minutes: number): string {
   const days = Math.floor(minutes / MINUTES_PER_DAY);
   const remainingMinutes = minutes % MINUTES_PER_DAY;
   const hours = Math.floor(remainingMinutes / 60);
-  const mins = remainingMinutes % 60;
+  const mins = Math.round(remainingMinutes % 60);
 
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
+  if (days > 0 && hours > 0) return `${days}d ${hours}h`;
+  if (days > 0) return `${days}d`;
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
   return `${mins}m`;
 }
 
@@ -101,7 +142,7 @@ export function getBusinessTimeInfo(createdAt: string, dueDate: string) {
     ? Math.min(100, Math.max(0, (elapsedBusinessMinutes / totalBusinessMinutes) * 100))
     : 100;
 
-  const isExpired = remainingBusinessMinutes <= 0 || now >= due;
+  const isExpired = remainingBusinessMinutes <= 0;
   const remainingHours = remainingBusinessMinutes / 60;
   const isCritical = !isExpired && remainingHours < 2;
   const isWarning = !isExpired && !isCritical && remainingHours < 4;
