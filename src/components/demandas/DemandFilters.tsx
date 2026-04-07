@@ -131,7 +131,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
           <span className="text-xs text-muted-foreground shrink-0">De:</span>
           <Popover open={fromOpen} onOpenChange={setFromOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-start text-xs font-normal">
+              <Button variant="outline" size="sm" className="h-9 min-w-[120px] sm:min-w-[140px] justify-start text-xs font-normal">
                 <CalendarDays size={14} className="mr-2 text-muted-foreground" />
                 {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : "Selecionar"}
               </Button>
@@ -150,7 +150,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
           <span className="text-xs text-muted-foreground shrink-0">Ate:</span>
           <Popover open={toOpen} onOpenChange={setToOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 min-w-[140px] justify-start text-xs font-normal">
+              <Button variant="outline" size="sm" className="h-9 min-w-[120px] sm:min-w-[140px] justify-start text-xs font-normal">
                 <CalendarDays size={14} className="mr-2 text-muted-foreground" />
                 {filters.dateTo ? formatDateDisplay(filters.dateTo) : "Selecionar"}
               </Button>
@@ -171,7 +171,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
       {/* Main filters row */}
       <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar demandas..."
@@ -183,7 +183,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
 
         {/* Client */}
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
           value={filters.client}
           onChange={(e) => update({ client: e.target.value })}
         >
@@ -195,7 +195,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
 
         {/* Priority */}
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
           value={filters.priority}
           onChange={(e) => update({ priority: e.target.value as DemandPriority | "all" })}
         >
@@ -208,7 +208,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
 
         {/* Status */}
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
           value={filters.status}
           onChange={(e) => update({ status: e.target.value as DemandStatus | "all" })}
         >
@@ -221,7 +221,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
 
         {/* Assignee */}
         <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
           value={filters.assignee}
           onChange={(e) => update({ assignee: e.target.value })}
         >

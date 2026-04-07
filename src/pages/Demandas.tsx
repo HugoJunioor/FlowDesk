@@ -16,12 +16,7 @@ import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
-const TEAM_MEMBERS = [
-  "Maria S.",
-  "Joao P.",
-  "Ana L.",
-  "Carlos R.",
-];
+const TEAM_MEMBERS: string[] = [];
 
 // Auto-verify and reclassify demands that already have priority (P1/P2/P3)
 // Demands "sem_classificacao" are left untouched
@@ -222,18 +217,18 @@ const Demandas = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="kanban">
-          <TabsList className="mb-4">
-            <TabsTrigger value="kanban" className="gap-1.5 text-xs">
-              <LayoutGrid size={14} /> Visao Geral
+          <TabsList className="mb-4 w-full sm:w-auto flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="kanban" className="gap-1 text-[11px] sm:text-xs px-2 sm:px-3">
+              <LayoutGrid size={14} /> <span className="hidden sm:inline">Visao</span> Geral
             </TabsTrigger>
-            <TabsTrigger value="date" className="gap-1.5 text-xs">
-              <Calendar size={14} /> Por Data
+            <TabsTrigger value="date" className="gap-1 text-[11px] sm:text-xs px-2 sm:px-3">
+              <Calendar size={14} /> <span className="hidden sm:inline">Por</span> Data
             </TabsTrigger>
-            <TabsTrigger value="priority" className="gap-1.5 text-xs">
-              <Signal size={14} /> Por Prioridade
+            <TabsTrigger value="priority" className="gap-1 text-[11px] sm:text-xs px-2 sm:px-3">
+              <Signal size={14} /> <span className="hidden sm:inline">Por</span> Prior.
             </TabsTrigger>
-            <TabsTrigger value="assignee" className="gap-1.5 text-xs">
-              <Users size={14} /> Por Responsavel
+            <TabsTrigger value="assignee" className="gap-1 text-[11px] sm:text-xs px-2 sm:px-3">
+              <Users size={14} /> <span className="hidden sm:inline">Por</span> Resp.
             </TabsTrigger>
           </TabsList>
 

@@ -216,7 +216,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                       onChange={(e) => setCompleteDate(e.target.value)}
                     />
                   </div>
-                  <div className="w-28">
+                  <div className="w-24 sm:w-28">
                     <label className="text-[11px] text-muted-foreground">Horario</label>
                     <Input
                       type="time"
@@ -295,7 +295,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
           <Separator />
 
           {/* Detalhes */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <MessageSquare size={12} /> Solicitante
