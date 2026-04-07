@@ -7,8 +7,12 @@ import { Separator } from "@/components/ui/separator";
 import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority } from "@/types/demand";
-import { extractClientName } from "@/data/mockDemands";
+import {
+  SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority,
+  ClosureFields, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, SUPPORT_LEVEL_OPTIONS,
+  DemandCategory, ExpirationReason, SupportLevel,
+} from "@/types/demand";
+import { extractClientName } from "@/data/demandsLoader";
 import { addBusinessHours } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
 
@@ -21,9 +25,10 @@ interface DemandDetailSheetProps {
   onStatusChange: (demandId: string, status: string, completedAt?: string) => void;
   onPriorityChange: (demandId: string, priority: DemandPriority) => void;
   onAddAssignee: (name: string) => void;
+  onClosureChange: (demandId: string, closure: Partial<ClosureFields>) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee, onClosureChange }: DemandDetailSheetProps) => {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
@@ -433,6 +438,98 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               <Separator />
             </>
           )}
+
+          {/* Closure fields */}
+          {(demand.status === "concluida" || demand.status === "expirada" || demand.status === "em_andamento") && (
+            <div className="p-4 rounded-lg border border-border space-y-3">
+              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Layers size={14} className="text-primary" />
+                Campos de fechamento
+              </p>
+
+              {/* Categoria */}
+              <div>
+                <label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Categoria
+                  {demand.closure?.autoFilled?.category && (
+                    <Sparkles size={10} className="text-primary" />
+                  )}
+                </label>
+                <select
+                  className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                  value={demand.closure?.category || ""}
+                  onChange={(e) => onClosureChange(demand.id, { category: e.target.value as DemandCategory })}
+                >
+                  <option value="">Selecionar...</option>
+                  {CATEGORY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nivel de suporte */}
+              <div>
+                <label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  Nivel de suporte
+                  {demand.closure?.autoFilled?.supportLevel && (
+                    <Sparkles size={10} className="text-primary" />
+                  )}
+                </label>
+                <select
+                  className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                  value={demand.closure?.supportLevel || ""}
+                  onChange={(e) => onClosureChange(demand.id, { supportLevel: e.target.value as SupportLevel })}
+                >
+                  <option value="">Selecionar...</option>
+                  {SUPPORT_LEVEL_OPTIONS.map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Motivo de expiracao - so aparece quando SLA expirado */}
+              {(demand.status === "expirada" || (() => {
+                if (demand.priority === "sem_classificacao") return false;
+                const cfg = PRIORITY_CONFIG[demand.priority];
+                if (!cfg.sla) return false;
+                const due = addBusinessHours(new Date(demand.createdAt), cfg.sla.resolutionHours);
+                return new Date() > due;
+              })()) && (
+                <div>
+                  <label className="text-[11px] text-destructive flex items-center gap-1">
+                    Motivo de expiracao (SLA estourado)
+                    {demand.closure?.autoFilled?.expirationReason && (
+                      <Sparkles size={10} className="text-primary" />
+                    )}
+                  </label>
+                  <select
+                    className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                    value={demand.closure?.expirationReason || ""}
+                    onChange={(e) => onClosureChange(demand.id, { expirationReason: e.target.value as ExpirationReason })}
+                  >
+                    <option value="">Selecionar...</option>
+                    {EXPIRATION_REASON_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Comentario interno */}
+              <div>
+                <label className="text-[11px] text-muted-foreground">Comentario interno</label>
+                <textarea
+                  className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-none"
+                  rows={2}
+                  placeholder="Observacoes internas sobre a demanda..."
+                  value={demand.closure?.internalComment || ""}
+                  onChange={(e) => onClosureChange(demand.id, { internalComment: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <Separator />
 
           {/* Task link */}
           {demand.hasTask && demand.taskLink && (

@@ -4,9 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { baseDemands, extractClientName } from "@/data/demandsLoader";
-import { SlackDemand, DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
+import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
+import { classifyClosureFields, generateBlankFieldsReport } from "@/lib/closureClassifier";
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
@@ -24,6 +25,7 @@ type DemandOverride = {
   assignee?: string | null;
   completedAt?: string | null;
   manualStatusOverride?: boolean;
+  closure?: Partial<ClosureFields>;
 };
 
 function loadOverrides(): Record<string, DemandOverride> {
@@ -61,14 +63,24 @@ function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
       assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
       completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
       manualStatusOverride: ov.manualStatusOverride || d.manualStatusOverride,
+      closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
     };
   });
 }
 
-// Auto-verify and reclassify demands that already have priority (P1/P2/P3)
-// Demands "sem_classificacao" are left untouched
+// Auto-verify and reclassify demands
 function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
+    // Rule: Remessa SITEF → Hugo Cordeiro Junior, P3
+    const titleLower = d.title.toLowerCase();
+    if (d.workflow.toLowerCase().includes("remessa") || titleLower.includes("remessa sitef") || titleLower.includes("remessa tef")) {
+      return { ...d, assignee: { name: "Hugo Cordeiro Junior", avatar: "" }, priority: "p3" as const };
+    }
+    // Rule: Conciliação → Daniel Bichof, P3
+    if (titleLower.includes("concilia") || titleLower.includes("nova concilia")) {
+      return { ...d, assignee: { name: "Daniel Bichof", avatar: "" }, priority: "p3" as const };
+    }
+
     // Skip demands without classification - don't touch them
     if (d.priority === "sem_classificacao") return d;
 
@@ -99,7 +111,12 @@ const Demandas = () => {
   const [demands, setDemands] = useState<SlackDemand[]>(() => {
     const classified = autoClassifyDemands(baseDemands);
     const analyzed = processDemandsStatus(classified);
-    return applyOverrides(analyzed);
+    // Auto-fill closure fields
+    const withClosure = analyzed.map((d) => ({
+      ...d,
+      closure: d.closure || classifyClosureFields(d),
+    }));
+    return applyOverrides(withClosure);
   });
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
@@ -181,6 +198,25 @@ const Demandas = () => {
     saveOverrides(overrides);
   }, []);
 
+  const handleClosureChange = useCallback((demandId: string, partial: Partial<ClosureFields>) => {
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId
+          ? { ...d, closure: { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...partial } as ClosureFields }
+          : d
+      )
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId
+        ? { ...prev, closure: { ...(prev.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...partial } as ClosureFields }
+        : prev
+    );
+    const overrides = loadOverrides();
+    const existing = overrides[demandId] || {};
+    overrides[demandId] = { ...existing, closure: { ...(existing as any).closure, ...partial } };
+    saveOverrides(overrides);
+  }, []);
+
   const handleStatClick = useCallback((statKey: string) => {
     setFilters((prev) => ({
       ...EMPTY_FILTERS,
@@ -236,6 +272,12 @@ const Demandas = () => {
 
       // Assignee
       if (filters.assignee && d.assignee?.name !== filters.assignee) return false;
+
+      // Category
+      if (filters.category !== "all" && d.closure?.category !== filters.category) return false;
+
+      // Support Level
+      if (filters.supportLevel !== "all" && d.closure?.supportLevel !== filters.supportLevel) return false;
 
       // Client
       if (filters.client && extractClientName(d.slackChannel) !== filters.client) return false;
@@ -324,6 +366,7 @@ const Demandas = () => {
           onStatusChange={handleStatusChange}
           onPriorityChange={handlePriorityChange}
           onAddAssignee={handleAddAssignee}
+          onClosureChange={handleClosureChange}
         />
       </div>
     </AppLayout>
