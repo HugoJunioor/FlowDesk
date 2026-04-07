@@ -26,7 +26,7 @@ async function hashString(str: string): Promise<string> {
 // Pre-hashed credentials (SHA-256 of "master" and "1")
 // To change: run in console: crypto.subtle.digest('SHA-256', new TextEncoder().encode('yourpassword')).then(b => Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join(''))
 const VALID_CREDENTIALS = {
-  usernameHash: "ee021d9e0cb36e30caed0017af4a4990f1b8b0f0cedd9a1a5e29cce15fae6e73", // SHA-256 of "master"
+  usernameHash: "fc613b4dfd6736a7bd268c8a0e74ed0d1c04a959f59dd74ef2874983fd443fc9", // SHA-256 of "master"
   passwordHash: "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b", // SHA-256 of "1"
 };
 
