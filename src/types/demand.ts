@@ -28,6 +28,12 @@ export interface SlackDemand {
   slackChannel: string;
   slackPermalink: string;
   replies: number;
+  autoClassification?: {
+    priority: DemandPriority;
+    confidence: "alta" | "media" | "baixa";
+    reason: string;
+    matchedKeywords: string[];
+  };
 }
 
 export const PRIORITY_CONFIG = {

@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Building2, MessageCircle, Clock } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ExternalLink, Building2, MessageCircle, Clock, Info, Sparkles } from "lucide-react";
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
 import { format } from "date-fns";
@@ -23,7 +24,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
       onClick={onClick}
     >
       <CardContent className="p-4">
-        {/* Header: title + assignee avatar */}
+        {/* Header: title + info icon + assignee avatar */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
@@ -31,11 +32,62 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
             </h3>
             <p className="text-[11px] text-muted-foreground mt-0.5">{demand.workflow}</p>
           </div>
-          {demand.assignee && (
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold shrink-0">
-              {demand.assignee.name.split(" ").map((n) => n[0]).join("")}
-            </div>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Info icon with classification popover */}
+            {demand.autoClassification && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Info size={14} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-72 p-3"
+                  align="end"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles size={12} className="text-primary" />
+                      <span className="text-xs font-semibold text-primary">Classificacao automatica</span>
+                    </div>
+                    <Badge variant="secondary" className={`text-[10px] ${PRIORITY_CONFIG[demand.autoClassification.priority].bg} ${PRIORITY_CONFIG[demand.autoClassification.priority].color}`}>
+                      {PRIORITY_CONFIG[demand.autoClassification.priority].label}
+                    </Badge>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {demand.autoClassification.reason}
+                    </p>
+                    {demand.autoClassification.matchedKeywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {demand.autoClassification.matchedKeywords.slice(0, 4).map((kw) => (
+                          <span key={kw} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1 pt-1 border-t border-border">
+                      <span className="text-[10px] text-muted-foreground">Confianca:</span>
+                      <span className={`text-[10px] font-medium ${
+                        demand.autoClassification.confidence === "alta" ? "text-success" :
+                        demand.autoClassification.confidence === "media" ? "text-warning" : "text-muted-foreground"
+                      }`}>
+                        {demand.autoClassification.confidence}
+                      </span>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            {demand.assignee && (
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
+                {demand.assignee.name.split(" ").map((n) => n[0]).join("")}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Client + date */}
@@ -72,7 +124,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
             </Badge>
           </div>
 
-          {/* Countdown - only if has SLA */}
+          {/* Countdown */}
           {demand.priority !== "sem_classificacao" && demand.status !== "concluida" && demand.status !== "expirada" && (
             <ExpirationCountdown
               dueDate={demand.dueDate || ""}
