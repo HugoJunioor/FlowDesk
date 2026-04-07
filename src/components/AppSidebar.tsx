@@ -56,21 +56,30 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
       >
         {/* Logo */}
         <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
-          <Workflow size={22} className="text-sidebar-primary shrink-0" />
-          {!collapsed && (
-            <span className="ml-2.5 text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
-              FlowDesk
-            </span>
+          {collapsed ? (
+            <button
+              onClick={() => setCollapsed(false)}
+              className="mx-auto text-sidebar-primary hover:text-sidebar-primary-foreground transition-colors p-1.5 rounded-md hover:bg-sidebar-accent"
+            >
+              <Workflow size={22} />
+            </button>
+          ) : (
+            <>
+              <Workflow size={22} className="text-sidebar-primary shrink-0" />
+              <span className="ml-2.5 text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
+                FlowDesk
+              </span>
+              <button
+                onClick={() => {
+                  if (mobileOpen) setMobileOpen(false);
+                  else setCollapsed(true);
+                }}
+                className="ml-auto text-sidebar-muted hover:text-sidebar-foreground transition-colors p-1 rounded-md hover:bg-sidebar-accent"
+              >
+                {mobileOpen ? <X size={18} /> : <ChevronLeft size={18} />}
+              </button>
+            </>
           )}
-          <button
-            onClick={() => {
-              if (mobileOpen) setMobileOpen(false);
-              else setCollapsed(!collapsed);
-            }}
-            className="ml-auto text-sidebar-muted hover:text-sidebar-foreground transition-colors p-1 rounded-md hover:bg-sidebar-accent"
-          >
-            {mobileOpen ? <X size={18} /> : collapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
-          </button>
         </div>
 
         {/* Navigation */}
