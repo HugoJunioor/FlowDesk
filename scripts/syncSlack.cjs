@@ -127,11 +127,18 @@ async function fetchChannelMessages(channelId, channelName) {
             const authorName = reply.user ? await getUserName(reply.user) : (reply.username || 'Bot');
             const isTeam = reply.user ? await isTeamMember(reply.user) : false;
             const replyText = await resolveUserMentions(reply.text || '');
+
+            // Check for ✅ reaction on this reply
+            const hasCheckReaction = (reply.reactions || []).some(r =>
+              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+            );
+
             threadReplies.push({
               author: authorName,
-              text: replyText,
+              text: hasCheckReaction ? `${replyText} [✅ Reacao de conclusao]` : replyText,
               timestamp: new Date(parseFloat(reply.ts) * 1000).toISOString(),
               isTeamMember: isTeam,
+              hasCheckReaction,
             });
           }
         } catch (e) {

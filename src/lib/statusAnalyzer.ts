@@ -94,6 +94,16 @@ export function analyzeThreadStatus(demand: SlackDemand): StatusAnalysisResult |
   for (let i = allReplies.length - 1; i >= 0; i--) {
     const reply = allReplies[i];
 
+    // Caso 0: Check reaction ✅ = conclusao definitiva
+    if (reply.hasCheckReaction && reply.isTeamMember) {
+      return {
+        suggestedStatus: "concluida",
+        reason: `Concluida via reacao ✅ na mensagem de ${reply.author}. Data: ${new Date(reply.timestamp).toLocaleString("pt-BR")}.`,
+        confidence: "alta",
+        detectedAt: reply.timestamp,
+      };
+    }
+
     // Caso 1: Ultima msg e da equipe com padrao de resolucao
     if (reply.isTeamMember) {
       const resolvedMatches = matchPatterns(reply.text, RESOLVED_PATTERNS);

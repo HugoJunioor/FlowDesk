@@ -54,6 +54,7 @@ export interface ThreadReply {
   text: string;
   timestamp: string;
   isTeamMember: boolean;
+  hasCheckReaction?: boolean;
 }
 
 export interface ClosureFields {

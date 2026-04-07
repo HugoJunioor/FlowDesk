@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { baseDemands, extractClientName } from "@/data/demandsLoader";
-import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason } from "@/types/demand";
+import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import { classifyClosureFields, generateBlankFieldsReport } from "@/lib/closureClassifier";
@@ -121,6 +121,9 @@ const Demandas = () => {
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [customAssignees, setCustomAssignees] = useState<string[]>(loadCustomAssignees);
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("fd_custom_categories") || "[]"); } catch { return []; }
+  });
 
   const assignees = useMemo(() => {
     const set = new Set<string>(customAssignees);
@@ -130,11 +133,26 @@ const Demandas = () => {
     return Array.from(set).sort();
   }, [demands, customAssignees]);
 
+  const allCategories = useMemo(() => {
+    const base = [...CATEGORY_OPTIONS];
+    customCategories.forEach((c) => { if (!base.includes(c as any)) base.push(c as any); });
+    return base;
+  }, [customCategories]);
+
   const handleAddAssignee = useCallback((name: string) => {
     setCustomAssignees((prev) => {
       if (prev.includes(name)) return prev;
       const updated = [...prev, name];
       saveCustomAssignees(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleAddCategory = useCallback((name: string) => {
+    setCustomCategories((prev) => {
+      if (prev.includes(name)) return prev;
+      const updated = [...prev, name];
+      localStorage.setItem("fd_custom_categories", JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -367,6 +385,8 @@ const Demandas = () => {
           onPriorityChange={handlePriorityChange}
           onAddAssignee={handleAddAssignee}
           onClosureChange={handleClosureChange}
+          categories={allCategories}
+          onAddCategory={handleAddCategory}
         />
       </div>
     </AppLayout>
