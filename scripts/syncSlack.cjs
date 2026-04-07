@@ -88,6 +88,11 @@ async function fetchChannelMessages(channelId, channelName) {
       const hasText = msg.text && msg.text.length > 20;
       if (!hasText) continue;
 
+      // ONLY import workflow/bot messages (Fluxo de Trabalho)
+      // Skip regular user messages, system messages, etc.
+      const isWorkflowMessage = (msg.subtype === 'bot_message' || !!msg.bot_id) && msg.username;
+      if (!isWorkflowMessage) continue;
+
       // Skip system/join/leave messages
       const skipSubtypes = ['channel_join', 'channel_leave', 'channel_topic', 'channel_purpose', 'channel_name', 'channel_archive', 'group_join', 'group_leave'];
       if (skipSubtypes.includes(msg.subtype)) continue;
