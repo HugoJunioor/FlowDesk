@@ -23,7 +23,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
       className={`border border-border shadow-sm hover:shadow-md transition-all cursor-pointer border-l-[3px] ${priority.border}`}
       onClick={onClick}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-3 sm:p-4 overflow-hidden">
         {/* Header: title + info icon + assignee avatar */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
