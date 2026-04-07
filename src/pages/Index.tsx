@@ -267,7 +267,7 @@ const Dashboard = () => {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           {[
             { title: "Total", value: total, icon: BarChart3, color: "text-foreground", bg: "bg-muted" },
             { title: "Abertas", value: abertas, icon: Inbox, color: "text-primary", bg: "bg-primary/10" },
@@ -277,7 +277,7 @@ const Dashboard = () => {
             { title: "SLA %", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= 80 ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= 80 ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
           ].map((kpi) => (
             <Card key={kpi.title} className="border border-border shadow-sm">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`p-1.5 rounded-lg ${kpi.bg}`}>
                     <kpi.icon size={14} className={kpi.color} />
@@ -291,7 +291,7 @@ const Dashboard = () => {
         </div>
 
         {/* Charts row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Demandas por cliente + local status filter */}
           <Card className="border border-border shadow-sm lg:col-span-2">
             <CardHeader className="pb-2">
@@ -411,7 +411,7 @@ const Dashboard = () => {
         </div>
 
         {/* Bottom row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* SLA por cliente */}
           <Card className="border border-border shadow-sm">
             <CardHeader className="pb-2">
@@ -494,7 +494,7 @@ const Dashboard = () => {
         </div>
 
         {/* Summary metrics row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <MessageCircle size={20} className="text-info mx-auto mb-2" />

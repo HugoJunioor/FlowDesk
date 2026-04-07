@@ -12,7 +12,7 @@ const Configuracoes = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-3xl mx-auto">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Configuracoes</h1>
           <p className="text-muted-foreground text-sm mt-1">Ajustes e preferencias do sistema</p>

@@ -46,7 +46,7 @@ const DemandByDate = ({ demands, onSelect }: DemandByDateProps) => {
             </div>
 
             {/* Cards grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {items.map((demand) => (
                 <DemandCard key={demand.id} demand={demand} onClick={() => onSelect(demand)} />
               ))}

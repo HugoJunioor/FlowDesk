@@ -41,7 +41,7 @@ const DemandByAssignee = ({ demands, onSelect }: DemandByAssigneeProps) => {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-foreground">{assignee}</h3>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-1 sm:gap-2 mt-0.5 flex-wrap">
                   <span className="text-[11px] text-muted-foreground">{items.length} total</span>
                   {openCount > 0 && (
                     <Badge variant="secondary" className="text-[10px] bg-info/10 text-info">
@@ -58,7 +58,7 @@ const DemandByAssignee = ({ demands, onSelect }: DemandByAssigneeProps) => {
             </div>
 
             {/* Cards grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {items.map((demand) => (
                 <DemandCard key={demand.id} demand={demand} onClick={() => onSelect(demand)} />
               ))}

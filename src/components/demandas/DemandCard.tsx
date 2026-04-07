@@ -49,7 +49,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="w-72 p-3"
+                  className="w-[85vw] sm:w-72 p-3"
                   align="end"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -96,7 +96,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
         </div>
 
         {/* Client + date */}
-        <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 sm:gap-3 mt-2 text-[11px] text-muted-foreground flex-wrap">
           <span className="flex items-center gap-0.5 text-primary/80 font-medium">
             <Building2 size={10} />
             {client}

@@ -12,7 +12,7 @@ const columns: DemandStatus[] = ["aberta", "em_andamento", "concluida", "expirad
 
 const DemandKanban = ({ demands, onSelect }: DemandKanbanProps) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
       {columns.map((col) => {
         const items = demands.filter((d) => d.status === col);
         const config = STATUS_CONFIG[col];
@@ -25,7 +25,7 @@ const DemandKanban = ({ demands, onSelect }: DemandKanbanProps) => {
             </div>
 
             {/* Cards */}
-            <ScrollArea className="h-auto max-h-[calc(100vh-340px)] lg:h-[calc(100vh-340px)] pr-1">
+            <ScrollArea className="h-auto max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-320px)] lg:h-[calc(100vh-340px)] pr-1">
               <div className="space-y-3">
                 {items.map((demand) => (
                   <DemandCard key={demand.id} demand={demand} onClick={() => onSelect(demand)} />
