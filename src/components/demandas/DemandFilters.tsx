@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Search, X, CalendarDays } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DemandPriority, DemandStatus } from "@/types/demand";
+import { DemandPriority, DemandStatus, DemandCategory, SupportLevel, CATEGORY_OPTIONS, SUPPORT_LEVEL_OPTIONS } from "@/types/demand";
 
 export type PeriodPreset = "hoje" | "semanal" | "mensal" | "personalizado" | "";
 
@@ -18,6 +18,8 @@ export interface DemandFilterState {
   client: string;
   dateFrom: string;
   dateTo: string;
+  category: DemandCategory | "all";
+  supportLevel: SupportLevel | "all";
   statFilter: string;
   periodPreset: PeriodPreset;
 }
@@ -30,6 +32,8 @@ export const EMPTY_FILTERS: DemandFilterState = {
   client: "",
   dateFrom: "",
   dateTo: "",
+  category: "all",
+  supportLevel: "all",
   statFilter: "",
   periodPreset: "",
 };
@@ -94,6 +98,8 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
     filters.client ||
     filters.dateFrom ||
     filters.dateTo ||
+    filters.category !== "all" ||
+    filters.supportLevel !== "all" ||
     filters.statFilter ||
     filters.periodPreset;
 
@@ -228,6 +234,30 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
           <option value="">Responsavel</option>
           {assignees.map((a) => (
             <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+
+        {/* Category */}
+        <select
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          value={filters.category}
+          onChange={(e) => update({ category: e.target.value as DemandCategory | "all" })}
+        >
+          <option value="all">Categoria</option>
+          {CATEGORY_OPTIONS.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
+        {/* Support Level */}
+        <select
+          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
+          value={filters.supportLevel}
+          onChange={(e) => update({ supportLevel: e.target.value as SupportLevel | "all" })}
+        >
+          <option value="all">Nivel</option>
+          {SUPPORT_LEVEL_OPTIONS.map((l) => (
+            <option key={l} value={l}>{l}</option>
           ))}
         </select>
 
