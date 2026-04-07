@@ -239,6 +239,53 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             )}
           </div>
 
+          {/* Status analysis */}
+          {demand.statusAnalysis && (
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Sparkles size={12} className="text-primary" />
+                <span className="text-[11px] font-semibold text-primary">Deteccao automatica de status</span>
+                <Badge variant="secondary" className="text-[9px] ml-auto">
+                  {demand.statusAnalysis.confidence === "alta" ? "Alta confianca" :
+                   demand.statusAnalysis.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {demand.statusAnalysis.reason}
+              </p>
+              {demand.manualStatusOverride && (
+                <p className="text-[10px] text-warning mt-1 flex items-center gap-1">
+                  <Info size={10} /> Status foi alterado manualmente (override)
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Thread replies timeline */}
+          {demand.threadReplies.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground font-medium mb-2">Respostas da thread ({demand.threadReplies.length})</p>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {demand.threadReplies.map((reply, i) => (
+                  <div key={i} className={`p-2.5 rounded-lg text-[11px] ${reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"}`}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
+                        {reply.author}
+                        {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed">{reply.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
           {/* Descricao */}
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-1.5">Descricao</p>

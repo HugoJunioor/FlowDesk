@@ -7,6 +7,13 @@ export interface SlackUser {
   avatar: string;
 }
 
+export interface ThreadReply {
+  author: string;
+  text: string;
+  timestamp: string;
+  isTeamMember: boolean;
+}
+
 export interface SlackDemand {
   id: string;
   title: string;
@@ -28,6 +35,19 @@ export interface SlackDemand {
   slackChannel: string;
   slackPermalink: string;
   replies: number;
+  threadReplies: ThreadReply[];
+  lastTeamReply?: {
+    author: string;
+    text: string;
+    timestamp: string;
+  };
+  statusAnalysis?: {
+    suggestedStatus: DemandStatus;
+    reason: string;
+    confidence: "alta" | "media" | "baixa";
+    detectedAt: string;
+  };
+  manualStatusOverride?: boolean;
   autoClassification?: {
     priority: DemandPriority;
     confidence: "alta" | "media" | "baixa";
