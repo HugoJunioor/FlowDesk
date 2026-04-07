@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+# Real Slack data (company data - never commit)
+src/data/realDemands.ts

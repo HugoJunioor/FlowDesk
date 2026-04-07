@@ -13,7 +13,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { mockDemands, extractClientName } from "@/data/mockDemands";
+import { baseDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween } from "@/lib/businessHours";
 
@@ -77,7 +77,7 @@ const Dashboard = () => {
 
   const clients = useMemo(() => {
     const set = new Set<string>();
-    mockDemands.forEach((d) => {
+    baseDemands.forEach((d) => {
       const c = extractClientName(d.slackChannel);
       if (c !== d.slackChannel) set.add(c);
     });
@@ -100,7 +100,7 @@ const Dashboard = () => {
   // Global filter: period + client
   const filtered = useMemo(() => {
     const range = getDateRange();
-    return mockDemands.filter((d) => {
+    return baseDemands.filter((d) => {
       const created = new Date(d.createdAt);
       if (created < range.from || created > range.to) return false;
       if (client && extractClientName(d.slackChannel) !== client) return false;

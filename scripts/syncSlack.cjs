@@ -296,8 +296,8 @@ export function extractClientName(channel: string): string {
 }
 `;
 
-  fs.writeFileSync(path.join(__dirname, '..', 'src', 'data', 'mockDemands.ts'), output);
-  console.log('\nArquivo src/data/mockDemands.ts atualizado com dados reais!');
+  fs.writeFileSync(path.join(__dirname, '..', 'src', 'data', 'realDemands.ts'), output);
+  console.log('\nArquivo src/data/realDemands.ts atualizado com dados reais (gitignored)!');
 }
 
 main().catch(console.error);
