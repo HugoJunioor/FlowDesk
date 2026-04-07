@@ -3,7 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
-import { mockDemands, extractClientName } from "@/data/mockDemands";
+import { baseDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
@@ -16,18 +16,53 @@ import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
-// Load custom assignees from localStorage
+// === LOCAL PERSISTENCE ===
+// Overrides: { [demandId]: { status?, priority?, assignee?, completedAt? } }
+type DemandOverride = {
+  status?: string;
+  priority?: string;
+  assignee?: string | null;
+  completedAt?: string | null;
+  manualStatusOverride?: boolean;
+};
+
+function loadOverrides(): Record<string, DemandOverride> {
+  try {
+    const stored = localStorage.getItem("fd_demand_overrides");
+    return stored ? JSON.parse(stored) : {};
+  } catch { return {}; }
+}
+
+function saveOverrides(overrides: Record<string, DemandOverride>) {
+  localStorage.setItem("fd_demand_overrides", JSON.stringify(overrides));
+}
+
 function loadCustomAssignees(): string[] {
   try {
     const stored = localStorage.getItem("fd_custom_assignees");
     return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function saveCustomAssignees(assignees: string[]) {
   localStorage.setItem("fd_custom_assignees", JSON.stringify(assignees));
+}
+
+// Apply saved overrides to demands
+function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
+  const overrides = loadOverrides();
+  return demands.map((d) => {
+    const ov = overrides[d.id];
+    if (!ov) return d;
+    return {
+      ...d,
+      status: (ov.status as any) || d.status,
+      priority: (ov.priority as any) || d.priority,
+      assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
+      completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
+      manualStatusOverride: ov.manualStatusOverride || d.manualStatusOverride,
+    };
+  });
 }
 
 // Auto-verify and reclassify demands that already have priority (P1/P2/P3)
@@ -62,8 +97,9 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
 
 const Demandas = () => {
   const [demands, setDemands] = useState<SlackDemand[]>(() => {
-    const classified = autoClassifyDemands(mockDemands);
-    return processDemandsStatus(classified);
+    const classified = autoClassifyDemands(baseDemands);
+    const analyzed = processDemandsStatus(classified);
+    return applyOverrides(analyzed);
   });
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
@@ -108,6 +144,10 @@ const Demandas = () => {
         ? { ...prev, assignee: newAssignee ? { name: newAssignee, avatar: "" } : null }
         : prev
     );
+    // Persist
+    const overrides = loadOverrides();
+    overrides[demandId] = { ...overrides[demandId], assignee: newAssignee };
+    saveOverrides(overrides);
   }, []);
 
   const handlePriorityChange = useCallback((demandId: string, newPriority: DemandPriority) => {
@@ -117,6 +157,9 @@ const Demandas = () => {
     setSelected((prev) =>
       prev && prev.id === demandId ? { ...prev, priority: newPriority } : prev
     );
+    const overrides = loadOverrides();
+    overrides[demandId] = { ...overrides[demandId], priority: newPriority };
+    saveOverrides(overrides);
   }, []);
 
   const handleStatusChange = useCallback((demandId: string, newStatus: string, completedAt?: string) => {
@@ -133,6 +176,9 @@ const Demandas = () => {
         ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : prev.completedAt, manualStatusOverride: true }
         : prev
     );
+    const overrides = loadOverrides();
+    overrides[demandId] = { ...overrides[demandId], status: newStatus, manualStatusOverride: true, completedAt: resolvedCompletedAt };
+    saveOverrides(overrides);
   }, []);
 
   const handleStatClick = useCallback((statKey: string) => {
