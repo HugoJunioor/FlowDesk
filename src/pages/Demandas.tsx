@@ -6,6 +6,7 @@ import { differenceInHours } from "date-fns";
 import { mockDemands, extractClientName } from "@/data/mockDemands";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
+import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
@@ -53,7 +54,10 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
 }
 
 const Demandas = () => {
-  const [demands, setDemands] = useState<SlackDemand[]>(() => autoClassifyDemands(mockDemands));
+  const [demands, setDemands] = useState<SlackDemand[]>(() => {
+    const classified = autoClassifyDemands(mockDemands);
+    return processDemandsStatus(classified);
+  });
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
 
@@ -103,13 +107,13 @@ const Demandas = () => {
     setDemands((prev) =>
       prev.map((d) =>
         d.id === demandId
-          ? { ...d, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : d.completedAt }
+          ? { ...d, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : d.completedAt, manualStatusOverride: true }
           : d
       )
     );
     setSelected((prev) =>
       prev && prev.id === demandId
-        ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : prev.completedAt }
+        ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : prev.completedAt, manualStatusOverride: true }
         : prev
     );
   }, []);

@@ -113,12 +113,25 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
           )}
         </div>
 
+        {/* Last team reply */}
+        {demand.lastTeamReply && (
+          <div className="mt-2 p-2 rounded bg-muted/40 text-[11px] text-muted-foreground">
+            <span className="font-medium text-foreground">{demand.lastTeamReply.author}:</span>{" "}
+            <span className="line-clamp-1">{demand.lastTeamReply.text}</span>
+          </div>
+        )}
+
         {/* Badges: status + priority + type */}
         <div className="mt-3 pt-3 border-t border-border space-y-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <Badge variant="secondary" className={`text-[10px] ${status.bg} ${status.color}`}>
               {status.label}
             </Badge>
+            {demand.statusAnalysis && !demand.manualStatusOverride && (
+              <Badge variant="secondary" className="text-[9px] bg-primary/10 text-primary">
+                Auto
+              </Badge>
+            )}
             {demand.priority !== "sem_classificacao" && (
               <Badge variant="secondary" className={`text-[10px] ${priority.bg} ${priority.color}`}>
                 {priority.shortLabel}
