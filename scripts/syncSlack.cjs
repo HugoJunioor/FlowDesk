@@ -88,10 +88,19 @@ async function fetchChannelMessages(channelId, channelName) {
       const hasText = msg.text && msg.text.length > 20;
       if (!hasText) continue;
 
-      // ONLY import workflow/bot messages (Fluxo de Trabalho)
-      // Skip regular user messages, system messages, etc.
-      const isWorkflowMessage = (msg.subtype === 'bot_message' || !!msg.bot_id) && msg.username;
-      if (!isWorkflowMessage) continue;
+      // ONLY import workflow/bot messages that are actual demands
+      // Must have bot_id AND contain demand patterns (Nova demanda, Solicitação, etc.)
+      const isBot = msg.subtype === 'bot_message' || !!msg.bot_id;
+      if (!isBot) continue;
+
+      const textCheck = (msg.text || '').toLowerCase();
+      const isDemand = textCheck.includes('nova demanda') ||
+                       textCheck.includes('solicitação') ||
+                       textCheck.includes('solicitacao') ||
+                       textCheck.includes('título da demanda') ||
+                       textCheck.includes('titulo da demanda') ||
+                       textCheck.includes('demanda enviada');
+      if (!isDemand) continue;
 
       // Skip system/join/leave messages
       const skipSubtypes = ['channel_join', 'channel_leave', 'channel_topic', 'channel_purpose', 'channel_name', 'channel_archive', 'group_join', 'group_leave'];
