@@ -26,21 +26,28 @@ interface DemandDetailSheetProps {
   onPriorityChange: (demandId: string, priority: DemandPriority) => void;
   onAddAssignee: (name: string) => void;
   onClosureChange: (demandId: string, closure: Partial<ClosureFields>) => void;
+  categories: DemandCategory[];
+  onAddCategory: (name: string) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee, onClosureChange }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee, onClosureChange, categories, onAddCategory }: DemandDetailSheetProps) => {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
   const [showAddAssignee, setShowAddAssignee] = useState(false);
   const [newAssigneeName, setNewAssigneeName] = useState("");
   const newAssigneeRef = useRef<HTMLInputElement>(null);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const newCategoryRef = useRef<HTMLInputElement>(null);
 
   // Reset forms when demand changes
   useEffect(() => {
     setShowCompleteForm(false);
     setShowAddAssignee(false);
     setNewAssigneeName("");
+    setShowAddCategory(false);
+    setNewCategoryName("");
     if (demand) {
       const now = new Date();
       setCompleteDate(format(now, "yyyy-MM-dd"));
@@ -458,13 +465,52 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                 <select
                   className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
                   value={demand.closure?.category || ""}
-                  onChange={(e) => onClosureChange(demand.id, { category: e.target.value as DemandCategory })}
+                  onChange={(e) => {
+                    if (e.target.value === "__add_new__") {
+                      setShowAddCategory(true);
+                      setTimeout(() => newCategoryRef.current?.focus(), 100);
+                    } else {
+                      onClosureChange(demand.id, { category: e.target.value as DemandCategory });
+                    }
+                  }}
                 >
                   <option value="">Selecionar...</option>
-                  {CATEGORY_OPTIONS.map((c) => (
+                  {categories.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
+                  <option value="__add_new__">+ Adicionar categoria...</option>
                 </select>
+                {showAddCategory && (
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      ref={newCategoryRef}
+                      placeholder="Nome da categoria"
+                      className="h-9 flex-1"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      maxLength={40}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newCategoryName.trim()) {
+                          onAddCategory(newCategoryName.trim());
+                          onClosureChange(demand.id, { category: newCategoryName.trim() as DemandCategory });
+                          setNewCategoryName(""); setShowAddCategory(false);
+                        }
+                        if (e.key === "Escape") setShowAddCategory(false);
+                      }}
+                    />
+                    <Button size="sm" className="h-9 text-xs" disabled={!newCategoryName.trim()}
+                      onClick={() => {
+                        if (newCategoryName.trim()) {
+                          onAddCategory(newCategoryName.trim());
+                          onClosureChange(demand.id, { category: newCategoryName.trim() as DemandCategory });
+                          setNewCategoryName(""); setShowAddCategory(false);
+                        }
+                      }}>Adicionar</Button>
+                    <Button variant="ghost" size="sm" className="h-9" onClick={() => setShowAddCategory(false)}>
+                      <X size={14} />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Nivel de suporte */}

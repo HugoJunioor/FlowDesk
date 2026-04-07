@@ -113,6 +113,18 @@ for (const d of demands) {
   for (let i = allReplies.length - 1; i >= 0; i--) {
     const reply = allReplies[i];
 
+    // Caso 0: Check reaction ✅ = conclusao definitiva
+    if (reply.hasCheckReaction && reply.isTeamMember) {
+      d.status = 'concluida';
+      d.completedAt = reply.timestamp;
+      updated++;
+      detected = true;
+      console.log(`[CONCLUIDA via ✅] ${d.title.slice(0, 60)}`);
+      console.log(`  Canal: ${d.slackChannel} | Reacao check na msg de ${reply.author}`);
+      console.log(`  Concluida em: ${new Date(reply.timestamp).toLocaleString('pt-BR')}\n`);
+      break;
+    }
+
     // Caso 1: Ultima mensagem e da equipe com padrao de resolucao
     if (reply.isTeamMember) {
       const resolvedMatches = matchPatterns(reply.text, RESOLVED_PATTERNS);
