@@ -1,11 +1,13 @@
 import { DemandStatus, SlackDemand, ThreadReply } from "@/types/demand";
 
 /**
- * Analisador automatico de status baseado nas respostas da thread.
- * Interpreta contexto das mensagens da equipe para detectar:
- * - Demanda concluida (resolvida)
- * - Demanda em andamento (task criada, analisando)
- * - Ultima resposta da equipe ao solicitante
+ * Analisador automatico de status por contexto da conversa.
+ *
+ * Logica:
+ * 1. Equipe da retorno tecnico -> cliente agradece = CONCLUIDA (data do retorno da equipe)
+ * 2. Equipe responde com padrao de resolucao direto = CONCLUIDA
+ * 3. Equipe respondeu que esta analisando/trabalhando = EM ANDAMENTO
+ * 4. Sem resposta da equipe = nao altera
  */
 
 const RESOLVED_PATTERNS = [
@@ -20,8 +22,22 @@ const RESOLVED_PATTERNS = [
   "executado", "aplicado", "processado",
   "segue ajustado", "segue corrigido", "segue atualizado",
   "problema resolvido", "situacao normalizada",
-  "enviado", "encaminhado para o cliente",
   "concluimos", "finalizamos", "realizamos",
+  "segue o retorno", "segue retorno",
+  "efetuado", "ja foi feito",
+  "procedimento executado", "procedimento realizado",
+  "fiz testes", "testei", "teste realizado",
+  "esta ok", "tudo certo", "tudo ok",
+  "alteracao feita", "troca realizada", "troca feita",
+  "cadastrado com sucesso", "cadastrado", "cadastro realizado",
+  "bloqueado", "desbloqueado", "liberado",
+  // Encaminhamento/redirecionamento = resolvido nesta thread
+  "vou continuar", "continuar a tratativa", "tratativa em outro",
+  "vamos tratar por", "tratar em outro canal", "tratar no privado",
+  "encaminhei", "encaminhado", "direcionei", "direcionado",
+  "abri uma demanda", "abri no canal", "vou tratar no",
+  "segue no canal", "segue em outro", "vou direcionar",
+  "transferi", "transferido", "movi para",
 ];
 
 const IN_PROGRESS_PATTERNS = [
@@ -33,14 +49,31 @@ const IN_PROGRESS_PATTERNS = [
   "em analise", "em tratamento", "em atendimento",
   "ja peguei", "ja assumi", "estou cuidando",
   "vou tratar", "vou resolver", "inicio agora",
-  "app.clickup.com", // link de task
+  "estamos atuando", "to levantando",
+  "app.clickup.com",
 ];
 
-const QUESTION_PATTERNS = [
-  "?", "pode enviar", "preciso de", "falta informacao",
-  "qual", "como", "quando", "poderia",
-  "me envia", "consegue enviar", "pode detalhar",
+const GRATITUDE_PATTERNS = [
+  "obrigada", "obrigado", "obg", "vlw", "valeu",
+  "certinho", "perfeito", "show", "top", "massa",
+  "verificado", "deu certo", "funcionou", "ok",
+  "confirmado", "certo", "beleza",
+  "muito obrigada", "muito obrigado",
+  "agradeco",
 ];
+
+function normalize(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function matchPatterns(text: string, patterns: string[]): string[] {
+  const norm = normalize(text);
+  return patterns.filter((p) => norm.includes(normalize(p)));
+}
+
+function isGratitude(text: string): boolean {
+  return matchPatterns(text, GRATITUDE_PATTERNS).length > 0;
+}
 
 interface StatusAnalysisResult {
   suggestedStatus: DemandStatus;
@@ -49,82 +82,100 @@ interface StatusAnalysisResult {
   detectedAt: string;
 }
 
-function matchPatterns(text: string, patterns: string[]): string[] {
-  const lower = text.toLowerCase();
-  return patterns.filter((p) => lower.includes(p));
-}
-
-function analyzeReply(reply: ThreadReply): {
-  resolvedMatches: string[];
-  progressMatches: string[];
-  questionMatches: string[];
-} {
-  return {
-    resolvedMatches: matchPatterns(reply.text, RESOLVED_PATTERNS),
-    progressMatches: matchPatterns(reply.text, IN_PROGRESS_PATTERNS),
-    questionMatches: matchPatterns(reply.text, QUESTION_PATTERNS),
-  };
-}
-
 export function analyzeThreadStatus(demand: SlackDemand): StatusAnalysisResult | null {
-  const teamReplies = demand.threadReplies.filter((r) => r.isTeamMember);
+  const allReplies = [...demand.threadReplies].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+  const teamReplies = allReplies.filter((r) => r.isTeamMember);
 
-  // No team replies = can't determine
   if (teamReplies.length === 0) return null;
 
-  // Analyze from most recent to oldest (most recent has priority)
-  const sorted = [...teamReplies].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  // Percorre de tras pra frente
+  for (let i = allReplies.length - 1; i >= 0; i--) {
+    const reply = allReplies[i];
 
-  const latestReply = sorted[0];
-  const analysis = analyzeReply(latestReply);
+    // Caso 1: Ultima msg e da equipe com padrao de resolucao
+    if (reply.isTeamMember) {
+      const resolvedMatches = matchPatterns(reply.text, RESOLVED_PATTERNS);
+      if (resolvedMatches.length > 0) {
+        return {
+          suggestedStatus: "concluida",
+          reason: `Detectado como concluida. ${reply.author} resolveu a demanda: ${resolvedMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}. Concluida em ${new Date(reply.timestamp).toLocaleString("pt-BR")}.`,
+          confidence: resolvedMatches.length >= 2 ? "alta" : "media",
+          detectedAt: reply.timestamp,
+        };
+      }
 
-  // Check for resolution in the latest reply
-  if (analysis.resolvedMatches.length > 0) {
-    return {
-      suggestedStatus: "concluida",
-      reason: `Detectado como concluida. Ultima resposta de ${latestReply.author}: identificados termos de resolucao (${analysis.resolvedMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}). A equipe indicou que a demanda foi atendida.`,
-      confidence: analysis.resolvedMatches.length >= 2 ? "alta" : "media",
-      detectedAt: new Date().toISOString(),
-    };
-  }
-
-  // Check for in-progress in the latest reply
-  if (analysis.progressMatches.length > 0) {
-    return {
-      suggestedStatus: "em_andamento",
-      reason: `Detectado como em andamento. Ultima resposta de ${latestReply.author}: identificados termos de progresso (${analysis.progressMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}). A equipe esta trabalhando na demanda.`,
-      confidence: analysis.progressMatches.length >= 2 ? "alta" : "media",
-      detectedAt: new Date().toISOString(),
-    };
-  }
-
-  // Check older replies if latest didn't match clearly
-  for (const reply of sorted.slice(1)) {
-    const olderAnalysis = analyzeReply(reply);
-    if (olderAnalysis.resolvedMatches.length >= 2) {
-      return {
-        suggestedStatus: "concluida",
-        reason: `Detectado como concluida. Resposta anterior de ${reply.author} indica resolucao (${olderAnalysis.resolvedMatches.slice(0, 2).map(m => `"${m}"`).join(", ")}). Nota: a resposta mais recente nao confirmou explicitamente.`,
-        confidence: "baixa",
-        detectedAt: new Date().toISOString(),
-      };
+      const progressMatches = matchPatterns(reply.text, IN_PROGRESS_PATTERNS);
+      if (progressMatches.length > 0) {
+        return {
+          suggestedStatus: "em_andamento",
+          reason: `${reply.author} esta trabalhando na demanda: ${progressMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}.`,
+          confidence: progressMatches.length >= 2 ? "alta" : "media",
+          detectedAt: reply.timestamp,
+        };
+      }
+      break;
     }
-    if (olderAnalysis.progressMatches.length >= 2) {
-      return {
-        suggestedStatus: "em_andamento",
-        reason: `Detectado como em andamento. Resposta anterior de ${reply.author} indica progresso (${olderAnalysis.progressMatches.slice(0, 2).map(m => `"${m}"`).join(", ")}).`,
-        confidence: "baixa",
-        detectedAt: new Date().toISOString(),
-      };
+
+    // Caso 2: Ultima msg e do cliente
+    if (!reply.isTeamMember) {
+      const clientIsGrateful = isGratitude(reply.text);
+
+      if (clientIsGrateful) {
+        // Cliente agradeceu - buscar resposta da equipe ANTERIOR
+        for (let j = i - 1; j >= 0; j--) {
+          if (allReplies[j].isTeamMember) {
+            const teamReply = allReplies[j];
+            return {
+              suggestedStatus: "concluida",
+              reason: `Concluida via contexto: ${teamReply.author} deu o retorno e ${reply.author} confirmou/agradeceu ("${reply.text.slice(0, 40)}"). Data da conclusao: ${new Date(teamReply.timestamp).toLocaleString("pt-BR")} (resposta da equipe).`,
+              confidence: "alta",
+              detectedAt: teamReply.timestamp,
+            };
+          }
+        }
+      }
+
+      // Cliente nao agradeceu - buscar ultima resposta da equipe antes
+      for (let j = i - 1; j >= 0; j--) {
+        if (allReplies[j].isTeamMember) {
+          const teamReply = allReplies[j];
+          const resolvedMatches = matchPatterns(teamReply.text, RESOLVED_PATTERNS);
+          if (resolvedMatches.length > 0) {
+            return {
+              suggestedStatus: "concluida",
+              reason: `${teamReply.author} resolveu: ${resolvedMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}. Cliente respondeu depois sem confirmar explicitamente.`,
+              confidence: "media",
+              detectedAt: teamReply.timestamp,
+            };
+          }
+
+          const progressMatches = matchPatterns(teamReply.text, IN_PROGRESS_PATTERNS);
+          if (progressMatches.length > 0) {
+            return {
+              suggestedStatus: "em_andamento",
+              reason: `${teamReply.author} esta trabalhando: ${progressMatches.slice(0, 3).map(m => `"${m}"`).join(", ")}.`,
+              confidence: "media",
+              detectedAt: teamReply.timestamp,
+            };
+          }
+
+          return {
+            suggestedStatus: "em_andamento",
+            reason: `${teamReply.author} respondeu mas sem padrao claro de resolucao.`,
+            confidence: "baixa",
+            detectedAt: teamReply.timestamp,
+          };
+        }
+      }
+      break;
     }
   }
 
-  // Team replied but couldn't determine status
   return {
     suggestedStatus: "em_andamento",
-    reason: `A equipe respondeu (${latestReply.author}) mas nao foi possivel determinar o status automaticamente. Ultima mensagem pode ser uma pergunta ou acompanhamento.`,
+    reason: `Equipe respondeu (${teamReplies[teamReplies.length - 1].author}) mas nao foi possivel determinar o status.`,
     confidence: "baixa",
     detectedAt: new Date().toISOString(),
   };
@@ -147,9 +198,7 @@ export function getLastTeamReply(demand: SlackDemand) {
 
 export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
-    // Skip if manually overridden
     if (d.manualStatusOverride) return d;
-    // Skip if already concluida (manual)
     if (d.status === "concluida" && d.completedAt) return d;
 
     const lastReply = getLastTeamReply(d);
@@ -159,11 +208,10 @@ export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
 
     if (analysis) {
       result.statusAnalysis = analysis;
-      // Apply suggested status if confidence is not baixa
       if (analysis.confidence !== "baixa" && analysis.suggestedStatus !== d.status) {
         result.status = analysis.suggestedStatus;
-        if (analysis.suggestedStatus === "concluida" && lastReply) {
-          result.completedAt = lastReply.timestamp;
+        if (analysis.suggestedStatus === "concluida") {
+          result.completedAt = analysis.detectedAt;
         }
       }
     }
