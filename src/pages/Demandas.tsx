@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { mockDemands, extractClientName } from "@/data/mockDemands";
-import { SlackDemand, DemandPriority } from "@/types/demand";
+import { SlackDemand, DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
@@ -22,16 +22,33 @@ const TEAM_MEMBERS = [
   "Carlos R.",
 ];
 
-// Auto-classify demands on load
+// Auto-verify and reclassify demands that already have priority (P1/P2/P3)
+// Demands "sem_classificacao" are left untouched
 function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
+    // Skip demands without classification - don't touch them
+    if (d.priority === "sem_classificacao") return d;
+
     const classification = classifyDemand(d.title, d.description);
-    const autoClassified = { ...d, autoClassification: classification };
-    // If demand has no priority or is "sem_classificacao", apply the auto classification
-    if (d.priority === "sem_classificacao" && classification.priority !== "sem_classificacao") {
-      autoClassified.priority = classification.priority;
+    const result = { ...d, autoClassification: classification };
+
+    // If classifier disagrees with original priority, reclassify
+    if (classification.priority !== "sem_classificacao" && classification.priority !== d.priority) {
+      result.autoClassification = {
+        ...classification,
+        reason: `Reclassificado de ${PRIORITY_CONFIG[d.priority].label} para ${PRIORITY_CONFIG[classification.priority].label}. ${classification.reason}`,
+      };
+      result.priority = classification.priority;
+    } else {
+      // Classifier agrees - just add confirmation
+      result.autoClassification = {
+        ...classification,
+        priority: d.priority,
+        reason: `Classificacao original confirmada como ${PRIORITY_CONFIG[d.priority].label}. ${classification.reason}`,
+      };
     }
-    return autoClassified;
+
+    return result;
   });
 }
 

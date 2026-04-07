@@ -34,14 +34,18 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {/* Info icon with classification popover */}
-            {demand.autoClassification && (
+            {demand.autoClassification && (() => {
+              const wasReclassified = demand.autoClassification!.reason.startsWith("Reclassificado");
+              return (
               <Popover>
                 <PopoverTrigger asChild>
                   <button
-                    className="p-1 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+                    className={`p-1 rounded-md hover:bg-muted transition-colors ${
+                      wasReclassified ? "text-warning animate-pulse" : "text-muted-foreground hover:text-primary"
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Info size={14} />
+                    {wasReclassified ? <Sparkles size={14} /> : <Info size={14} />}
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -81,7 +85,8 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
                   </div>
                 </PopoverContent>
               </Popover>
-            )}
+              );
+            })()}
             {demand.assignee && (
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
                 {demand.assignee.name.split(" ").map((n) => n[0]).join("")}
