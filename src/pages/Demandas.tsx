@@ -5,6 +5,14 @@ import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { baseDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
+import { addBusinessHours, getFirstResponseMinutes } from "@/lib/businessHours";
+
+function parseResponseSla(sla: string): number {
+  const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
+  if (!match) return 60;
+  const val = parseInt(match[1]);
+  return match[2].startsWith("hora") ? val * 60 : val;
+}
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import { classifyClosureFields, generateBlankFieldsReport } from "@/lib/closureClassifier";
@@ -265,6 +273,33 @@ const Demandas = () => {
             if (!d.completedAt) return false;
             const daysAgo = differenceInHours(now, new Date(d.completedAt)) / 24;
             if (daysAgo > 7) return false;
+            break;
+          }
+          case "sla_estourado": {
+            if (d.priority === "sem_classificacao") return false;
+            const cfg = PRIORITY_CONFIG[d.priority];
+            if (!cfg.sla) return false;
+            if (d.status === "concluida" && d.completedAt) {
+              const due = addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+              if (new Date(d.completedAt) <= due) return false;
+            } else if (d.status !== "expirada") {
+              const due = addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+              if (now <= due) return false;
+            }
+            break;
+          }
+          case "resposta_atrasada": {
+            if (d.priority === "sem_classificacao") return false;
+            const cfg2 = PRIORITY_CONFIG[d.priority];
+            if (!cfg2.sla) return false;
+            const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
+            const slaMinutes = parseResponseSla(cfg2.sla.response);
+            if (mins === null) {
+              const elapsed = (now.getTime() - new Date(d.createdAt).getTime()) / 60000;
+              if (elapsed <= slaMinutes || d.status === "concluida") return false;
+            } else {
+              if (mins <= slaMinutes) return false;
+            }
             break;
           }
         }

@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -13,8 +14,15 @@ import {
   DemandCategory, ExpirationReason, SupportLevel,
 } from "@/types/demand";
 import { extractClientName } from "@/data/demandsLoader";
-import { addBusinessHours } from "@/lib/businessHours";
+import { addBusinessHours, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, getBusinessMinutesBetween } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
+
+function parseResponseSla(sla: string): number {
+  const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
+  if (!match) return 60;
+  const val = parseInt(match[1]);
+  return match[2].startsWith("hora") ? val * 60 : val;
+}
 
 interface DemandDetailSheetProps {
   demand: SlackDemand | null;
@@ -144,24 +152,32 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               <UserCog size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
             </div>
-            <select
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-              value={demand.assignee?.name || ""}
-              onChange={(e) => {
-                if (e.target.value === "__add_new__") {
+            <Select
+              value={demand.assignee?.name || "_none_"}
+              onValueChange={(v) => {
+                if (v === "__add_new__") {
                   setShowAddAssignee(true);
                   setTimeout(() => newAssigneeRef.current?.focus(), 100);
                 } else {
-                  onAssigneeChange(demand.id, e.target.value || null);
+                  onAssigneeChange(demand.id, v === "_none_" ? null : v);
                 }
               }}
             >
-              <option value="">Sem responsavel</option>
-              {assignees.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-              <option value="__add_new__">+ Adicionar responsavel...</option>
-            </select>
+              <SelectTrigger className="w-full h-9 text-sm">
+                <SelectValue placeholder="Sem responsavel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none_">Sem responsavel</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+                <SelectItem value="__add_new__">
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <Plus size={12} /> Adicionar responsavel...
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
             {showAddAssignee && (
               <div className="mt-2 flex gap-2">
@@ -215,16 +231,17 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               <Signal size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Prioridade</p>
             </div>
-            <select
-              className={`w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-medium ${priority.color}`}
-              value={demand.priority}
-              onChange={(e) => onPriorityChange(demand.id, e.target.value as DemandPriority)}
-            >
-              <option value="p1">P1 - Critico</option>
-              <option value="p2">P2 - Alta</option>
-              <option value="p3">P3 - Media</option>
-              <option value="sem_classificacao">Sem classificacao</option>
-            </select>
+            <Select value={demand.priority} onValueChange={(v) => onPriorityChange(demand.id, v as DemandPriority)}>
+              <SelectTrigger className={`w-full h-9 text-sm font-medium ${priority.color}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="p1">P1 - Critico</SelectItem>
+                <SelectItem value="p2">P2 - Alta</SelectItem>
+                <SelectItem value="p3">P3 - Media</SelectItem>
+                <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Auto classification info */}
             {demand.autoClassification && (
@@ -259,16 +276,17 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               <Clock size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Status</p>
             </div>
-            <select
-              className={`w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-medium ${status.color}`}
-              value={showCompleteForm ? "concluida" : demand.status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-            >
-              <option value="aberta">Aberta</option>
-              <option value="em_andamento">Em andamento</option>
-              <option value="concluida">Concluida</option>
-              <option value="expirada">Expirada</option>
-            </select>
+            <Select value={showCompleteForm ? "concluida" : demand.status} onValueChange={handleStatusChange}>
+              <SelectTrigger className={`w-full h-9 text-sm font-medium ${status.color}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aberta">Aberta</SelectItem>
+                <SelectItem value="em_andamento">Em andamento</SelectItem>
+                <SelectItem value="concluida">Concluida</SelectItem>
+                <SelectItem value="expirada">Expirada</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Formulario de conclusao */}
             {showCompleteForm && (
@@ -423,28 +441,71 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
           <Separator />
 
           {/* SLA */}
-          {demand.priority !== "sem_classificacao" && priority.sla && (
-            <>
-              <div className="p-4 rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground font-medium mb-3">SLA - {priority.label}</p>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Resposta</p>
-                    <p className="text-sm font-semibold text-foreground">{priority.sla.response}</p>
+          {demand.priority !== "sem_classificacao" && priority.sla && (() => {
+            const firstRespMinutes = getFirstResponseMinutes(demand.createdAt, demand.threadReplies);
+            const slaRespMinutes = parseResponseSla(priority.sla.response);
+            const firstRespOk = firstRespMinutes !== null ? firstRespMinutes <= slaRespMinutes : null;
+
+            const resolutionMinutes = getResolutionMinutes(demand.createdAt, demand.completedAt);
+            const slaResMinutes = priority.sla.resolutionHours * 60;
+            const resolutionOk = resolutionMinutes !== null ? resolutionMinutes <= slaResMinutes : null;
+
+            return (
+              <>
+                <div className="p-4 rounded-lg border border-border space-y-4">
+                  <p className="text-xs text-muted-foreground font-medium">SLA - {priority.label}</p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Resposta</p>
+                      <p className="text-sm font-semibold text-foreground">{priority.sla.response}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Resolucao</p>
+                      <p className="text-sm font-semibold text-foreground">{priority.sla.resolution}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Horario</p>
+                      <p className="text-sm font-semibold text-foreground">Seg-Sex 8-18h</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Resolucao</p>
-                    <p className="text-sm font-semibold text-foreground">{priority.sla.resolution}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Horario</p>
-                    <p className="text-sm font-semibold text-foreground">Seg-Sex 8-18h</p>
+
+                  {/* SLA Tracking */}
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    {/* 1a Resposta */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">1a Resposta</span>
+                      {firstRespMinutes !== null ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-foreground">{formatBusinessTime(firstRespMinutes)}</span>
+                          <Badge variant="secondary" className={`text-[9px] px-1.5 ${firstRespOk ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                            {firstRespOk ? "No prazo" : "Atrasada"}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground italic">Aguardando resposta</span>
+                      )}
+                    </div>
+
+                    {/* Resolucao */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Resolucao</span>
+                      {resolutionMinutes !== null ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-foreground">{formatBusinessTime(resolutionMinutes)}</span>
+                          <Badge variant="secondary" className={`text-[9px] px-1.5 ${resolutionOk ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                            {resolutionOk ? "No prazo" : "Estourado"}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground italic">Em aberto</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Separator />
-            </>
-          )}
+                <Separator />
+              </>
+            );
+          })()}
 
           {/* Closure fields */}
           {(demand.status === "concluida" || demand.status === "expirada" || demand.status === "em_andamento") && (
@@ -462,24 +523,32 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                     <Sparkles size={10} className="text-primary" />
                   )}
                 </label>
-                <select
-                  className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  value={demand.closure?.category || ""}
-                  onChange={(e) => {
-                    if (e.target.value === "__add_new__") {
+                <Select
+                  value={demand.closure?.category || "_none_"}
+                  onValueChange={(v) => {
+                    if (v === "__add_new__") {
                       setShowAddCategory(true);
                       setTimeout(() => newCategoryRef.current?.focus(), 100);
                     } else {
-                      onClosureChange(demand.id, { category: e.target.value as DemandCategory });
+                      onClosureChange(demand.id, { category: (v === "_none_" ? "" : v) as DemandCategory });
                     }
                   }}
                 >
-                  <option value="">Selecionar...</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                  <option value="__add_new__">+ Adicionar categoria...</option>
-                </select>
+                  <SelectTrigger className="w-full h-9 mt-1 text-sm">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none_">Selecionar...</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                    <SelectItem value="__add_new__">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        <Plus size={12} /> Adicionar categoria...
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
                 {showAddCategory && (
                   <div className="mt-2 flex gap-2">
                     <Input
@@ -521,16 +590,20 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                     <Sparkles size={10} className="text-primary" />
                   )}
                 </label>
-                <select
-                  className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  value={demand.closure?.supportLevel || ""}
-                  onChange={(e) => onClosureChange(demand.id, { supportLevel: e.target.value as SupportLevel })}
+                <Select
+                  value={demand.closure?.supportLevel || "_none_"}
+                  onValueChange={(v) => onClosureChange(demand.id, { supportLevel: (v === "_none_" ? "" : v) as SupportLevel })}
                 >
-                  <option value="">Selecionar...</option>
-                  {SUPPORT_LEVEL_OPTIONS.map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 mt-1 text-sm">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none_">Selecionar...</SelectItem>
+                    {SUPPORT_LEVEL_OPTIONS.map((l) => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Motivo de expiracao - so aparece quando SLA expirado */}
@@ -548,16 +621,20 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                       <Sparkles size={10} className="text-primary" />
                     )}
                   </label>
-                  <select
-                    className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                    value={demand.closure?.expirationReason || ""}
-                    onChange={(e) => onClosureChange(demand.id, { expirationReason: e.target.value as ExpirationReason })}
+                  <Select
+                    value={demand.closure?.expirationReason || "_none_"}
+                    onValueChange={(v) => onClosureChange(demand.id, { expirationReason: (v === "_none_" ? "" : v) as ExpirationReason })}
                   >
-                    <option value="">Selecionar...</option>
-                    {EXPIRATION_REASON_OPTIONS.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-9 mt-1 text-sm">
+                      <SelectValue placeholder="Selecionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none_">Selecionar...</SelectItem>
+                      {EXPIRATION_REASON_OPTIONS.map((r) => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

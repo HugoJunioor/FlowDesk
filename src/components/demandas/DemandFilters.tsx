@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, CalendarDays } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -188,78 +189,84 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
         </div>
 
         {/* Client */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.client}
-          onChange={(e) => update({ client: e.target.value })}
-        >
-          <option value="">Cliente</option>
-          {clients.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        <Select value={filters.client || "_all_"} onValueChange={(v) => update({ client: v === "_all_" ? "" : v })}>
+          <SelectTrigger className="h-9 w-full sm:w-[160px] text-xs">
+            <SelectValue placeholder="Cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">Todos os clientes</SelectItem>
+            {clients.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Priority */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.priority}
-          onChange={(e) => update({ priority: e.target.value as DemandPriority | "all" })}
-        >
-          <option value="all">Prioridade</option>
-          <option value="p1">P1 - Critico</option>
-          <option value="p2">P2 - Alta</option>
-          <option value="p3">P3 - Media</option>
-          <option value="sem_classificacao">Sem classificacao</option>
-        </select>
+        <Select value={filters.priority} onValueChange={(v) => update({ priority: v as DemandPriority | "all" })}>
+          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas prioridades</SelectItem>
+            <SelectItem value="p1">P1 - Critico</SelectItem>
+            <SelectItem value="p2">P2 - Alta</SelectItem>
+            <SelectItem value="p3">P3 - Media</SelectItem>
+            <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Status */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.status}
-          onChange={(e) => update({ status: e.target.value as DemandStatus | "all" })}
-        >
-          <option value="all">Status</option>
-          <option value="aberta">Aberta</option>
-          <option value="em_andamento">Em andamento</option>
-          <option value="concluida">Concluida</option>
-          <option value="expirada">Expirada</option>
-        </select>
+        <Select value={filters.status} onValueChange={(v) => update({ status: v as DemandStatus | "all" })}>
+          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos status</SelectItem>
+            <SelectItem value="aberta">Aberta</SelectItem>
+            <SelectItem value="em_andamento">Em andamento</SelectItem>
+            <SelectItem value="concluida">Concluida</SelectItem>
+            <SelectItem value="expirada">Expirada</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Assignee */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.assignee}
-          onChange={(e) => update({ assignee: e.target.value })}
-        >
-          <option value="">Responsavel</option>
-          {assignees.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
+        <Select value={filters.assignee || "_all_"} onValueChange={(v) => update({ assignee: v === "_all_" ? "" : v })}>
+          <SelectTrigger className="h-9 w-full sm:w-[160px] text-xs">
+            <SelectValue placeholder="Responsavel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all_">Todos responsaveis</SelectItem>
+            {assignees.map((a) => (
+              <SelectItem key={a} value={a}>{a}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Category */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.category}
-          onChange={(e) => update({ category: e.target.value as DemandCategory | "all" })}
-        >
-          <option value="all">Categoria</option>
-          {CATEGORY_OPTIONS.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        <Select value={filters.category} onValueChange={(v) => update({ category: v as DemandCategory | "all" })}>
+          <SelectTrigger className="h-9 w-full sm:w-[160px] text-xs">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas categorias</SelectItem>
+            {CATEGORY_OPTIONS.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Support Level */}
-        <select
-          className="h-9 w-full sm:w-auto rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          value={filters.supportLevel}
-          onChange={(e) => update({ supportLevel: e.target.value as SupportLevel | "all" })}
-        >
-          <option value="all">Nivel</option>
-          {SUPPORT_LEVEL_OPTIONS.map((l) => (
-            <option key={l} value={l}>{l}</option>
-          ))}
-        </select>
+        <Select value={filters.supportLevel} onValueChange={(v) => update({ supportLevel: v as SupportLevel | "all" })}>
+          <SelectTrigger className="h-9 w-full sm:w-[120px] text-xs">
+            <SelectValue placeholder="Nivel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos niveis</SelectItem>
+            {SUPPORT_LEVEL_OPTIONS.map((l) => (
+              <SelectItem key={l} value={l}>{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Clear */}
         {hasFilters && (

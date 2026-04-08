@@ -8,18 +8,27 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import {
   AlertTriangle, CheckCircle2, Clock, Inbox, Building2,
-  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter,
+  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { baseDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
-import { addBusinessHours, getBusinessMinutesBetween } from "@/lib/businessHours";
+import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime } from "@/lib/businessHours";
 
 type Period = "hoje" | "semanal" | "mensal" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
 type BarStatusFilter = "all" | "abertas" | "concluidas" | "expiradas";
+
+// Parse SLA response string ("15 min", "1 hora", "4 horas") to minutes
+function parseResponseSla(sla: string): number {
+  const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
+  if (!match) return 60;
+  const val = parseInt(match[1]);
+  return match[2].startsWith("hora") ? val * 60 : val;
+}
 
 const PIE_COLORS: Record<string, string> = { P1: "#ef4444", P2: "#f59e0b", P3: "#3b82f6" };
 const BAR_COLORS = { abertas: "#3b82f6", concluidas: "#22c55e", expiradas: "#ef4444" };
@@ -129,14 +138,43 @@ const Dashboard = () => {
   });
   const slaRate = withSla.length > 0 ? Math.round((slaCompliant.length / withSla.length) * 100) : 100;
 
-  const withReplies = filtered.filter((d) => d.replies > 0);
-  const avgFirstResponse = withReplies.length > 0
-    ? Math.round(withReplies.reduce((sum, d) => {
-        const config = PRIORITY_CONFIG[d.priority];
-        if (d.priority === "sem_classificacao" || !config.sla) return sum + 30;
-        return sum + Math.min(config.sla.resolutionHours * 60 * 0.1, 60);
-      }, 0) / withReplies.length)
-    : 0;
+  // SLA de primeira resposta (real, baseado em threadReplies)
+  const firstResponseData = useMemo(() => {
+    const demandsWithResponse = filtered
+      .map((d) => ({ demand: d, minutes: getFirstResponseMinutes(d.createdAt, d.threadReplies) }))
+      .filter((r) => r.minutes !== null) as { demand: typeof filtered[0]; minutes: number }[];
+
+    const avg = demandsWithResponse.length > 0
+      ? Math.round(demandsWithResponse.reduce((sum, r) => sum + r.minutes, 0) / demandsWithResponse.length)
+      : 0;
+
+    // Dentro do SLA de resposta?
+    const withinSla = demandsWithResponse.filter((r) => {
+      const config = PRIORITY_CONFIG[r.demand.priority];
+      if (r.demand.priority === "sem_classificacao" || !config.sla) return true;
+      const slaResponseMinutes = parseResponseSla(config.sla.response);
+      return r.minutes <= slaResponseMinutes;
+    });
+
+    const rate = demandsWithResponse.length > 0
+      ? Math.round((withinSla.length / demandsWithResponse.length) * 100) : 100;
+
+    return { avg, rate, total: demandsWithResponse.length };
+  }, [filtered]);
+
+  // SLA de resolucao no prazo
+  const resolutionSlaData = useMemo(() => {
+    const concluded = filtered.filter((d) => d.status === "concluida" && d.completedAt && d.priority !== "sem_classificacao");
+    const withinSla = concluded.filter((d) => {
+      const config = PRIORITY_CONFIG[d.priority];
+      if (!config.sla) return true;
+      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+      return new Date(d.completedAt!) <= due;
+    });
+    const breached = concluded.length - withinSla.length;
+    const rate = concluded.length > 0 ? Math.round((withinSla.length / concluded.length) * 100) : 100;
+    return { rate, breached, total: concluded.length };
+  }, [filtered]);
 
   // === PIE CHART DATA (exclude sem_classificacao, apply local filter) ===
   const pieData = useMemo(() => {
@@ -253,28 +291,31 @@ const Dashboard = () => {
               </div>
             )}
 
-            <select
-              className="h-8 rounded-md border border-input bg-background px-3 text-xs text-foreground"
-              value={client}
-              onChange={(e) => setClient(e.target.value)}
-            >
-              <option value="">Todos os clientes</option>
-              {clients.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <Select value={client || "_all_"} onValueChange={(v) => setClient(v === "_all_" ? "" : v)}>
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue placeholder="Todos os clientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all_">Todos os clientes</SelectItem>
+                {clients.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
           {[
             { title: "Total", value: total, icon: BarChart3, color: "text-foreground", bg: "bg-muted" },
             { title: "Abertas", value: abertas, icon: Inbox, color: "text-primary", bg: "bg-primary/10" },
             { title: "P1 Criticos", value: p1Count, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
             { title: "Concluidas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
             { title: "Expiradas", value: expiradas, icon: Clock, color: "text-destructive", bg: "bg-destructive/10" },
-            { title: "SLA %", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= 80 ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= 80 ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: "SLA Resolucao", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= 80 ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= 80 ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: "SLA 1a Resposta", value: `${firstResponseData.rate}%`, icon: Zap, color: firstResponseData.rate >= 80 ? "text-success" : firstResponseData.rate >= 50 ? "text-warning" : "text-destructive", bg: firstResponseData.rate >= 80 ? "bg-success/10" : firstResponseData.rate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: "SLA Estourado", value: resolutionSlaData.breached, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10" },
           ].map((kpi) => (
             <Card key={kpi.title} className="border border-border shadow-sm">
               <CardContent className="p-3 sm:p-4">
@@ -497,8 +538,8 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
-              <MessageCircle size={20} className="text-info mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{avgFirstResponse}m</p>
+              <Zap size={20} className="text-info mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{firstResponseData.avg > 0 ? formatBusinessTime(firstResponseData.avg) : "—"}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Tempo medio 1a resposta</p>
             </CardContent>
           </Card>
