@@ -3,7 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
-import { baseDemands, extractClientName } from "@/data/demandsLoader";
+import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
 import { addBusinessHours, getFirstResponseMinutes } from "@/lib/businessHours";
 
@@ -13,9 +13,6 @@ function parseResponseSla(sla: string): number {
   const val = parseInt(match[1]);
   return match[2].startsWith("hora") ? val * 60 : val;
 }
-import { classifyDemand } from "@/lib/priorityClassifier";
-import { processDemandsStatus } from "@/lib/statusAnalyzer";
-import { classifyClosureFields, generateBlankFieldsReport } from "@/lib/closureClassifier";
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
@@ -26,7 +23,6 @@ import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
 // === LOCAL PERSISTENCE ===
-// Overrides: { [demandId]: { status?, priority?, assignee?, completedAt? } }
 type DemandOverride = {
   status?: string;
   priority?: string;
@@ -58,74 +54,8 @@ function saveCustomAssignees(assignees: string[]) {
   localStorage.setItem("fd_custom_assignees", JSON.stringify(assignees));
 }
 
-// Apply saved overrides to demands
-function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
-  const overrides = loadOverrides();
-  return demands.map((d) => {
-    const ov = overrides[d.id];
-    if (!ov) return d;
-    return {
-      ...d,
-      status: (ov.status as any) || d.status,
-      priority: (ov.priority as any) || d.priority,
-      assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
-      completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
-      manualStatusOverride: ov.manualStatusOverride || d.manualStatusOverride,
-      closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
-    };
-  });
-}
-
-// Auto-verify and reclassify demands
-function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
-  return demands.map((d) => {
-    // Rule: Remessa SITEF → Hugo Cordeiro Junior, P3
-    const titleLower = d.title.toLowerCase();
-    if (d.workflow.toLowerCase().includes("remessa") || titleLower.includes("remessa sitef") || titleLower.includes("remessa tef")) {
-      return { ...d, assignee: { name: "Hugo Cordeiro Junior", avatar: "" }, priority: "p3" as const };
-    }
-    // Rule: Conciliação → Daniel Bichof, P3
-    if (titleLower.includes("concilia") || titleLower.includes("nova concilia")) {
-      return { ...d, assignee: { name: "Daniel Bichof", avatar: "" }, priority: "p3" as const };
-    }
-
-    // Skip demands without classification - don't touch them
-    if (d.priority === "sem_classificacao") return d;
-
-    const classification = classifyDemand(d.title, d.description);
-    const result = { ...d, autoClassification: classification };
-
-    // If classifier disagrees with original priority, reclassify
-    if (classification.priority !== "sem_classificacao" && classification.priority !== d.priority) {
-      result.autoClassification = {
-        ...classification,
-        reason: `Reclassificado de ${PRIORITY_CONFIG[d.priority].label} para ${PRIORITY_CONFIG[classification.priority].label}. ${classification.reason}`,
-      };
-      result.priority = classification.priority;
-    } else {
-      // Classifier agrees - just add confirmation
-      result.autoClassification = {
-        ...classification,
-        priority: d.priority,
-        reason: `Classificacao original confirmada como ${PRIORITY_CONFIG[d.priority].label}. ${classification.reason}`,
-      };
-    }
-
-    return result;
-  });
-}
-
 const Demandas = () => {
-  const [demands, setDemands] = useState<SlackDemand[]>(() => {
-    const classified = autoClassifyDemands(baseDemands);
-    const analyzed = processDemandsStatus(classified);
-    // Auto-fill closure fields
-    const withClosure = analyzed.map((d) => ({
-      ...d,
-      closure: d.closure || classifyClosureFields(d),
-    }));
-    return applyOverrides(withClosure);
-  });
+  const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [customAssignees, setCustomAssignees] = useState<string[]>(loadCustomAssignees);
