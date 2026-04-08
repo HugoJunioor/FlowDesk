@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, User, Eye, EyeOff, Workflow } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { branding } from "@/config/brandingLoader";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -38,37 +39,15 @@ const Login = () => {
         <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-white/5" />
         <div className="absolute top-[40%] left-[20%] w-[200px] h-[200px] rounded-full bg-white/5" />
 
-        <div className="relative z-10 text-white max-w-md space-y-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
-              <Workflow className="w-7 h-7" />
+        <div className="relative z-10 text-white flex flex-col items-center text-center space-y-12">
+          {branding.logo ? (
+            <img src={branding.logo} alt={branding.name} className="h-24 w-auto" />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
+              <Workflow className="w-10 h-10" />
             </div>
-            <span className="text-2xl font-bold tracking-tight">FlowDesk</span>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-4xl font-bold leading-tight">
-              Gerencie suas operacoes com simplicidade
-            </h2>
-            <p className="text-white/75 text-lg leading-relaxed">
-              Tarefas, cadastros e relatorios em um unico lugar. Controle total da sua equipe.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 pt-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">1.2k+</p>
-              <p className="text-xs text-white/65 mt-1">Cadastros</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">94%</p>
-              <p className="text-xs text-white/65 mt-1">Conclusao</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold">24</p>
-              <p className="text-xs text-white/65 mt-1">Ativas</p>
-            </div>
-          </div>
+          )}
+          <span className="text-5xl font-bold tracking-tight">{branding.name}</span>
         </div>
       </div>
 
@@ -77,11 +56,15 @@ const Login = () => {
         <div className="w-full max-w-md space-y-6 animate-fade-in">
           {/* Mobile logo */}
           <div className="text-center space-y-2 lg:hidden">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-2">
-              <Workflow className="w-7 h-7 text-primary" />
-            </div>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">FlowDesk</h1>
-            <p className="text-sm text-muted-foreground">Sistema de Gestao Interna</p>
+            {branding.logo ? (
+              <img src={branding.logo} alt={branding.name} className="h-10 w-auto mx-auto mb-2" />
+            ) : (
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-2">
+                <Workflow className="w-7 h-7 text-primary" />
+              </div>
+            )}
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">{branding.name}</h1>
+            <p className="text-sm text-muted-foreground">{branding.subtitle}</p>
           </div>
 
           <Card className="border-border/50 shadow-lg">

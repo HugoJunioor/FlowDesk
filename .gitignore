@@ -30,3 +30,7 @@ dist-ssr
 
 # Real Slack data (company data - never commit)
 src/data/realDemands.ts
+
+# Local branding (company-specific)
+src/config/branding.local.ts
+public/just-logo.*
