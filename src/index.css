@@ -157,4 +157,9 @@
   .dark input[type="time"]::-webkit-calendar-picker-indicator {
     filter: invert(0.8) brightness(1.2);
   }
+
+  /* Dark mode: realcar cores do logo (bolinha vermelha) */
+  .dark img[alt="JustFlow"] {
+    filter: saturate(2.5) brightness(1.2);
+  }
 }
