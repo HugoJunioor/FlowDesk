@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { branding } from "@/config/brandingLoader";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -55,20 +56,35 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
         `}
       >
         {/* Logo */}
-        <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
+        <div className={`flex items-center justify-center h-16 border-b border-sidebar-border ${collapsed ? "px-2" : "px-4"}`}>
           {collapsed ? (
             <button
               onClick={() => setCollapsed(false)}
-              className="mx-auto text-sidebar-primary hover:text-sidebar-primary-foreground transition-colors p-1.5 rounded-md hover:bg-sidebar-accent"
+              className="mx-auto text-sidebar-primary hover:text-sidebar-primary-foreground transition-colors p-1 rounded-md hover:bg-sidebar-accent"
             >
-              <Workflow size={22} />
+              {branding.logo ? (
+                <img src={branding.logo} alt={branding.name} className="h-5 max-w-[44px] object-contain" />
+              ) : (
+                <Workflow size={22} />
+              )}
             </button>
           ) : (
             <>
-              <Workflow size={22} className="text-sidebar-primary shrink-0" />
-              <span className="ml-2.5 text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
-                FlowDesk
-              </span>
+              {branding.logo ? (
+                <div className="flex items-center gap-3">
+                  <img src={branding.logo} alt={branding.name} className="h-8 w-auto shrink-0" />
+                  <span className="text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
+                    {branding.name}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <Workflow size={20} className="text-sidebar-primary shrink-0" />
+                  <span className="ml-2 text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
+                    {branding.name}
+                  </span>
+                </>
+              )}
               <button
                 onClick={() => {
                   if (mobileOpen) setMobileOpen(false);

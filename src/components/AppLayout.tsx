@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu, Workflow } from "lucide-react";
 import AppSidebar from "./AppSidebar";
+import { branding } from "@/config/brandingLoader";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -27,8 +28,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         >
           <Menu size={20} />
         </button>
-        <Workflow size={18} className="ml-3 text-primary" />
-        <span className="ml-1.5 font-semibold text-foreground">FlowDesk</span>
+        {branding.logo ? (
+          <img src={branding.logo} alt={branding.name} className="ml-3 h-5 w-auto" />
+        ) : (
+          <Workflow size={18} className="ml-3 text-primary" />
+        )}
+        <span className="ml-1.5 font-semibold text-foreground">{branding.name}</span>
       </div>
 
       <main
