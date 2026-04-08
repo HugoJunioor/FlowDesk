@@ -14,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { baseDemands, extractClientName } from "@/data/demandsLoader";
+import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime } from "@/lib/businessHours";
+import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 
 type Period = "hoje" | "semanal" | "mensal" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
@@ -75,6 +76,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 const Dashboard = () => {
   const [period, setPeriod] = useState<Period>("mensal");
   const [client, setClient] = useState("");
+  const [assignee, setAssignee] = useState("");
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
@@ -84,14 +86,24 @@ const Dashboard = () => {
   const [pieFilter, setPieFilter] = useState<PieFilter>("all");
   const [barStatusFilter, setBarStatusFilter] = useState<BarStatusFilter>("all");
 
+  const allDemands = useMemo(() => getProcessedDemands(), []);
+
   const clients = useMemo(() => {
     const set = new Set<string>();
-    baseDemands.forEach((d) => {
+    allDemands.forEach((d) => {
       const c = extractClientName(d.slackChannel);
       if (c !== d.slackChannel) set.add(c);
     });
     return Array.from(set).sort();
-  }, []);
+  }, [allDemands]);
+
+  const assignees = useMemo(() => {
+    const set = new Set<string>();
+    allDemands.forEach((d) => {
+      if (d.assignee?.name) set.add(d.assignee.name);
+    });
+    return Array.from(set).sort();
+  }, [allDemands]);
 
   const getDateRange = () => {
     const now = new Date();
@@ -109,13 +121,14 @@ const Dashboard = () => {
   // Global filter: period + client
   const filtered = useMemo(() => {
     const range = getDateRange();
-    return baseDemands.filter((d) => {
+    return allDemands.filter((d) => {
       const created = new Date(d.createdAt);
       if (created < range.from || created > range.to) return false;
       if (client && extractClientName(d.slackChannel) !== client) return false;
+      if (assignee && d.assignee?.name !== assignee) return false;
       return true;
     });
-  }, [period, client, customFrom, customTo]);
+  }, [period, client, assignee, customFrom, customTo]);
 
   // === METRICS (from global filtered) ===
   const total = filtered.length;
@@ -245,9 +258,12 @@ const Dashboard = () => {
       <div className="space-y-6">
         {/* Header + global filters */}
         <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Visao analitica das demandas Slack</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground text-sm mt-1">Visao analitica das demandas Slack</p>
+            </div>
+            <SyncStatusIndicator />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -299,6 +315,18 @@ const Dashboard = () => {
                 <SelectItem value="_all_">Todos os clientes</SelectItem>
                 {clients.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={assignee || "_all_"} onValueChange={(v) => setAssignee(v === "_all_" ? "" : v)}>
+              <SelectTrigger className="h-8 w-[180px] text-xs">
+                <SelectValue placeholder="Todos responsaveis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all_">Todos responsaveis</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
