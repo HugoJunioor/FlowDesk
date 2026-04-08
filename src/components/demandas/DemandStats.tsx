@@ -1,7 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Clock, CheckCircle2, Inbox } from "lucide-react";
-import { SlackDemand } from "@/types/demand";
+import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap } from "lucide-react";
+import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
+import { addBusinessHours, getFirstResponseMinutes } from "@/lib/businessHours";
+
+function parseResponseSla(sla: string): number {
+  const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
+  if (!match) return 60;
+  const val = parseInt(match[1]);
+  return match[2].startsWith("hora") ? val * 60 : val;
+}
 
 interface DemandStatsProps {
   demands: SlackDemand[];
@@ -25,15 +33,50 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     return daysAgo <= 7;
   }).length;
 
+  // SLA Estourado: concluidas fora do prazo de resolucao
+  const slaBreach = demands.filter((d) => {
+    if (d.priority === "sem_classificacao") return false;
+    const config = PRIORITY_CONFIG[d.priority];
+    if (!config.sla) return false;
+    if (d.status === "concluida" && d.completedAt) {
+      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+      return new Date(d.completedAt) > due;
+    }
+    // Ainda aberta mas ja passou do prazo
+    if (d.status !== "concluida" && d.status !== "expirada") {
+      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+      return new Date() > due;
+    }
+    return d.status === "expirada";
+  }).length;
+
+  // SLA 1a resposta estourado
+  const firstResponseBreach = demands.filter((d) => {
+    if (d.priority === "sem_classificacao") return false;
+    const config = PRIORITY_CONFIG[d.priority];
+    if (!config.sla) return false;
+    const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
+    if (mins === null) {
+      // Sem resposta ainda - verificar se ja passou do prazo de resposta
+      const slaMinutes = parseResponseSla(config.sla.response);
+      const elapsed = (new Date().getTime() - new Date(d.createdAt).getTime()) / 60000;
+      return elapsed > slaMinutes && d.status !== "concluida";
+    }
+    const slaMinutes = parseResponseSla(config.sla.response);
+    return mins > slaMinutes;
+  }).length;
+
   const stats = [
     { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
     { key: "urgentes", title: "P1 Criticos", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
     { key: "vencendo", title: "Vencendo Hoje", value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
     { key: "concluidas", title: "Concluidas (7d)", value: completedWeek, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
+    { key: "sla_estourado", title: "SLA Estourado", value: slaBreach, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
+    { key: "resposta_atrasada", title: "1a Resp. Atrasada", value: firstResponseBreach, icon: Zap, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {stats.map((stat) => {
         const isActive = activeFilter === stat.key;
         return (

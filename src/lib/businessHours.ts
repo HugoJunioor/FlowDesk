@@ -129,6 +129,29 @@ export function formatBusinessTime(minutes: number): string {
   return `${mins}m`;
 }
 
+/**
+ * SLA de primeira resposta: minutos uteis entre criacao e primeira resposta da equipe.
+ * Retorna null se nao ha resposta da equipe.
+ */
+export function getFirstResponseMinutes(createdAt: string, threadReplies: { timestamp: string; isTeamMember: boolean }[]): number | null {
+  const teamReplies = threadReplies
+    .filter((r) => r.isTeamMember)
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  if (teamReplies.length === 0) return null;
+
+  return getBusinessMinutesBetween(new Date(createdAt), new Date(teamReplies[0].timestamp));
+}
+
+/**
+ * SLA de resolucao: minutos uteis entre criacao e conclusao.
+ * Retorna null se nao foi concluida.
+ */
+export function getResolutionMinutes(createdAt: string, completedAt: string | null): number | null {
+  if (!completedAt) return null;
+  return getBusinessMinutesBetween(new Date(createdAt), new Date(completedAt));
+}
+
 export function getBusinessTimeInfo(createdAt: string, dueDate: string) {
   const now = new Date();
   const created = new Date(createdAt);
