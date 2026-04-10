@@ -31,40 +31,43 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex login-page">
-      {/* Left side - Branding (sempre claro) */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary via-primary/90 to-primary/70 items-center justify-center p-12 overflow-hidden">
-        {/* Decorative circles */}
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-white/5" />
-        <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-white/5" />
-        <div className="absolute top-[40%] left-[20%] w-[200px] h-[200px] rounded-full bg-white/5" />
+    <div className="min-h-screen flex login-page bg-gradient-to-br from-primary via-primary/90 to-primary/70 relative overflow-hidden">
+      {/* Decorative circles (full background) */}
+      <div className="absolute top-[-10%] right-[30%] w-[500px] h-[500px] rounded-full bg-white/5" />
+      <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-white/5" />
+      <div className="absolute top-[40%] left-[15%] w-[200px] h-[200px] rounded-full bg-white/5" />
 
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-3/5 relative items-center justify-center p-12">
         <div className="relative z-10 text-white flex flex-col items-center text-center space-y-12">
           {branding.logo ? (
-            <img src={branding.logo} alt={branding.name} className="h-24 w-auto" />
+            <img src={branding.logo} alt={branding.name} className="h-48 w-auto" />
           ) : (
             <div className="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center">
               <Workflow className="w-10 h-10" />
             </div>
           )}
-          <span className="text-3xl font-bold tracking-tight">{branding.name}</span>
+          <div className="flex flex-col items-center">
+            <span className="text-3xl font-bold tracking-tight">{branding.name}</span>
+            <span className="text-sm font-light tracking-wide text-white/70 mt-1">{branding.subtitle}</span>
+          </div>
         </div>
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-background">
-        <div className="w-full max-w-md space-y-6 animate-fade-in">
+      <div className="flex-1 lg:flex-none lg:w-[38%] flex flex-col justify-center items-center p-6 pb-20 lg:p-12 relative z-10 lg:bg-background lg:rounded-l-3xl lg:shadow-2xl lg:absolute lg:right-0 lg:top-0 lg:bottom-0 lg:pb-12">
+        <div className="w-full max-w-sm space-y-6 animate-fade-in">
           {/* Mobile logo */}
           <div className="text-center space-y-2 lg:hidden">
             {branding.logo ? (
-              <img src={branding.logo} alt={branding.name} className="h-10 w-auto mx-auto mb-2" />
+              <img src={branding.logo} alt={branding.name} className="h-24 w-auto mx-auto mb-2" />
             ) : (
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-2">
-                <Workflow className="w-7 h-7 text-primary" />
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/15 mb-2">
+                <Workflow className="w-7 h-7 text-white" />
               </div>
             )}
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">{branding.name}</h1>
-            <p className="text-sm text-muted-foreground">{branding.subtitle}</p>
+            <h1 className="text-lg font-semibold text-white tracking-tight">{branding.name}</h1>
+            <p className="text-sm text-white/70">{branding.subtitle}</p>
           </div>
 
           <Card className="border-border/50 shadow-lg">
@@ -153,8 +156,8 @@ const Login = () => {
             </CardContent>
           </Card>
 
-          <p className="text-xs text-muted-foreground mt-6 text-center">
-            Powered by <a href="https://www.wearejust.it" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">Just</a>. 2026
+          <p className="text-xs text-white/50 lg:text-muted-foreground mt-6 text-center">
+            Powered by <a href="https://www.wearejust.it" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline text-white/70 lg:text-foreground">Just</a>. 2026
           </p>
         </div>
       </div>
