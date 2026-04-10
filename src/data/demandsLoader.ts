@@ -67,13 +67,20 @@ function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
     const ov = overrides[d.id];
     if (!ov) return d;
+
+    // Se o sync detectou conclusao (check reaction) e o override manual era um status inferior,
+    // o sync tem prioridade — remove o override desatualizado
+    const syncConcluded = d.status === "concluida" && d.completedAt;
+    const overrideStatus = syncConcluded ? d.status : ((ov.status as any) || d.status);
+    const overrideCompleted = syncConcluded ? d.completedAt : (ov.completedAt !== undefined ? ov.completedAt : d.completedAt);
+
     return {
       ...d,
-      status: (ov.status as any) || d.status,
+      status: overrideStatus,
       priority: (ov.priority as any) || d.priority,
       assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
-      completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
-      manualStatusOverride: ov.manualStatusOverride || d.manualStatusOverride,
+      completedAt: overrideCompleted,
+      manualStatusOverride: syncConcluded ? false : (ov.manualStatusOverride || d.manualStatusOverride),
       closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
     };
   });
