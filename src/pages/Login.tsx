@@ -31,8 +31,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Branding */}
+    <div className="min-h-screen flex login-page">
+      {/* Left side - Branding (sempre claro) */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary via-primary/90 to-primary/70 items-center justify-center p-12 overflow-hidden">
         {/* Decorative circles */}
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-white/5" />
@@ -47,12 +47,12 @@ const Login = () => {
               <Workflow className="w-10 h-10" />
             </div>
           )}
-          <span className="text-5xl font-bold tracking-tight">{branding.name}</span>
+          <span className="text-3xl font-bold tracking-tight">{branding.name}</span>
         </div>
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-background">
         <div className="w-full max-w-md space-y-6 animate-fade-in">
           {/* Mobile logo */}
           <div className="text-center space-y-2 lg:hidden">
@@ -152,6 +152,10 @@ const Login = () => {
               )}
             </CardContent>
           </Card>
+
+          <p className="text-xs text-muted-foreground mt-6 text-center">
+            Powered by <a href="https://www.wearejust.it" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">Just</a>. 2026
+          </p>
         </div>
       </div>
     </div>
