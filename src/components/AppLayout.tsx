@@ -21,23 +21,23 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       />
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border flex items-center px-4 z-30">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-primary border-b border-primary/80 flex items-center px-4 z-30">
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2 -ml-2 text-muted-foreground hover:text-foreground rounded-lg"
+          className="p-2 -ml-2 text-white/80 hover:text-white rounded-lg"
         >
           <Menu size={20} />
         </button>
         {branding.logo ? (
-          <img src={branding.logo} alt={branding.name} className="ml-3 h-5 w-auto" />
+          <img src={branding.logo} alt={branding.name} className="ml-3 h-7 w-auto" />
         ) : (
           <Workflow size={18} className="ml-3 text-primary" />
         )}
-        <span className="ml-1.5 font-semibold text-foreground">{branding.name}</span>
+        <span className="ml-1.5 text-sm font-semibold text-white">{branding.name}</span>
       </div>
 
       <main
-        className={`transition-all duration-300 p-4 sm:p-6 pt-18 lg:pt-8 animate-fade-in overflow-x-hidden ${
+        className={`transition-all duration-300 p-4 sm:p-6 pt-20 lg:pt-8 animate-fade-in overflow-x-hidden ${
           collapsed ? "lg:ml-16" : "lg:ml-60"
         }`}
       >

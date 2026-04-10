@@ -18,8 +18,9 @@ import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime } from "@/lib/businessHours";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
+import ReportButton from "@/components/reports/ReportButton";
 
-type Period = "hoje" | "semanal" | "mensal" | "personalizado";
+type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
 type BarStatusFilter = "all" | "abertas" | "concluidas" | "expiradas";
 
@@ -75,6 +76,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 
 const Dashboard = () => {
   const [period, setPeriod] = useState<Period>("mensal");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [client, setClient] = useState("");
   const [assignee, setAssignee] = useState("");
   const [fromOpen, setFromOpen] = useState(false);
@@ -111,6 +113,7 @@ const Dashboard = () => {
       case "hoje": return { from: startOfDay(now), to: endOfDay(now) };
       case "semanal": return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
       case "mensal": return { from: startOfMonth(now), to: endOfMonth(now) };
+      case "anual": return { from: new Date(selectedYear, 0, 1), to: new Date(selectedYear, 11, 31, 23, 59, 59) };
       case "personalizado": return {
         from: customFrom || startOfMonth(now),
         to: customTo || endOfMonth(now),
@@ -128,7 +131,7 @@ const Dashboard = () => {
       if (assignee && d.assignee?.name !== assignee) return false;
       return true;
     });
-  }, [period, client, assignee, customFrom, customTo]);
+  }, [period, client, assignee, customFrom, customTo, selectedYear]);
 
   // === METRICS (from global filtered) ===
   const total = filtered.length;
@@ -258,16 +261,26 @@ const Dashboard = () => {
       <div className="space-y-6">
         {/* Header + global filters */}
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-              <p className="text-muted-foreground text-sm mt-1">Visao analitica das demandas Slack</p>
+              <p className="text-muted-foreground text-sm text-center sm:text-left">Visao analitica das demandas Slack</p>
             </div>
-            <SyncStatusIndicator />
+            <div className="flex items-center gap-2">
+              <ReportButton
+                demands={filtered}
+                source="dashboard"
+                filters={{
+                  Período: period === "personalizado" ? `${customFrom || "?"} a ${customTo || "?"}` : period === "anual" ? `${selectedYear}` : period,
+                  ...(client ? { Cliente: client } : {}),
+                  ...(assignee ? { Responsável: assignee } : {}),
+                }}
+              />
+              <SyncStatusIndicator />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(["hoje", "semanal", "mensal", "personalizado"] as Period[]).map((p) => (
+            {(["hoje", "semanal", "mensal", "anual", "personalizado"] as Period[]).map((p) => (
               <Button
                 key={p}
                 variant={period === p ? "default" : "outline"}
@@ -279,6 +292,19 @@ const Dashboard = () => {
                 {p}
               </Button>
             ))}
+
+            {period === "anual" && (
+              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                <SelectTrigger className="h-8 w-[100px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i).map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             {period === "personalizado" && (
               <div className="flex items-center gap-2 flex-wrap">
@@ -309,10 +335,10 @@ const Dashboard = () => {
 
             <Select value={client || "_all_"} onValueChange={(v) => setClient(v === "_all_" ? "" : v)}>
               <SelectTrigger className="h-8 w-[160px] text-xs">
-                <SelectValue placeholder="Todos os clientes" />
+                <SelectValue placeholder="Cliente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all_">Todos os clientes</SelectItem>
+                <SelectItem value="_all_">Cliente</SelectItem>
                 {clients.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
@@ -321,10 +347,10 @@ const Dashboard = () => {
 
             <Select value={assignee || "_all_"} onValueChange={(v) => setAssignee(v === "_all_" ? "" : v)}>
               <SelectTrigger className="h-8 w-[180px] text-xs">
-                <SelectValue placeholder="Todos responsaveis" />
+                <SelectValue placeholder="Responsável" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all_">Todos responsaveis</SelectItem>
+                <SelectItem value="_all_">Responsável</SelectItem>
                 {assignees.map((a) => (
                   <SelectItem key={a} value={a}>{a}</SelectItem>
                 ))}
