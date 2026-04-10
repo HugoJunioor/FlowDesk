@@ -9,7 +9,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { ptBR } from "date-fns/locale";
 import { DemandPriority, DemandStatus, DemandCategory, SupportLevel, CATEGORY_OPTIONS, SUPPORT_LEVEL_OPTIONS } from "@/types/demand";
 
-export type PeriodPreset = "hoje" | "semanal" | "mensal" | "personalizado" | "";
+export type PeriodPreset = "hoje" | "semanal" | "mensal" | "anual" | "personalizado" | "";
 
 export interface DemandFilterState {
   search: string;
@@ -63,6 +63,7 @@ function getPeriodDates(preset: PeriodPreset): { from: string; to: string } {
 const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersProps) => {
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const update = (partial: Partial<DemandFilterState>) =>
     onChange({ ...filters, ...partial });
@@ -73,10 +74,26 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
       update({ periodPreset: "", dateFrom: "", dateTo: "" });
     } else if (preset === "personalizado") {
       update({ periodPreset: "personalizado" });
+    } else if (preset === "anual") {
+      const year = selectedYear;
+      update({
+        periodPreset: "anual",
+        dateFrom: new Date(year, 0, 1).toISOString(),
+        dateTo: new Date(year, 11, 31, 23, 59, 59).toISOString(),
+      });
     } else {
       const dates = getPeriodDates(preset);
       update({ periodPreset: preset, dateFrom: dates.from, dateTo: dates.to });
     }
+  };
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    update({
+      periodPreset: "anual",
+      dateFrom: new Date(year, 0, 1).toISOString(),
+      dateTo: new Date(year, 11, 31, 23, 59, 59).toISOString(),
+    });
   };
 
   const handleDateFromSelect = (date: Date | undefined) => {
@@ -117,6 +134,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
           { key: "hoje" as PeriodPreset, label: "Hoje" },
           { key: "semanal" as PeriodPreset, label: "Semanal" },
           { key: "mensal" as PeriodPreset, label: "Mensal" },
+          { key: "anual" as PeriodPreset, label: "Anual" },
           { key: "personalizado" as PeriodPreset, label: "Personalizado" },
         ]).map((p) => (
           <Button
@@ -130,6 +148,19 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             {p.label}
           </Button>
         ))}
+
+        {filters.periodPreset === "anual" && (
+          <Select value={String(selectedYear)} onValueChange={(v) => handleYearChange(Number(v))}>
+            <SelectTrigger className="h-8 w-[100px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i).map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Custom date pickers - shown when personalizado is active */}
@@ -194,7 +225,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Cliente" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="_all_">Todos os clientes</SelectItem>
+            <SelectItem value="_all_">Cliente</SelectItem>
             {clients.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
@@ -207,7 +238,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Prioridade" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas prioridades</SelectItem>
+            <SelectItem value="all">Prioridade</SelectItem>
             <SelectItem value="p1">P1 - Critico</SelectItem>
             <SelectItem value="p2">P2 - Alta</SelectItem>
             <SelectItem value="p3">P3 - Media</SelectItem>
@@ -221,7 +252,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos status</SelectItem>
+            <SelectItem value="all">Status</SelectItem>
             <SelectItem value="aberta">Aberta</SelectItem>
             <SelectItem value="em_andamento">Em andamento</SelectItem>
             <SelectItem value="concluida">Concluida</SelectItem>
@@ -235,7 +266,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Responsavel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="_all_">Todos responsaveis</SelectItem>
+            <SelectItem value="_all_">Responsável</SelectItem>
             {assignees.map((a) => (
               <SelectItem key={a} value={a}>{a}</SelectItem>
             ))}
@@ -248,7 +279,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas categorias</SelectItem>
+            <SelectItem value="all">Categoria</SelectItem>
             {CATEGORY_OPTIONS.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
@@ -261,7 +292,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <SelectValue placeholder="Nivel" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos niveis</SelectItem>
+            <SelectItem value="all">Nível</SelectItem>
             {SUPPORT_LEVEL_OPTIONS.map((l) => (
               <SelectItem key={l} value={l}>{l}</SelectItem>
             ))}

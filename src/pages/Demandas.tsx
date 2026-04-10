@@ -21,6 +21,7 @@ import DemandByPriority from "@/components/demandas/DemandByPriority";
 import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
+import ReportButton from "@/components/reports/ReportButton";
 
 // === LOCAL PERSISTENCE ===
 type DemandOverride = {
@@ -287,10 +288,25 @@ const Demandas = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Demandas Slack</h1>
-            <p className="text-muted-foreground text-sm mt-1">Acompanhe as demandas recebidas via Slack</p>
+            <p className="text-muted-foreground text-sm text-center sm:text-left">Acompanhe as demandas recebidas via Slack</p>
           </div>
-          <SyncStatusIndicator />
+          <div className="flex items-center gap-2">
+            <ReportButton
+              demands={filtered}
+              source="demandas"
+              filters={{
+                ...(filters.priority !== "all" ? { Prioridade: filters.priority } : {}),
+                ...(filters.status !== "all" ? { Status: filters.status } : {}),
+                ...(filters.assignee ? { Responsável: filters.assignee } : {}),
+                ...(filters.client ? { Cliente: filters.client } : {}),
+                ...(filters.category !== "all" ? { Categoria: filters.category } : {}),
+                ...(filters.dateFrom ? { "Data de": filters.dateFrom } : {}),
+                ...(filters.dateTo ? { "Data até": filters.dateTo } : {}),
+                ...(filters.statFilter ? { Filtro: filters.statFilter } : {}),
+              }}
+            />
+            <SyncStatusIndicator />
+          </div>
         </div>
 
         {/* Stats - clicaveis */}

@@ -42,6 +42,7 @@ const SyncStatusIndicator = () => {
       onClick={doSync}
       disabled={isSyncing}
     >
+      <span className="sm:hidden">Sincronizar</span>
       <RefreshCw size={13} className={isSyncing ? "animate-spin" : ""} />
       <span className="hidden sm:inline">
         {isSyncing

@@ -113,6 +113,11 @@ async function fetchChannelMessages(channelId, channelName) {
       const resolvedText = await resolveUserMentions(msg.text || '');
       const fields = parseWorkflowMessage(resolvedText, '');
 
+      // Check for ✅ reaction on parent message
+      const parentCheckReaction = (msg.reactions || []).some(r =>
+        ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+      );
+
       // Get thread replies
       const threadReplies = [];
       if (msg.reply_count > 0) {
@@ -122,7 +127,33 @@ async function fetchChannelMessages(channelId, channelName) {
             ts: msg.ts,
             limit: 50,
           });
-          // Skip first message (it's the parent)
+
+          // Parent message (index 0) - check reactions from full API response
+          const parentFull = replies.messages[0];
+          const parentHasCheck = parentCheckReaction || (parentFull.reactions || []).some(r =>
+            ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+          );
+
+          // If parent has check reaction, inject a synthetic "conclusion" reply
+          if (parentHasCheck) {
+            // Find who reacted with check
+            const checkReaction = (parentFull.reactions || msg.reactions || []).find(r =>
+              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+            );
+            const reactorId = checkReaction?.users?.[0];
+            const reactorName = reactorId ? await getUserName(reactorId) : 'Equipe';
+            const isReactorTeam = reactorId ? await isTeamMember(reactorId) : true;
+
+            threadReplies.push({
+              author: reactorName,
+              text: '[✅ Reacao de conclusao na mensagem principal]',
+              timestamp: new Date(parseFloat(parentFull.ts) * 1000 + 1000).toISOString(),
+              isTeamMember: isReactorTeam,
+              hasCheckReaction: true,
+            });
+          }
+
+          // Thread replies (skip parent at index 0)
           for (const reply of replies.messages.slice(1)) {
             const authorName = reply.user ? await getUserName(reply.user) : (reply.username || 'Bot');
             const isTeam = reply.user ? await isTeamMember(reply.user) : false;
@@ -144,6 +175,22 @@ async function fetchChannelMessages(channelId, channelName) {
         } catch (e) {
           console.error(`  Erro ao buscar replies de ${msg.ts}:`, e.message);
         }
+      } else if (parentCheckReaction) {
+        // No replies but parent has check reaction
+        const checkReaction = (msg.reactions || []).find(r =>
+          ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+        );
+        const reactorId = checkReaction?.users?.[0];
+        const reactorName = reactorId ? await getUserName(reactorId) : 'Equipe';
+        const isReactorTeam = reactorId ? await isTeamMember(reactorId) : true;
+
+        threadReplies.push({
+          author: reactorName,
+          text: '[✅ Reacao de conclusao na mensagem principal]',
+          timestamp: new Date(parseFloat(msg.ts) * 1000 + 1000).toISOString(),
+          isTeamMember: isReactorTeam,
+          hasCheckReaction: true,
+        });
       }
 
       // Extract demand info
@@ -288,7 +335,74 @@ async function main() {
   // Sort by date (newest first)
   allDemands.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  // === ANALISE DE STATUS ===
+  const RESOLVED_PATTERNS = [
+    /ajustad[oa]/i, /corrigid[oa]/i, /resolvid[oa]/i, /conclu[ií]d[oa]/i,
+    /finalizado/i, /pronto/i, /feito/i, /realizado/i,
+    /liberado/i, /publicado/i, /implantado/i, /deploy/i,
+    /pode testar/i, /já pode/i, /ja pode/i,
+    /atualizado/i, /alterado conforme/i,
+    /solicitação atendida/i, /solicitacao atendida/i,
+    /problema resolvido/i, /tudo certo/i,
+    /encaminhad[oa]/i, /repassad[oa]/i, /direcionad[oa]/i,
+  ];
+  const GRATITUDE_PATTERNS = [
+    /obrigad[oa]/i, /valeu/i, /agradec/i, /perfeito/i,
+    /excelente/i, /show/i, /top/i, /massa/i,
+    /muito bom/i, /deu certo/i, /funcionou/i, /consegui/i,
+  ];
+
+  let statusConcluida = 0, statusAndamento = 0, statusAberta = 0;
+
+  for (const d of allDemands) {
+    const replies = [...(d.threadReplies || [])].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    const teamReplies = replies.filter(r => r.isTeamMember);
+
+    // Caso 0: Ultimo check reaction de membro da equipe = conclusao
+    const checks = replies.filter(r => r.hasCheckReaction && r.isTeamMember);
+    if (checks.length > 0) {
+      d.status = 'concluida';
+      d.completedAt = checks[checks.length - 1].timestamp;
+      statusConcluida++;
+      continue;
+    }
+
+    if (teamReplies.length === 0) { statusAberta++; continue; }
+
+    // Analise do ultimo reply
+    let analyzed = false;
+    for (let i = replies.length - 1; i >= 0; i--) {
+      const r = replies[i];
+      if (r.isTeamMember) {
+        if (RESOLVED_PATTERNS.some(p => p.test(r.text))) {
+          d.status = 'concluida';
+          d.completedAt = r.timestamp;
+          statusConcluida++;
+        } else {
+          d.status = 'em_andamento';
+          statusAndamento++;
+        }
+        analyzed = true;
+        break;
+      }
+      if (!r.isTeamMember && GRATITUDE_PATTERNS.some(p => p.test(r.text))) {
+        const teamBefore = replies.slice(0, i).reverse().find(t => t.isTeamMember);
+        if (teamBefore) {
+          d.status = 'concluida';
+          d.completedAt = teamBefore.timestamp;
+          statusConcluida++;
+          analyzed = true;
+          break;
+        }
+      }
+    }
+    if (!analyzed) statusAberta++;
+  }
+
   console.log(`\nTotal: ${allDemands.length} demandas sincronizadas`);
+  console.log(`  Concluidas: ${statusConcluida} | Em andamento: ${statusAndamento} | Abertas: ${statusAberta}`);
 
   // Write to file
   const output = `import { SlackDemand } from "@/types/demand";

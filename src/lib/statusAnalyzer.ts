@@ -90,19 +90,22 @@ export function analyzeThreadStatus(demand: SlackDemand): StatusAnalysisResult |
 
   if (teamReplies.length === 0) return null;
 
-  // Percorre de tras pra frente
+  // Caso 0 (PRIORIDADE MAXIMA): Buscar o ULTIMO check reaction na thread inteira
+  // O ultimo comentario com check = conclusao, independente de msgs posteriores sem check
+  const checksInThread = allReplies.filter((r) => r.hasCheckReaction && r.isTeamMember);
+  if (checksInThread.length > 0) {
+    const lastCheck = checksInThread[checksInThread.length - 1];
+    return {
+      suggestedStatus: "concluida",
+      reason: `Concluida via reacao ✅ na mensagem de ${lastCheck.author}. Data: ${new Date(lastCheck.timestamp).toLocaleString("pt-BR")}.`,
+      confidence: "alta",
+      detectedAt: lastCheck.timestamp,
+    };
+  }
+
+  // Percorre de tras pra frente para analise de padroes de texto
   for (let i = allReplies.length - 1; i >= 0; i--) {
     const reply = allReplies[i];
-
-    // Caso 0: Check reaction ✅ = conclusao definitiva
-    if (reply.hasCheckReaction && reply.isTeamMember) {
-      return {
-        suggestedStatus: "concluida",
-        reason: `Concluida via reacao ✅ na mensagem de ${reply.author}. Data: ${new Date(reply.timestamp).toLocaleString("pt-BR")}.`,
-        confidence: "alta",
-        detectedAt: reply.timestamp,
-      };
-    }
 
     // Caso 1: Ultima msg e da equipe com padrao de resolucao
     if (reply.isTeamMember) {
