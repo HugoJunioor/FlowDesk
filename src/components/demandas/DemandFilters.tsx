@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X, CalendarDays } from "lucide-react";
+import { Search, X, CalendarDays, Shield } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DemandPriority, DemandStatus, DemandCategory, SupportLevel, CATEGORY_OPTIONS, SUPPORT_LEVEL_OPTIONS } from "@/types/demand";
@@ -23,7 +23,18 @@ export interface DemandFilterState {
   supportLevel: SupportLevel | "all";
   statFilter: string;
   periodPreset: PeriodPreset;
+  slaSort: boolean;
 }
+
+function getDefaultMonthDates(): { from: string; to: string } {
+  const now = new Date();
+  return {
+    from: startOfMonth(now).toISOString(),
+    to: endOfMonth(now).toISOString(),
+  };
+}
+
+const defaultMonth = getDefaultMonthDates();
 
 export const EMPTY_FILTERS: DemandFilterState = {
   search: "",
@@ -31,12 +42,13 @@ export const EMPTY_FILTERS: DemandFilterState = {
   status: "all",
   assignee: "",
   client: "",
-  dateFrom: "",
-  dateTo: "",
+  dateFrom: defaultMonth.from,
+  dateTo: defaultMonth.to,
   category: "all",
   supportLevel: "all",
   statFilter: "",
-  periodPreset: "",
+  periodPreset: "mensal",
+  slaSort: false,
 };
 
 interface DemandFiltersProps {
@@ -119,7 +131,8 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
     filters.category !== "all" ||
     filters.supportLevel !== "all" ||
     filters.statFilter ||
-    filters.periodPreset;
+    filters.periodPreset ||
+    filters.slaSort;
 
   const formatDateDisplay = (iso: string) => {
     if (!iso) return "";
@@ -298,6 +311,18 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             ))}
           </SelectContent>
         </Select>
+
+        {/* SLA Sort */}
+        <Button
+          variant={filters.slaSort ? "default" : "outline"}
+          size="sm"
+          className="h-9 text-xs gap-1.5"
+          onClick={() => update({ slaSort: !filters.slaSort })}
+          title="Ordenar por urgência de SLA: estourados primeiro, depois por tempo restante"
+        >
+          <Shield size={14} />
+          SLA
+        </Button>
 
         {/* Clear */}
         {hasFilters && (

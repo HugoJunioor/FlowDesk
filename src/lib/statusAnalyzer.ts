@@ -211,6 +211,29 @@ export function getLastTeamReply(demand: SlackDemand) {
 
 export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
+    // Check reaction tem prioridade absoluta — sempre conclui
+    const hasCheck = d.threadReplies.some((r) => r.hasCheckReaction && r.isTeamMember);
+    if (hasCheck) {
+      const lastCheck = [...d.threadReplies]
+        .filter((r) => r.hasCheckReaction && r.isTeamMember)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+
+      const lastReply = getLastTeamReply(d);
+      return {
+        ...d,
+        status: "concluida" as DemandStatus,
+        completedAt: lastCheck.timestamp,
+        manualStatusOverride: false,
+        lastTeamReply: lastReply,
+        statusAnalysis: {
+          suggestedStatus: "concluida" as DemandStatus,
+          reason: `Concluida via reacao ✅ de ${lastCheck.author}.`,
+          confidence: "alta" as const,
+          detectedAt: lastCheck.timestamp,
+        },
+      };
+    }
+
     if (d.manualStatusOverride) return d;
     if (d.status === "concluida" && d.completedAt) return d;
 

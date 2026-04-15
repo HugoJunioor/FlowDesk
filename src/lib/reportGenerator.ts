@@ -1,5 +1,5 @@
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandPriority } from "@/types/demand";
-import { getFirstResponseMinutes, getResolutionMinutes } from "./businessHours";
+import { getFirstResponseMinutes, getResolutionMinutes, isExcludedFromFirstResponseSla } from "./businessHours";
 import { branding } from "@/config/brandingLoader";
 
 interface ReportOptions {
@@ -88,14 +88,16 @@ export function generateInteractiveReport(options: ReportOptions): string {
       else slaResBreach++;
     }
 
-    // First response SLA
-    const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
-    if (frMins !== null) {
-      totalFirstResp++;
-      sumFirstResp += frMins;
-      const slaRespMins = parseResponseSla(cfg.sla.response);
-      if (frMins <= slaRespMins) slaRespOk++;
-      else slaRespBreach++;
+    // First response SLA (exclui conciliação e remessa SITEF)
+    if (!isExcludedFromFirstResponseSla(d)) {
+      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
+      if (frMins !== null) {
+        totalFirstResp++;
+        sumFirstResp += frMins;
+        const slaRespMins = parseResponseSla(cfg.sla.response);
+        if (frMins <= slaRespMins) slaRespOk++;
+        else slaRespBreach++;
+      }
     }
   }
 
@@ -228,7 +230,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
 <title>${escapeHtml(title)} - ${brandName}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
-  :root {
+  :root, [data-theme="dark"] {
     --bg: #0f1729;
     --bg-card: #1a2332;
     --bg-card-hover: #1e2b3d;
@@ -250,6 +252,29 @@ export function generateInteractiveReport(options: ReportOptions): string {
     --purple-bg: rgba(168, 85, 247, 0.12);
     --radius: 12px;
     --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  [data-theme="light"] {
+    --bg: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-dim: #64748b;
+    --border: #e2e8f0;
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --success: #16a34a;
+    --success-bg: rgba(22, 163, 74, 0.1);
+    --warning: #d97706;
+    --warning-bg: rgba(217, 119, 6, 0.1);
+    --danger: #dc2626;
+    --danger-bg: rgba(220, 38, 38, 0.1);
+    --info: #0891b2;
+    --info-bg: rgba(8, 145, 178, 0.1);
+    --purple: #9333ea;
+    --purple-bg: rgba(147, 51, 234, 0.1);
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -429,6 +454,33 @@ export function generateInteractiveReport(options: ReportOptions): string {
   .footer a { color: var(--primary-light); text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
 
+  /* Theme toggle */
+  .theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(8px);
+  }
+  .theme-toggle:hover { background: var(--bg-card-hover); border-color: var(--primary); }
+
+  [data-theme="light"] .header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%); }
+  [data-theme="light"] thead th { background: rgba(0,0,0,0.04); }
+  [data-theme="light"] tbody td { border-bottom-color: #f1f5f9; }
+  [data-theme="light"] .table-row:hover { background: #f8fafc; }
+
   /* Table pagination */
   .pagination { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 12px; color: var(--text-muted); }
   .pagination button {
@@ -462,7 +514,12 @@ export function generateInteractiveReport(options: ReportOptions): string {
   }
 </style>
 </head>
-<body>
+<body data-theme="dark">
+
+<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Alternar tema">
+  <span id="themeIcon">☀️</span>
+  <span id="themeLabel">Tema Claro</span>
+</button>
 
 <div class="header">
   <div class="header-content">
@@ -645,6 +702,36 @@ export function generateInteractiveReport(options: ReportOptions): string {
 </div>
 
 <script>
+// Theme toggle
+function toggleTheme() {
+  const body = document.body;
+  const isDark = body.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  body.setAttribute('data-theme', newTheme);
+  document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
+  document.getElementById('themeLabel').textContent = isDark ? 'Tema Escuro' : 'Tema Claro';
+  updateChartColors(newTheme);
+}
+
+function updateChartColors(theme) {
+  const textColor = theme === 'light' ? '#475569' : '#94a3b8';
+  const gridColor = theme === 'light' ? 'rgba(0,0,0,0.06)' : 'rgba(42,58,78,0.5)';
+  Chart.defaults.color = textColor;
+  Chart.defaults.borderColor = gridColor;
+  Object.values(Chart.instances).forEach(chart => {
+    if (chart.options.scales) {
+      Object.values(chart.options.scales).forEach(scale => {
+        if (scale.grid) scale.grid.color = gridColor;
+        if (scale.ticks) scale.ticks.color = textColor;
+      });
+    }
+    if (chart.options.plugins?.legend?.labels) {
+      chart.options.plugins.legend.labels.color = textColor;
+    }
+    chart.update();
+  });
+}
+
 // Chart.js defaults
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(42,58,78,0.5)';
