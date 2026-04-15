@@ -18,18 +18,34 @@ export const isRealData = !!realModule;
 
 // === PROCESSAMENTO COMPARTILHADO ===
 
+// Regras de auto-atribuição configuráveis via localStorage
+function loadAutoAssignRules(): { pattern: string; field: "title" | "workflow"; match: "includes" | "equals"; assignee: string; priority?: string }[] {
+  try {
+    const stored = localStorage.getItem("fd_auto_assign_rules");
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+}
+
 function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
+  const rules = loadAutoAssignRules();
+
   return demands.map((d) => {
     const titleLower = d.title.toLowerCase();
     const workflowLower = d.workflow.toLowerCase();
 
-    // Rule: Remessa SITEF → Hugo, sem classificacao
-    if (workflowLower.includes("remessa") || titleLower.includes("remessa sitef") || titleLower.includes("remessa tef")) {
-      return { ...d, assignee: { name: "Hugo Cordeiro Junior", avatar: "" }, priority: "sem_classificacao" as const };
-    }
-    // Rule: Conciliacao (por workflow) → Daniel, sem classificacao
-    if (workflowLower === "nova conciliação" || workflowLower === "nova conciliacao") {
-      return { ...d, assignee: { name: "Daniel Bichof", avatar: "" }, priority: "sem_classificacao" as const };
+    // Regras dinâmicas de auto-atribuição (configuradas localmente)
+    for (const rule of rules) {
+      const value = rule.field === "title" ? titleLower : workflowLower;
+      const matched = rule.match === "equals"
+        ? value === rule.pattern.toLowerCase()
+        : value.includes(rule.pattern.toLowerCase());
+      if (matched) {
+        return {
+          ...d,
+          assignee: { name: rule.assignee, avatar: "" },
+          priority: (rule.priority as any) || d.priority,
+        };
+      }
     }
 
     if (d.priority === "sem_classificacao") return d;
