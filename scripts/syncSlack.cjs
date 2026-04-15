@@ -291,7 +291,7 @@ async function fetchChannelMessages(channelId, channelName) {
         taskLink,
         tags,
         slackChannel: `#${channelName}`,
-        slackPermalink: `https://wearejust-it.slack.com/archives/${channelId}/p${msg.ts.replace('.', '')}`,
+        slackPermalink: `https://${process.env.SLACK_WORKSPACE || 'workspace'}.slack.com/archives/${channelId}/p${msg.ts.replace('.', '')}`,
         replies: msg.reply_count || 0,
         threadReplies,
       };
