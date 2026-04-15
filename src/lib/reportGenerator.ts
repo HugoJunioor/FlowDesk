@@ -457,24 +457,26 @@ export function generateInteractiveReport(options: ReportOptions): string {
   /* Theme toggle */
   .theme-toggle {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    top: 12px;
+    right: 12px;
     z-index: 100;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 14px;
-    color: var(--text);
-    font-size: 13px;
+    background: none;
+    border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+    width: 16px;
+    height: 16px;
     cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(8px);
+    justify-content: center;
   }
-  .theme-toggle:hover { background: var(--bg-card-hover); border-color: var(--primary); }
+  .theme-toggle:hover { border-color: rgba(255,255,255,0.6); }
+  .theme-toggle .check { display: none; font-size: 10px; line-height: 1; color: var(--primary); }
+  [data-theme="light"] .theme-toggle { border-color: var(--border); background: var(--primary); }
+  [data-theme="light"] .theme-toggle .check { display: block; color: #fff; }
+  [data-theme="light"] .theme-toggle:hover { opacity: 0.8; }
 
   [data-theme="light"] .header { background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%); }
   [data-theme="light"] thead th { background: rgba(0,0,0,0.04); }
@@ -516,9 +518,8 @@ export function generateInteractiveReport(options: ReportOptions): string {
 </head>
 <body data-theme="dark">
 
-<button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Alternar tema">
-  <span id="themeIcon">☀️</span>
-  <span id="themeLabel">Tema Claro</span>
+<button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+  <span class="check">✓</span>
 </button>
 
 <div class="header">
@@ -708,8 +709,6 @@ function toggleTheme() {
   const isDark = body.getAttribute('data-theme') === 'dark';
   const newTheme = isDark ? 'light' : 'dark';
   body.setAttribute('data-theme', newTheme);
-  document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
-  document.getElementById('themeLabel').textContent = isDark ? 'Tema Escuro' : 'Tema Claro';
   updateChartColors(newTheme);
 }
 

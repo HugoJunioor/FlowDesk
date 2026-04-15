@@ -36,13 +36,16 @@ export const EXPIRATION_REASON_OPTIONS: ExpirationReason[] = [
 
 export const SUPPORT_LEVEL_OPTIONS: SupportLevel[] = ["N1", "N2", "N3"];
 
-// N1: Bruna, Schai | N2: Daniel, Hugo | N3: Rafa, Cezar, Erick, Gabriel
-export const SUPPORT_LEVEL_MEMBERS: Record<string, SupportLevel> = {
-  "Bruna Queiroz": "N1", "Bruna": "N1", "Schai Bock": "N1", "Schai": "N1",
-  "Daniel Bichof": "N2", "Daniel": "N2", "Hugo Cordeiro Junior": "N2", "Hugo": "N2",
-  "Rafael Cursino": "N3", "Rafa": "N3", "Cezar Felipe": "N3", "Cezar": "N3",
-  "Erick": "N3", "Gabriel": "N3",
-};
+// Mapeamento de membros da equipe por nível de suporte
+// Configurar via localStorage key "fd_support_members" ou editar localmente
+function loadSupportMembers(): Record<string, SupportLevel> {
+  try {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("fd_support_members") : null;
+    return stored ? JSON.parse(stored) : {};
+  } catch { return {}; }
+}
+
+export const SUPPORT_LEVEL_MEMBERS: Record<string, SupportLevel> = loadSupportMembers();
 
 export interface SlackUser {
   name: string;

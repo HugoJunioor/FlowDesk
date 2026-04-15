@@ -188,7 +188,22 @@ const Dashboard = () => {
       const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
       return new Date(d.completedAt!) <= due;
     });
-    const breached = concluded.length - withinSla.length;
+    // Total de SLA estourado: concluidas fora do prazo + abertas/andamento que já passaram
+    const now = new Date();
+    const breached = filtered.filter((d) => {
+      if (d.priority === "sem_classificacao") return false;
+      const config = PRIORITY_CONFIG[d.priority];
+      if (!config.sla) return false;
+      if (d.status === "concluida" && d.completedAt) {
+        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+        return new Date(d.completedAt) > due;
+      }
+      if (d.status !== "concluida" && d.status !== "expirada") {
+        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+        return now > due;
+      }
+      return d.status === "expirada";
+    }).length;
     const rate = concluded.length > 0 ? Math.round((withinSla.length / concluded.length) * 100) : 100;
     return { rate, breached, total: concluded.length };
   }, [filtered]);
