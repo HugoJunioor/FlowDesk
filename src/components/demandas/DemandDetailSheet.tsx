@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X, Plus } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority,
-  ClosureFields, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, SUPPORT_LEVEL_OPTIONS,
+  ClosureFields, ClosureAttachment, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, SUPPORT_LEVEL_OPTIONS,
   DemandCategory, ExpirationReason, SupportLevel,
 } from "@/types/demand";
 import { extractClientName } from "@/data/demandsLoader";
@@ -42,6 +42,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
+  const [completeObservation, setCompleteObservation] = useState("");
   const [showAddAssignee, setShowAddAssignee] = useState(false);
   const [newAssigneeName, setNewAssigneeName] = useState("");
   const newAssigneeRef = useRef<HTMLInputElement>(null);
@@ -56,10 +57,12 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
     setNewAssigneeName("");
     setShowAddCategory(false);
     setNewCategoryName("");
+    setCompleteObservation("");
     if (demand) {
       const now = new Date();
       setCompleteDate(format(now, "yyyy-MM-dd"));
       setCompleteTime(format(now, "HH:mm"));
+      setCompleteObservation(demand.closure?.observation || "");
     }
   }, [demand?.id]);
 
@@ -94,6 +97,9 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
   const handleConfirmComplete = () => {
     if (!completeDate || !completeTime) return;
     const completedAt = new Date(`${completeDate}T${completeTime}:00`).toISOString();
+    if (completeObservation.trim()) {
+      onClosureChange(demand.id, { observation: completeObservation.trim() });
+    }
     onStatusChange(demand.id, "concluida", completedAt);
     setShowCompleteForm(false);
   };
@@ -315,6 +321,17 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground">Observação</label>
+                  <textarea
+                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[48px]"
+                    rows={2}
+                    maxLength={2000}
+                    placeholder="Observação sobre a conclusão (opcional)..."
+                    value={completeObservation}
+                    onChange={(e) => setCompleteObservation(e.target.value)}
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" className="h-8 text-xs flex-1" onClick={handleConfirmComplete}>
                     <CheckCircle2 size={13} className="mr-1" />
@@ -432,9 +449,17 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
           </div>
 
           {demand.completedAt && (
-            <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-              <p className="text-xs text-muted-foreground">Concluido em</p>
-              <p className="text-sm font-medium text-success">{formatDate(demand.completedAt)}</p>
+            <div className="p-3 rounded-lg bg-success/5 border border-success/20 space-y-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Concluido em</p>
+                <p className="text-sm font-medium text-success">{formatDate(demand.completedAt)}</p>
+              </div>
+              {demand.closure?.observation && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Observação</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{demand.closure.observation}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -638,16 +663,96 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                 </div>
               )}
 
-              {/* Comentario interno */}
+              {/* Resolução */}
               <div>
-                <label className="text-[11px] text-muted-foreground">Comentario interno</label>
+                <label className="text-[11px] text-muted-foreground">Resolução</label>
                 <textarea
-                  className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-none"
-                  rows={2}
-                  placeholder="Observacoes internas sobre a demanda..."
+                  className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[80px]"
+                  rows={5}
+                  maxLength={5000}
+                  placeholder="Descreva a resolução da demanda..."
                   value={demand.closure?.internalComment || ""}
                   onChange={(e) => onClosureChange(demand.id, { internalComment: e.target.value })}
                 />
+                <div className="flex items-center justify-between mt-0.5">
+                  <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                    <Paperclip size={12} />
+                    <span>Anexar arquivo</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.7z"
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (!files) return;
+                        const existing = demand.closure?.attachments || [];
+                        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+                        Array.from(files).forEach((file) => {
+                          if (file.size > MAX_FILE_SIZE) {
+                            alert(`Arquivo "${file.name}" excede o limite de 5MB.`);
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const attachment: ClosureAttachment = {
+                              id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                              name: file.name,
+                              type: file.type,
+                              size: file.size,
+                              dataUrl: reader.result as string,
+                              addedAt: new Date().toISOString(),
+                            };
+                            onClosureChange(demand.id, { attachments: [...existing, attachment] });
+                            existing.push(attachment);
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">
+                    {(demand.closure?.internalComment || "").length}/5000
+                  </span>
+                </div>
+
+                {/* Lista de anexos */}
+                {(demand.closure?.attachments || []).length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {(demand.closure?.attachments || []).map((att) => (
+                      <div key={att.id} className="flex items-center gap-2 p-2 rounded-md border border-input bg-muted/30 group">
+                        {att.type.startsWith("image/") ? (
+                          <Image size={14} className="text-blue-500 shrink-0" />
+                        ) : (
+                          <FileText size={14} className="text-muted-foreground shrink-0" />
+                        )}
+                        <span className="text-xs truncate flex-1" title={att.name}>{att.name}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {att.size < 1024 ? `${att.size}B` : att.size < 1024 * 1024 ? `${(att.size / 1024).toFixed(0)}KB` : `${(att.size / (1024 * 1024)).toFixed(1)}MB`}
+                        </span>
+                        <a
+                          href={att.dataUrl}
+                          download={att.name}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Baixar"
+                        >
+                          <Download size={13} className="text-muted-foreground hover:text-foreground" />
+                        </a>
+                        <button
+                          onClick={() => {
+                            const updated = (demand.closure?.attachments || []).filter((a) => a.id !== att.id);
+                            onClosureChange(demand.id, { attachments: updated });
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remover"
+                        >
+                          <Trash2 size={13} className="text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

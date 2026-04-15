@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap } from "lucide-react";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
-import { addBusinessHours, getFirstResponseMinutes } from "@/lib/businessHours";
+import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -27,11 +27,7 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     const hoursLeft = differenceInHours(new Date(d.dueDate), now);
     return hoursLeft >= 0 && hoursLeft <= 24;
   }).length;
-  const completedWeek = demands.filter((d) => {
-    if (!d.completedAt) return false;
-    const daysAgo = differenceInHours(now, new Date(d.completedAt)) / 24;
-    return daysAgo <= 7;
-  }).length;
+  const concluidas = demands.filter((d) => d.status === "concluida").length;
 
   // SLA Estourado: concluidas fora do prazo de resolucao
   const slaBreach = demands.filter((d) => {
@@ -53,6 +49,7 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
   // SLA 1a resposta estourado
   const firstResponseBreach = demands.filter((d) => {
     if (d.priority === "sem_classificacao") return false;
+    if (isExcludedFromFirstResponseSla(d)) return false;
     const config = PRIORITY_CONFIG[d.priority];
     if (!config.sla) return false;
     const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
@@ -70,7 +67,7 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
     { key: "urgentes", title: "P1 Criticos", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
     { key: "vencendo", title: "Vencendo Hoje", value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
-    { key: "concluidas", title: "Concluidas (7d)", value: completedWeek, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
+    { key: "concluidas", title: "Concluídas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
     { key: "sla_estourado", title: "SLA Estourado", value: slaBreach, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
     { key: "resposta_atrasada", title: "1a Resp. Atrasada", value: firstResponseBreach, icon: Zap, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
   ];

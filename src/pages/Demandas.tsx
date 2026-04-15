@@ -5,7 +5,7 @@ import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
-import { addBusinessHours, getFirstResponseMinutes } from "@/lib/businessHours";
+import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -181,6 +181,23 @@ const Demandas = () => {
     }));
   }, []);
 
+  // Demandas filtradas pelo período (para os quadros de stats)
+  const periodFiltered = useMemo(() => {
+    return demands.filter((d) => {
+      if (filters.dateFrom) {
+        const from = new Date(filters.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (new Date(d.createdAt) < from) return false;
+      }
+      if (filters.dateTo) {
+        const to = new Date(filters.dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(d.createdAt) > to) return false;
+      }
+      return true;
+    });
+  }, [filters.dateFrom, filters.dateTo, demands]);
+
   const filtered = useMemo(() => {
     const now = new Date();
 
@@ -201,9 +218,7 @@ const Demandas = () => {
             break;
           }
           case "concluidas": {
-            if (!d.completedAt) return false;
-            const daysAgo = differenceInHours(now, new Date(d.completedAt)) / 24;
-            if (daysAgo > 7) return false;
+            if (d.status !== "concluida") return false;
             break;
           }
           case "sla_estourado": {
@@ -221,6 +236,7 @@ const Demandas = () => {
           }
           case "resposta_atrasada": {
             if (d.priority === "sem_classificacao") return false;
+            if (isExcludedFromFirstResponseSla(d)) return false;
             const cfg2 = PRIORITY_CONFIG[d.priority];
             if (!cfg2.sla) return false;
             const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
@@ -282,6 +298,28 @@ const Demandas = () => {
     });
   }, [filters, demands]);
 
+  // SLA sort: estourados primeiro, depois por menor tempo restante até estouro
+  const sorted = useMemo(() => {
+    if (!filters.slaSort) return filtered;
+
+    const now = new Date();
+
+    function getSlaScore(d: SlackDemand): number {
+      // Concluídas vão pro final
+      if (d.status === "concluida") return Infinity;
+
+      const cfg = PRIORITY_CONFIG[d.priority];
+      if (!cfg.sla || d.priority === "sem_classificacao") return Infinity - 1;
+
+      const dueDate = addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+      const remainingMs = dueDate.getTime() - now.getTime();
+      // Negativo = estourado (quanto mais negativo, mais estourado → menor score → aparece primeiro)
+      return remainingMs;
+    }
+
+    return [...filtered].sort((a, b) => getSlaScore(a) - getSlaScore(b));
+  }, [filtered, filters.slaSort]);
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -292,7 +330,7 @@ const Demandas = () => {
           </div>
           <div className="flex items-center gap-2">
             <ReportButton
-              demands={filtered}
+              demands={sorted}
               source="demandas"
               filters={{
                 ...(filters.priority !== "all" ? { Prioridade: filters.priority } : {}),
@@ -311,7 +349,7 @@ const Demandas = () => {
 
         {/* Stats - clicaveis */}
         <DemandStats
-          demands={demands}
+          demands={periodFiltered}
           activeFilter={filters.statFilter}
           onFilterClick={handleStatClick}
         />
@@ -342,16 +380,16 @@ const Demandas = () => {
           </TabsList>
 
           <TabsContent value="kanban">
-            <DemandKanban demands={filtered} onSelect={setSelected} />
+            <DemandKanban demands={sorted} onSelect={setSelected} />
           </TabsContent>
           <TabsContent value="date">
-            <DemandByDate demands={filtered} onSelect={setSelected} />
+            <DemandByDate demands={sorted} onSelect={setSelected} />
           </TabsContent>
           <TabsContent value="priority">
-            <DemandByPriority demands={filtered} onSelect={setSelected} />
+            <DemandByPriority demands={sorted} onSelect={setSelected} />
           </TabsContent>
           <TabsContent value="assignee">
-            <DemandByAssignee demands={filtered} onSelect={setSelected} />
+            <DemandByAssignee demands={sorted} onSelect={setSelected} />
           </TabsContent>
         </Tabs>
 

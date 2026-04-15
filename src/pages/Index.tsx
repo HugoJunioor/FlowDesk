@@ -16,7 +16,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { ptBR } from "date-fns/locale";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
-import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime } from "@/lib/businessHours";
+import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
 
@@ -157,6 +157,7 @@ const Dashboard = () => {
   // SLA de primeira resposta (real, baseado em threadReplies)
   const firstResponseData = useMemo(() => {
     const demandsWithResponse = filtered
+      .filter((d) => !isExcludedFromFirstResponseSla(d))
       .map((d) => ({ demand: d, minutes: getFirstResponseMinutes(d.createdAt, d.threadReplies) }))
       .filter((r) => r.minutes !== null) as { demand: typeof filtered[0]; minutes: number }[];
 
