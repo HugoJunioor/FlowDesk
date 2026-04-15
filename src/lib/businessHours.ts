@@ -1,3 +1,15 @@
+import { SlackDemand } from "@/types/demand";
+
+/** Demandas de conciliação e remessa SITEF não contam no SLA de 1ª resposta */
+export function isExcludedFromFirstResponseSla(d: SlackDemand): boolean {
+  const title = d.title.toLowerCase();
+  const workflow = d.workflow.toLowerCase();
+  return (
+    workflow.includes("concilia") || title.includes("concilia") ||
+    workflow.includes("remessa") || title.includes("remessa sitef") || title.includes("remessa tef")
+  );
+}
+
 /**
  * Calcula minutos uteis entre duas datas
  * Horario comercial: Seg-Sex 8h-18h (10h/dia = 600min/dia)

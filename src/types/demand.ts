@@ -57,11 +57,22 @@ export interface ThreadReply {
   hasCheckReaction?: boolean;
 }
 
+export interface ClosureAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  addedAt: string;
+}
+
 export interface ClosureFields {
   category: DemandCategory;
   expirationReason: ExpirationReason;
   supportLevel: SupportLevel;
   internalComment: string;
+  observation?: string;
+  attachments?: ClosureAttachment[];
   autoFilled: {
     category: boolean;
     expirationReason: boolean;
