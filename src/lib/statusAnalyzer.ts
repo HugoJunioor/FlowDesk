@@ -211,7 +211,10 @@ export function getLastTeamReply(demand: SlackDemand) {
 
 export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
   return demands.map((d) => {
-    // Check reaction tem prioridade absoluta — sempre conclui
+    // Override manual sempre tem prioridade — usuário editou depois
+    if (d.manualStatusOverride) return d;
+
+    // Check reaction conclui automaticamente (se não há override manual)
     const hasCheck = d.threadReplies.some((r) => r.hasCheckReaction && r.isTeamMember);
     if (hasCheck) {
       const lastCheck = [...d.threadReplies]
@@ -223,7 +226,6 @@ export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
         ...d,
         status: "concluida" as DemandStatus,
         completedAt: lastCheck.timestamp,
-        manualStatusOverride: false,
         lastTeamReply: lastReply,
         statusAnalysis: {
           suggestedStatus: "concluida" as DemandStatus,
@@ -233,8 +235,6 @@ export function processDemandsStatus(demands: SlackDemand[]): SlackDemand[] {
         },
       };
     }
-
-    if (d.manualStatusOverride) return d;
     if (d.status === "concluida" && d.completedAt) return d;
 
     const lastReply = getLastTeamReply(d);
