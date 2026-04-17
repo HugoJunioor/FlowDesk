@@ -92,6 +92,16 @@ const CHECK_REACTIONS = [
   'check',
 ];
 
+// === Padroes de aprovacao (inicia contagem do SLA) ===
+// Detecta mensagens tipo "aprovado", "aprovada", "query aprovada",
+// "@fulano a query foi aprovada" etc.
+const SQL_APPROVED_PATTERNS = [
+  /\baprovad[oa]\b/i,
+  /\bautorizad[oa]\b/i,
+  /\bliberad[oa]\b/i,
+  /\bpode\s+(rodar|executar|seguir|prosseguir)/i,
+];
+
 // === Padroes de conclusao por texto (so para o modulo SQL) ===
 const SQL_RESOLVED_PATTERNS = [
   /\bconcluid[oa]\b/i,
@@ -105,6 +115,8 @@ const SQL_RESOLVED_PATTERNS = [
   /\brealizad[oa]\b/i,
   /\brodad[oa]\b/i,
   /\bjob finalizou\b/i,
+  /\brodei\b/i,
+  /\bexecutei\b/i,
 ];
 
 async function fetchAllReplies(channelId, threadTs) {
@@ -213,31 +225,53 @@ function analyzeStatus(d) {
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  // 1) Check reaction no parent OU em qualquer reply = concluida
-  if (d.parentHasCheck) {
-    return { status: 'concluida', completedAt: new Date(parseFloat(d.id.split('_').pop()) * 1000).toISOString() };
-  }
-  const checkReply = replies.find((r) => r.hasCheckReaction);
-  if (checkReply) {
-    return { status: 'concluida', completedAt: checkReply.timestamp };
-  }
-
-  // 2) Mensagem com padrao de conclusao (equipe ou qualquer)
-  for (let i = replies.length - 1; i >= 0; i--) {
-    const r = replies[i];
-    if (SQL_RESOLVED_PATTERNS.some((p) => p.test(r.text))) {
-      return { status: 'concluida', completedAt: r.timestamp };
+  // 1) Detecta APROVACAO na thread: primeira mensagem com padrao "aprovado"
+  //    Pode vir da equipe ou do cliente (gerente/solicitante aprovando).
+  let approvedAt = null;
+  let approvalIdx = -1;
+  for (let i = 0; i < replies.length; i++) {
+    if (SQL_APPROVED_PATTERNS.some((p) => p.test(replies[i].text))) {
+      approvedAt = replies[i].timestamp;
+      approvalIdx = i;
+      break;
     }
   }
 
-  // 3) Equipe respondeu? Em andamento. (primeira resposta da equipe = aprovacao)
-  const teamReplies = replies.filter((r) => r.isTeamMember);
-  if (teamReplies.length > 0) {
-    return { status: 'em_andamento', completedAt: null, approvedAt: teamReplies[0].timestamp };
+  // Se nao ha aprovacao, fica aberta (ignora outros sinais)
+  if (approvedAt === null) {
+    return { status: 'aberta', completedAt: null, approvedAt: null };
   }
 
-  // 4) Sem aprovacao ainda
-  return { status: 'aberta', completedAt: null };
+  // Considera apenas mensagens APOS a aprovacao para detectar conclusao
+  const repliesAfterApproval = replies.slice(approvalIdx + 1);
+
+  // 2) Check reaction apos a aprovacao = concluida
+  const checkReply = repliesAfterApproval.find((r) => r.hasCheckReaction);
+  if (checkReply) {
+    return { status: 'concluida', completedAt: checkReply.timestamp, approvedAt };
+  }
+
+  // 3) Mensagem com padrao de conclusao apos aprovacao
+  for (let i = repliesAfterApproval.length - 1; i >= 0; i--) {
+    const r = repliesAfterApproval[i];
+    if (SQL_RESOLVED_PATTERNS.some((p) => p.test(r.text))) {
+      return { status: 'concluida', completedAt: r.timestamp, approvedAt };
+    }
+  }
+
+  // 4) Check reaction no parent tambem conclui (muito comum no canal SQL)
+  if (d.parentHasCheck) {
+    // parentHasCheck precisa vir apos a aprovacao logicamente, mas como
+    // nao temos timestamp exato do reaction, usamos timestamp do ultimo reply
+    // ou do parent + 1 segundo
+    const lastTs = repliesAfterApproval.length > 0
+      ? repliesAfterApproval[repliesAfterApproval.length - 1].timestamp
+      : new Date(new Date(approvedAt).getTime() + 60000).toISOString();
+    return { status: 'concluida', completedAt: lastTs, approvedAt };
+  }
+
+  // 5) Aprovada mas sem conclusao detectada
+  return { status: 'em_andamento', completedAt: null, approvedAt };
 }
 
 async function main() {
