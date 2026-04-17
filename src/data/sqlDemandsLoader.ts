@@ -20,6 +20,7 @@ function loadSqlOverrides(): Record<
   {
     status?: string;
     completedAt?: string | null;
+    approvedAt?: string | null;
     manualStatusOverride?: boolean;
     assignee?: string | null;
   }
@@ -38,13 +39,20 @@ export function applySqlOverrides(demands: SlackDemand[]): SlackDemand[] {
     const ov = overrides[d.id];
     if (!ov) return d;
     const hasManualStatus = ov.manualStatusOverride && ov.status;
-    return {
+    const override: Record<string, unknown> = {
       ...d,
       status: hasManualStatus ? (ov.status as SlackDemand["status"]) : ((ov.status as SlackDemand["status"]) || d.status),
       assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
       completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
       manualStatusOverride: ov.manualStatusOverride || false,
     };
+    // Propaga approvedAt (tanto do override quanto do arquivo)
+    if (ov.approvedAt) {
+      override.approvedAt = ov.approvedAt;
+    } else if ((d as SlackDemand & { approvedAt?: string }).approvedAt) {
+      override.approvedAt = (d as SlackDemand & { approvedAt?: string }).approvedAt;
+    }
+    return override as SlackDemand;
   });
 }
 
