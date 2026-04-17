@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Demandas from "./pages/Demandas.tsx";
+import DemandasSql from "./pages/DemandasSql.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import UserManagement from "./pages/UserManagement.tsx";
 import Profile from "./pages/Profile.tsx";
@@ -36,6 +37,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/demandas" element={<Demandas />} />
+      <Route path="/demandas-sql" element={<DemandasSql />} />
       <Route path="/configuracoes" element={<Configuracoes />} />
       <Route path="/perfil" element={<Profile />} />
       {currentUser?.role === "master" && (
