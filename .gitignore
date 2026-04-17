@@ -32,9 +32,10 @@ dist-ssr
 src/data/realDemands.ts
 src/data/historicalDemands.ts
 src/data/historicalDemands.json
+src/data/sqlDemands.ts
 
 # Shared state (users, overrides, groups — local only)
-data/
+/data/
 
 # Local branding (company-specific)
 src/config/branding.local.ts

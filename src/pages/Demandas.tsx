@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Calendar, Signal, Users, List } from "lucide-react";
+import { LayoutGrid, Calendar, Signal, Users, List, Database } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
@@ -59,6 +60,7 @@ function saveCustomAssignees(assignees: string[]) {
 }
 
 const Demandas = () => {
+  const navigate = useNavigate();
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
@@ -390,13 +392,27 @@ const Demandas = () => {
           onFilterClick={handleStatClick}
         />
 
-        {/* Filters */}
-        <DemandFilters
-          filters={filters}
-          onChange={setFilters}
-          assignees={assignees}
-          clients={clients}
-        />
+        {/* Filters + SQL button */}
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <DemandFilters
+              filters={filters}
+              onChange={setFilters}
+              assignees={assignees}
+              clients={clients}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/demandas-sql")}
+            className="gap-1.5 shrink-0"
+            title="Abrir modulo de demandas do canal #operacoes-sql (isolado)"
+          >
+            <Database size={14} />
+            <span className="hidden sm:inline">Demandas SQL</span>
+          </Button>
+        </div>
 
         {/* View mode + Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
