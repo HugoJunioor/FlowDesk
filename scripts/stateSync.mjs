@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,7 @@ const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
 export const SYNCED_KEYS = [
   "fd_users_v2",
   "fd_demand_overrides",
+  "fd_sql_demand_overrides",  // overrides do modulo SQL (isolado)
   "fd_groups",
   "fd_auto_assign_rules",
   "fd_support_members",
@@ -53,7 +55,52 @@ function readBody(req) {
   });
 }
 
+// Controle para nao rodar 2 syncs SQL em paralelo
+let sqlSyncInProgress = false;
+
+function runSqlSync() {
+  return new Promise((resolve) => {
+    if (sqlSyncInProgress) {
+      resolve({ ok: false, error: "Sync ja em andamento" });
+      return;
+    }
+    sqlSyncInProgress = true;
+    const script = path.join(__dirname, "syncSqlChannel.cjs");
+    const root = path.join(__dirname, "..");
+    const child = spawn("node", [script], { cwd: root, stdio: "pipe" });
+    let stdout = "", stderr = "";
+    child.stdout.on("data", (d) => (stdout += d.toString()));
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.on("exit", (code) => {
+      sqlSyncInProgress = false;
+      resolve({ ok: code === 0, code, stdout, stderr });
+    });
+    child.on("error", (err) => {
+      sqlSyncInProgress = false;
+      resolve({ ok: false, error: err.message });
+    });
+  });
+}
+
 function handler(req, res, next) {
+  // Endpoint de sync sob demanda do canal SQL
+  if (req.url === "/__sync-sql") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      return res.end();
+    }
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      return res.end(JSON.stringify({ error: "Use POST" }));
+    }
+    return runSqlSync().then((result) => {
+      res.setHeader("Content-Type", "application/json");
+      res.statusCode = result.ok ? 200 : 500;
+      res.end(JSON.stringify(result));
+    });
+  }
+
   if (!req.url?.startsWith("/__state")) return next();
 
   // CORS

@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "share": "npm run sync && npm run build && concurrently -n \"serve,sync,ips\" -c \"cyan,yellow,green\" \"vite preview\" \"node scripts/shareWatch.cjs\" \"npm:ips\"",
     "sync": "node scripts/syncSlack.cjs",
+    "sync:sql": "node scripts/syncSqlChannel.cjs",
     "sync:watch": "node scripts/syncWatch.cjs",
     "share:watch": "node scripts/shareWatch.cjs",
     "test": "vitest run",
