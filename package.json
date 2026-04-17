@@ -12,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "share": "npm run build && concurrently -n \"serve,sync,ips\" -c \"cyan,yellow,green\" \"vite preview\" \"node scripts/shareWatch.cjs\" \"npm:ips\"",
+    "share": "npm run sync && npm run build && concurrently -n \"serve,sync,ips\" -c \"cyan,yellow,green\" \"vite preview\" \"node scripts/shareWatch.cjs\" \"npm:ips\"",
     "sync": "node scripts/syncSlack.cjs",
     "sync:watch": "node scripts/syncWatch.cjs",
     "share:watch": "node scripts/shareWatch.cjs",
