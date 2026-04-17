@@ -114,9 +114,14 @@ async function fetchAllReplies(channelId, threadTs) {
   return all;
 }
 
-// Apenas o circulo verde marca como concluida.
-// Deliberadamente excluidos: white_check_mark, heavy_check_mark, ballot_box_with_check, check.
-const CHECK_REACTIONS = ['large_green_circle'];
+// Emojis de reacao que marcam uma demanda como concluida.
+// Nao ha mais detecao por texto ("resolvido", "obrigado"): apenas reactions.
+const CHECK_REACTIONS = [
+  'large_green_circle',        // 🟢 circulo verde
+  'white_check_mark',          // ✅ check (mais universal no Slack)
+  'heavy_check_mark',          // ✔️ check pesado
+  'ballot_box_with_check',     // ☑️ caixa marcada
+];
 
 async function fetchChannelMessages(channelId, channelName) {
   const demands = [];
