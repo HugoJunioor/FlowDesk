@@ -114,7 +114,9 @@ async function fetchAllReplies(channelId, threadTs) {
   return all;
 }
 
-const CHECK_REACTIONS = ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'];
+// Apenas o circulo verde marca como concluida.
+// Deliberadamente excluidos: white_check_mark, heavy_check_mark, ballot_box_with_check, check.
+const CHECK_REACTIONS = ['large_green_circle'];
 
 async function fetchChannelMessages(channelId, channelName) {
   const demands = [];
@@ -372,21 +374,13 @@ async function main() {
   allDemands.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // === ANALISE DE STATUS ===
-  const RESOLVED_PATTERNS = [
-    /ajustad[oa]/i, /corrigid[oa]/i, /resolvid[oa]/i, /conclu[ií]d[oa]/i,
-    /finalizado/i, /pronto/i, /feito/i, /realizado/i,
-    /liberado/i, /publicado/i, /implantado/i, /deploy/i,
-    /pode testar/i, /já pode/i, /ja pode/i,
-    /atualizado/i, /alterado conforme/i,
-    /solicitação atendida/i, /solicitacao atendida/i,
-    /problema resolvido/i, /tudo certo/i,
-    /encaminhad[oa]/i, /repassad[oa]/i, /direcionad[oa]/i,
-  ];
-  const GRATITUDE_PATTERNS = [
-    /obrigad[oa]/i, /valeu/i, /agradec/i, /perfeito/i,
-    /excelente/i, /show/i, /top/i, /massa/i,
-    /muito bom/i, /deu certo/i, /funcionou/i, /consegui/i,
-  ];
+  // Regras DETERMINISTICAS:
+  //   concluida   = reacao de circulo verde :large_green_circle: na thread
+  //   em_andamento = tem pelo menos uma resposta da equipe (sem circulo verde)
+  //   aberta      = nenhuma resposta da equipe
+  //
+  // Nao ha detecao por texto ("resolvido", "obrigado", etc). Se precisa
+  // marcar como concluida, reage com o circulo verde na thread do Slack.
 
   let statusConcluida = 0, statusAndamento = 0, statusAberta = 0, statusPreservadas = 0;
 
@@ -396,7 +390,7 @@ async function main() {
     );
     const teamReplies = replies.filter(r => r.isTeamMember);
 
-    // Caso 0: Ultimo check reaction na thread = conclusao
+    // 1) Tem circulo verde na thread? Concluida.
     const checks = replies.filter(r => r.hasCheckReaction);
     if (checks.length > 0) {
       d.status = 'concluida';
@@ -405,71 +399,28 @@ async function main() {
       continue;
     }
 
-    if (teamReplies.length === 0) {
-      // Preservar estado anterior se era concluida
-      const prev = previousConcluded.get(d.id);
-      if (prev) {
-        d.status = prev.status;
-        d.completedAt = prev.completedAt;
-        statusPreservadas++;
-      } else {
-        statusAberta++;
-      }
+    // 2) Equipe ja respondeu? Em andamento.
+    if (teamReplies.length > 0) {
+      d.status = 'em_andamento';
+      statusAndamento++;
       continue;
     }
 
-    let analyzed = false;
-    for (let i = replies.length - 1; i >= 0; i--) {
-      const r = replies[i];
-      if (r.isTeamMember) {
-        if (RESOLVED_PATTERNS.some(p => p.test(r.text))) {
-          d.status = 'concluida';
-          d.completedAt = r.timestamp;
-          statusConcluida++;
-        } else {
-          d.status = 'em_andamento';
-          statusAndamento++;
-        }
-        analyzed = true;
-        break;
-      }
-      if (!r.isTeamMember && GRATITUDE_PATTERNS.some(p => p.test(r.text))) {
-        const teamBefore = replies.slice(0, i).reverse().find(t => t.isTeamMember);
-        if (teamBefore) {
-          d.status = 'concluida';
-          d.completedAt = teamBefore.timestamp;
-          statusConcluida++;
-          analyzed = true;
-          break;
-        }
-      }
-    }
-
-    if (!analyzed) {
-      // Preservar estado anterior se era concluida
-      const prev = previousConcluded.get(d.id);
-      if (prev) {
-        d.status = prev.status;
-        d.completedAt = prev.completedAt;
-        statusPreservadas++;
-      } else {
-        statusAberta++;
-      }
-    } else if (d.status !== 'concluida') {
-      // Demanda ficou "em_andamento" agora, mas estava "concluida" antes?
-      // Isso pode ser regressao indevida - preservar o concluida anterior
-      const prev = previousConcluded.get(d.id);
-      if (prev) {
-        d.status = prev.status;
-        d.completedAt = prev.completedAt;
-        statusAndamento--;
-        statusPreservadas++;
-      }
+    // 3) Ninguem da equipe respondeu. Preserva concluida anterior (se houve)
+    //    para protecao contra remocao acidental do circulo verde.
+    //    Caso contrario, fica aberta.
+    const prev = previousConcluded.get(d.id);
+    if (prev) {
+      d.status = prev.status;
+      d.completedAt = prev.completedAt;
+      statusPreservadas++;
+    } else {
+      statusAberta++;
     }
   }
 
   console.log(`\nTotal: ${allDemands.length} demandas sincronizadas`);
-  console.log(`  Concluidas (nova deteccao): ${statusConcluida}`);
+  console.log(`  Concluidas (circulo verde detectado): ${statusConcluida}`);
   console.log(`  Concluidas (preservadas do sync anterior): ${statusPreservadas}`);
   console.log(`  Em andamento: ${statusAndamento} | Abertas: ${statusAberta}`);
 
