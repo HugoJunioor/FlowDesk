@@ -179,8 +179,21 @@
 
   /* ── Violeta ── */
   .theme-violeta {
+    --background: 268 18% 97%;
+    --card: 272 16% 99%;
+    --card-foreground: 268 22% 14%;
+    --popover: 272 16% 99%;
+    --popover-foreground: 268 22% 14%;
     --primary: 270 58% 44%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 268 20% 93%;
+    --secondary-foreground: 268 22% 14%;
+    --muted: 268 16% 95%;
+    --muted-foreground: 268 14% 48%;
+    --accent: 268 20% 91%;
+    --accent-foreground: 268 22% 14%;
+    --border: 268 18% 89%;
+    --input: 268 18% 89%;
     --ring: 270 58% 44%;
     --sidebar-background: 270 24% 15%;
     --sidebar-foreground: 265 14% 80%;
@@ -209,8 +222,21 @@
 
   /* ── Rosa ── */
   .theme-rosa {
+    --background: 338 20% 97%;
+    --card: 340 18% 99%;
+    --card-foreground: 340 24% 14%;
+    --popover: 340 18% 99%;
+    --popover-foreground: 340 24% 14%;
     --primary: 340 75% 48%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 338 22% 93%;
+    --secondary-foreground: 340 24% 14%;
+    --muted: 338 16% 95%;
+    --muted-foreground: 338 14% 46%;
+    --accent: 338 22% 91%;
+    --accent-foreground: 340 24% 14%;
+    --border: 338 18% 89%;
+    --input: 338 18% 89%;
     --ring: 340 75% 48%;
     --sidebar-background: 340 28% 14%;
     --sidebar-foreground: 335 14% 80%;
@@ -239,8 +265,21 @@
 
   /* ── Esmeralda ── */
   .theme-esmeralda {
+    --background: 152 18% 97%;
+    --card: 155 16% 99%;
+    --card-foreground: 155 24% 13%;
+    --popover: 155 16% 99%;
+    --popover-foreground: 155 24% 13%;
     --primary: 155 65% 36%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 152 20% 93%;
+    --secondary-foreground: 155 24% 13%;
+    --muted: 152 14% 95%;
+    --muted-foreground: 153 14% 46%;
+    --accent: 152 20% 91%;
+    --accent-foreground: 155 24% 13%;
+    --border: 152 18% 89%;
+    --input: 152 18% 89%;
     --ring: 155 65% 36%;
     --sidebar-background: 155 26% 13%;
     --sidebar-foreground: 150 14% 80%;
@@ -269,8 +308,21 @@
 
   /* ── Ambar ── */
   .theme-ambar {
+    --background: 30 22% 97%;
+    --card: 32 20% 99%;
+    --card-foreground: 25 28% 14%;
+    --popover: 32 20% 99%;
+    --popover-foreground: 25 28% 14%;
     --primary: 25 85% 46%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 30 24% 92%;
+    --secondary-foreground: 25 28% 14%;
+    --muted: 30 18% 94%;
+    --muted-foreground: 26 16% 46%;
+    --accent: 30 24% 90%;
+    --accent-foreground: 25 28% 14%;
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
     --ring: 25 85% 46%;
     --sidebar-background: 25 30% 13%;
     --sidebar-foreground: 28 14% 80%;
@@ -299,8 +351,21 @@
 
   /* ── Rubi ── */
   .theme-rubi {
+    --background: 352 18% 97%;
+    --card: 355 16% 99%;
+    --card-foreground: 355 24% 14%;
+    --popover: 355 16% 99%;
+    --popover-foreground: 355 24% 14%;
     --primary: 355 72% 48%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 352 20% 93%;
+    --secondary-foreground: 355 24% 14%;
+    --muted: 352 14% 95%;
+    --muted-foreground: 352 14% 46%;
+    --accent: 352 20% 91%;
+    --accent-foreground: 355 24% 14%;
+    --border: 352 18% 89%;
+    --input: 352 18% 89%;
     --ring: 355 72% 48%;
     --sidebar-background: 355 28% 14%;
     --sidebar-foreground: 350 14% 80%;
@@ -329,8 +394,21 @@
 
   /* ── Turquesa ── */
   .theme-turquesa {
+    --background: 172 18% 97%;
+    --card: 175 16% 99%;
+    --card-foreground: 175 24% 13%;
+    --popover: 175 16% 99%;
+    --popover-foreground: 175 24% 13%;
     --primary: 175 65% 36%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 172 20% 93%;
+    --secondary-foreground: 175 24% 13%;
+    --muted: 172 14% 95%;
+    --muted-foreground: 174 14% 46%;
+    --accent: 172 20% 91%;
+    --accent-foreground: 175 24% 13%;
+    --border: 172 18% 89%;
+    --input: 172 18% 89%;
     --ring: 175 65% 36%;
     --sidebar-background: 175 26% 13%;
     --sidebar-foreground: 172 14% 80%;
@@ -359,8 +437,21 @@
 
   /* ── Lavanda ── */
   .theme-lavanda {
+    --background: 256 16% 97%;
+    --card: 260 14% 99%;
+    --card-foreground: 260 22% 15%;
+    --popover: 260 14% 99%;
+    --popover-foreground: 260 22% 15%;
     --primary: 260 45% 50%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 256 18% 93%;
+    --secondary-foreground: 260 22% 15%;
+    --muted: 256 14% 95%;
+    --muted-foreground: 258 14% 48%;
+    --accent: 256 18% 91%;
+    --accent-foreground: 260 22% 15%;
+    --border: 256 16% 89%;
+    --input: 256 16% 89%;
     --ring: 260 45% 50%;
     --sidebar-background: 260 22% 15%;
     --sidebar-foreground: 258 14% 80%;
@@ -389,8 +480,21 @@
 
   /* ── Safira ── */
   .theme-safira {
+    --background: 232 18% 97%;
+    --card: 235 16% 99%;
+    --card-foreground: 235 22% 14%;
+    --popover: 235 16% 99%;
+    --popover-foreground: 235 22% 14%;
     --primary: 235 65% 52%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 232 20% 93%;
+    --secondary-foreground: 235 22% 14%;
+    --muted: 232 14% 95%;
+    --muted-foreground: 233 14% 48%;
+    --accent: 232 20% 91%;
+    --accent-foreground: 235 22% 14%;
+    --border: 232 18% 89%;
+    --input: 232 18% 89%;
     --ring: 235 65% 52%;
     --sidebar-background: 235 26% 14%;
     --sidebar-foreground: 232 14% 80%;
@@ -419,8 +523,21 @@
 
   /* ── Grafite ── */
   .theme-grafite {
+    --background: 220 6% 97%;
+    --card: 220 4% 99%;
+    --card-foreground: 220 10% 14%;
+    --popover: 220 4% 99%;
+    --popover-foreground: 220 10% 14%;
     --primary: 220 8% 40%;
     --primary-foreground: 0 0% 100%;
+    --secondary: 220 8% 93%;
+    --secondary-foreground: 220 10% 14%;
+    --muted: 220 6% 95%;
+    --muted-foreground: 218 6% 46%;
+    --accent: 220 8% 91%;
+    --accent-foreground: 220 10% 14%;
+    --border: 220 6% 88%;
+    --input: 220 6% 88%;
     --ring: 220 8% 40%;
     --sidebar-background: 220 8% 13%;
     --sidebar-foreground: 218 6% 78%;
