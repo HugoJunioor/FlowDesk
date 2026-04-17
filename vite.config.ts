@@ -11,6 +11,7 @@ export default defineConfig({
     allowedHosts: true,        // aceita qualquer hostname (necessario para acesso via VPN/IP)
     hmr: {
       overlay: false,
+      clientPort: 8080,   // garante que o HMR websocket usa a mesma porta que o cliente acessou
     },
   },
   preview: {
