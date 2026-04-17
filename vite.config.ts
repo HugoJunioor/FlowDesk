@@ -1,8 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const stateSyncPlugin = require("./scripts/stateSync.cjs");
+import stateSyncPlugin from "./scripts/stateSync.mjs";
 
 // https://vitejs.dev/config/
 export default defineConfig({
