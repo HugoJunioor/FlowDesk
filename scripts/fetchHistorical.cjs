@@ -25,12 +25,11 @@ async function getUserName(userId) {
   } catch { USER_CACHE[userId] = userId; return userId; }
 }
 
-// Equipe Just (time interno). Qualquer usuario fora dessa lista = cliente externo.
-const JUST_TEAM_NAMES = new Set([
-  'Hugo Cordeiro Junior', 'Daniel Bichof', 'Bruna Queiroz',
-  'Cezar Felipe', 'Tiago Silva', 'Rafael Cursino',
-  'Gabriel', 'Schai Bock', 'Vinicius Nunes', 'Erick Sousa', 'Luiza',
-]);
+// Equipe interna (time interno). Qualquer usuario fora dessa lista = cliente externo.
+// Configurar via variavel de ambiente TEAM_MEMBERS (JSON array) ou editar localmente.
+const TEAM_NAMES = new Set(
+  process.env.TEAM_MEMBERS ? JSON.parse(process.env.TEAM_MEMBERS) : []
+);
 
 async function isTeamMember(userId) {
   if (TEAM_CACHE[userId] !== undefined) return TEAM_CACHE[userId];
@@ -40,7 +39,7 @@ async function isTeamMember(userId) {
     if (isBot) { TEAM_CACHE[userId] = false; return false; }
     const realName = info.user.real_name || info.user.profile?.real_name || '';
     const displayName = info.user.profile?.display_name || '';
-    const isTeam = JUST_TEAM_NAMES.has(realName) || JUST_TEAM_NAMES.has(displayName);
+    const isTeam = TEAM_NAMES.has(realName) || TEAM_NAMES.has(displayName);
     TEAM_CACHE[userId] = isTeam;
     return isTeam;
   } catch { TEAM_CACHE[userId] = false; return false; }
@@ -115,9 +114,9 @@ function mapExpirationReason(reason) {
   const r = reason.trim();
   const mapping = {
     'Falta de retorno do cliente': 'Falta de retorno do cliente',
-    'Falta de retorno da Just': 'Falta de retorno da Just',
+    'Falta de retorno da equipe': 'Falta de retorno da equipe',
     'Demora para validar a correção': 'Demora para validar a correcao',
-    'Demora no retorno da Just': 'Demora no retorno da Just',
+    'Demora no retorno da equipe': 'Demora no retorno da equipe',
     'Demora no primeiro atendimento': 'Demora no primeiro atendimento',
     'Demora no retorno do cliente': 'Demora no retorno do cliente',
     'Demanda fora do escopo': 'Demanda fora do escopo',
@@ -128,7 +127,7 @@ function mapExpirationReason(reason) {
     'Muitas denandas juntas': 'Muitas demandas juntas',
     'Muitas demandas juntas': 'Muitas demandas juntas',
     'Resolução por task': 'Demanda fora do escopo',
-    'Erro operacional': 'Demora no retorno da Just',
+    'Erro operacional': 'Demora no retorno da equipe',
     'Mais de uma demanda no mesmo chamado': 'Muitas demandas juntas',
     'Prioridade incorreta': 'Ajuste na prioridade',
   };
@@ -137,7 +136,7 @@ function mapExpirationReason(reason) {
 
 async function main() {
   // Read spreadsheet
-  const filePath = path.join('C:', 'Users', 'hugoc', 'Downloads', 'Demandas Suporte - Just.xlsx');
+  const filePath = process.env.HISTORICAL_XLSX_PATH || path.join('downloads', 'historico.xlsx');
   const wb = XLSX.readFile(filePath);
   const ws = wb.Sheets['Suporte 2026'];
   const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', range: 0 });
@@ -271,7 +270,7 @@ async function main() {
         const realTeamReplies = threadReplies.filter(r => r.isTeamMember && !r.text.includes('Reacao de conclusao'));
         const firstTeamAuthor = realTeamReplies.length > 0
           ? realTeamReplies.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0].author
-          : 'Equipe Just';
+          : 'Equipe Interna';
         // Inserir no inicio para ser o primeiro reply cronologicamente
         threadReplies.unshift({
           author: firstTeamAuthor,
@@ -391,7 +390,7 @@ function buildFromSpreadsheet(row, channelId, ts, link) {
   const threadReplies = [];
   if (atendimentoAt) {
     threadReplies.push({
-      author: 'Equipe Just',
+      author: 'Equipe Interna',
       text: '[Primeiro atendimento registrado na planilha]',
       timestamp: atendimentoAt,
       isTeamMember: true,

@@ -131,7 +131,7 @@ const UserManagement = () => {
     if (!isJustEmail(createEmail)) {
       toast({
         title: "E-mail inválido",
-        description: "Apenas e-mails @wearejust.it são permitidos.",
+        description: "Apenas e-mails corporativos válidos são permitidos.",
         variant: "destructive",
       });
       return;
@@ -455,12 +455,12 @@ const UserManagement = () => {
                 <label className="text-sm font-medium">E-mail *</label>
                 <Input
                   type="email"
-                  placeholder="nome@wearejust.it"
+                  placeholder="nome@empresa.com"
                   value={createEmail}
                   onChange={(e) => setCreateEmail(e.target.value)}
                 />
                 {createEmail && !isJustEmail(createEmail) && (
-                  <p className="text-xs text-destructive">Apenas e-mails @wearejust.it</p>
+                  <p className="text-xs text-destructive">E-mail corporativo inválido</p>
                 )}
               </div>
 

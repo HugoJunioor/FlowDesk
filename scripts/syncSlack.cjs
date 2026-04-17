@@ -12,12 +12,11 @@ const NOW = Date.now() / 1000;
 // Team members (internal) - will be detected by checking if they're in the workspace
 const TEAM_MEMBERS_CACHE = {};
 
-// Equipe Just (time interno). Qualquer usuario fora dessa lista = cliente externo.
-const JUST_TEAM_NAMES = new Set([
-  'Hugo Cordeiro Junior', 'Daniel Bichof', 'Bruna Queiroz',
-  'Cezar Felipe', 'Tiago Silva', 'Rafael Cursino',
-  'Gabriel', 'Schai Bock', 'Vinicius Nunes', 'Erick Sousa', 'Luiza',
-]);
+// Equipe interna (time interno). Qualquer usuario fora dessa lista = cliente externo.
+// Configurar via variavel de ambiente TEAM_MEMBERS (JSON array) ou editar localmente.
+const TEAM_NAMES = new Set(
+  process.env.TEAM_MEMBERS ? JSON.parse(process.env.TEAM_MEMBERS) : []
+);
 
 async function isTeamMember(userId) {
   if (TEAM_MEMBERS_CACHE[userId] !== undefined) return TEAM_MEMBERS_CACHE[userId];
@@ -28,7 +27,7 @@ async function isTeamMember(userId) {
     if (isBot) { TEAM_MEMBERS_CACHE[userId] = false; return false; }
     const realName = info.user.real_name || info.user.profile?.real_name || '';
     const displayName = info.user.profile?.display_name || '';
-    const isTeam = JUST_TEAM_NAMES.has(realName) || JUST_TEAM_NAMES.has(displayName);
+    const isTeam = TEAM_NAMES.has(realName) || TEAM_NAMES.has(displayName);
     TEAM_MEMBERS_CACHE[userId] = isTeam;
     return isTeam;
   } catch {

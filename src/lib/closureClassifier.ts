@@ -152,7 +152,7 @@ export function classifyExpirationReason(demand: SlackDemand): { value: Expirati
     // Client replied last = check if team was slow
     if (!lastReply.isTeamMember && secondLast && !secondLast.isTeamMember) {
       // Multiple client messages without team response
-      return { value: "Demora no retorno da Just", confidence: "media" };
+      return { value: "Demora no retorno da equipe", confidence: "media" };
     }
 
     // Client asked, team took too long
@@ -162,11 +162,11 @@ export function classifyExpirationReason(demand: SlackDemand): { value: Expirati
       if (timeBetween > 24 * 3600000) {
         return { value: "Falta de retorno do cliente", confidence: "baixa" };
       }
-      return { value: "Demora no retorno da Just", confidence: "baixa" };
+      return { value: "Demora no retorno da equipe", confidence: "baixa" };
     }
   }
 
-  return { value: "Falta de retorno da Just", confidence: "baixa" };
+  return { value: "Falta de retorno da equipe", confidence: "baixa" };
 }
 
 // === MAIN: Classify all closure fields ===

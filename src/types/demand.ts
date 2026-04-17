@@ -9,8 +9,8 @@ export type DemandCategory =
   | "Boleto" | "NF" | "Saldo" | "Pagamento" | "";
 
 export type ExpirationReason =
-  | "Falta de retorno do cliente" | "Falta de retorno da Just"
-  | "Demora para validar a correcao" | "Demora no retorno da Just"
+  | "Falta de retorno do cliente" | "Falta de retorno da equipe"
+  | "Demora para validar a correcao" | "Demora no retorno da equipe"
   | "Demora no primeiro atendimento" | "Demora no retorno do cliente"
   | "Demanda fora do escopo" | "Dependencia de terceiros"
   | "Ajuste na prioridade" | "Demanda complexa"
@@ -26,8 +26,8 @@ export const CATEGORY_OPTIONS: DemandCategory[] = [
 ];
 
 export const EXPIRATION_REASON_OPTIONS: ExpirationReason[] = [
-  "Falta de retorno do cliente", "Falta de retorno da Just",
-  "Demora para validar a correcao", "Demora no retorno da Just",
+  "Falta de retorno do cliente", "Falta de retorno da equipe",
+  "Demora para validar a correcao", "Demora no retorno da equipe",
   "Demora no primeiro atendimento", "Demora no retorno do cliente",
   "Demanda fora do escopo", "Dependencia de terceiros",
   "Ajuste na prioridade", "Demanda complexa",
