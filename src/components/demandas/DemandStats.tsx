@@ -68,7 +68,8 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     return mins > slaMinutes;
   }).length;
 
-  // Sem interacao 24h: demandas abertas sem nenhuma atividade nas ultimas 24h
+  // Sem interacao 24h: demandas nao concluidas sem nenhuma mensagem
+  // (equipe ou cliente) nas ultimas 24h.
   const semInteracao = demands.filter((d) => {
     if (d.status === "concluida" || d.status === "expirada") return false;
     const replies = d.threadReplies || [];
