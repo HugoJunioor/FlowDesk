@@ -395,7 +395,7 @@ async function main() {
     );
     const teamReplies = replies.filter(r => r.isTeamMember);
 
-    // 1) Tem circulo verde na thread? Concluida.
+    // 1) Tem emoji de check na thread? Concluida. (fonte de verdade mais forte)
     const checks = replies.filter(r => r.hasCheckReaction);
     if (checks.length > 0) {
       d.status = 'concluida';
@@ -404,24 +404,26 @@ async function main() {
       continue;
     }
 
-    // 2) Equipe ja respondeu? Em andamento.
+    // 2) Estava concluida no sync anterior? Preserva.
+    //    Protege contra remocao acidental do emoji e mantem o estado
+    //    manualmente ajustado (via UI ou script de limpeza).
+    const prev = previousConcluded.get(d.id);
+    if (prev) {
+      d.status = prev.status;
+      d.completedAt = prev.completedAt;
+      statusPreservadas++;
+      continue;
+    }
+
+    // 3) Equipe ja respondeu? Em andamento.
     if (teamReplies.length > 0) {
       d.status = 'em_andamento';
       statusAndamento++;
       continue;
     }
 
-    // 3) Ninguem da equipe respondeu. Preserva concluida anterior (se houve)
-    //    para protecao contra remocao acidental do circulo verde.
-    //    Caso contrario, fica aberta.
-    const prev = previousConcluded.get(d.id);
-    if (prev) {
-      d.status = prev.status;
-      d.completedAt = prev.completedAt;
-      statusPreservadas++;
-    } else {
-      statusAberta++;
-    }
+    // 4) Ninguem da equipe respondeu ainda. Aberta.
+    statusAberta++;
   }
 
   console.log(`\nTotal: ${allDemands.length} demandas sincronizadas`);
