@@ -1,9 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
-  CheckSquare,
-  Database,
-  BarChart3,
   Settings,
   ChevronLeft,
   Menu,
@@ -13,6 +10,8 @@ import {
   X,
   Workflow,
   MessageSquare,
+  Users,
+  UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -32,8 +31,9 @@ interface AppSidebarProps {
 
 const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppSidebarProps) => {
   const location = useLocation();
-  const { username, logout } = useAuth();
+  const { username, logout, currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const isMaster = currentUser?.role === "master";
 
   const initials = username
     ? username.slice(0, 2).toUpperCase()
@@ -121,20 +121,54 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               </NavLink>
             );
           })}
+
+          {/* Master-only: Users */}
+          {isMaster && (
+            <NavLink
+              to="/usuarios"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                location.pathname === "/usuarios"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              {location.pathname === "/usuarios" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
+              )}
+              <Users size={20} className={location.pathname === "/usuarios" ? "text-sidebar-primary" : ""} />
+              {!collapsed && <span>Usuários</span>}
+            </NavLink>
+          )}
         </nav>
 
-        {/* User info */}
+        {/* User info + profile link */}
         <div className="px-2 py-3 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 px-3 py-2">
+          <NavLink
+            to="/perfil"
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/50"
+              }`
+            }
+            title="Meu perfil"
+          >
             <div className="w-8 h-8 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary text-xs font-bold shrink-0">
               {initials}
             </div>
             {!collapsed && (
-              <span className="text-sm font-medium text-sidebar-foreground truncate">
-                {username}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-medium text-sidebar-foreground truncate block">
+                  {username}
+                </span>
+                <span className="text-[10px] text-sidebar-muted">
+                  {currentUser?.role === "master" ? "Master" : "Usuário"}
+                </span>
+              </div>
             )}
-          </div>
+            {!collapsed && <UserCircle size={14} className="text-sidebar-muted shrink-0" />}
+          </NavLink>
         </div>
 
         {/* Footer */}
