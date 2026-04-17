@@ -114,14 +114,10 @@ async function fetchAllReplies(channelId, threadTs) {
   return all;
 }
 
-// Emojis de reacao que marcam uma demanda como concluida.
-// Nao ha mais detecao por texto ("resolvido", "obrigado"): apenas reactions.
-const CHECK_REACTIONS = [
-  'large_green_circle',        // 🟢 circulo verde
-  'white_check_mark',          // ✅ check (mais universal no Slack)
-  'heavy_check_mark',          // ✔️ check pesado
-  'ballot_box_with_check',     // ☑️ caixa marcada
-];
+// UNICO sinal de conclusao: 🟢 circulo verde (large_green_circle).
+// Sem deteccao por texto, sem outros emojis de check.
+// Demandas ja fechadas antes sao preservadas pela logica de preservacao.
+const CHECK_REACTIONS = ['large_green_circle'];
 
 async function fetchChannelMessages(channelId, channelName) {
   const demands = [];
