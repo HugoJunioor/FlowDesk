@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface CopyLinkButtonProps {
   url: string;
@@ -10,13 +11,14 @@ interface CopyLinkButtonProps {
 const CopyLinkButton = ({ url, size = 14, className = "" }: CopyLinkButtonProps) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    navigator.clipboard.writeText(url).then(() => {
+    const ok = await copyToClipboard(url);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }
   };
 
   return (

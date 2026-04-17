@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
+import { copyToClipboard } from "@/lib/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -154,11 +155,15 @@ const UserManagement = () => {
     reload();
   };
 
-  const handleCopyTempPass = () => {
+  const handleCopyTempPass = async () => {
     if (!createdResult) return;
-    navigator.clipboard.writeText(createdResult.tempPassword);
-    setCopiedPass(true);
-    setTimeout(() => setCopiedPass(false), 2000);
+    const ok = await copyToClipboard(createdResult.tempPassword);
+    if (ok) {
+      setCopiedPass(true);
+      setTimeout(() => setCopiedPass(false), 2000);
+    } else {
+      toast({ title: "Nao foi possivel copiar", description: "Copie manualmente o texto.", variant: "destructive" });
+    }
   };
 
   // ── Edit ──────────────────────────────────────────────────────────────────────
@@ -216,11 +221,15 @@ const UserManagement = () => {
     reload();
   };
 
-  const handleCopyResetPass = () => {
+  const handleCopyResetPass = async () => {
     if (!resetResult) return;
-    navigator.clipboard.writeText(resetResult.password);
-    setCopiedReset(true);
-    setTimeout(() => setCopiedReset(false), 2000);
+    const ok = await copyToClipboard(resetResult.password);
+    if (ok) {
+      setCopiedReset(true);
+      setTimeout(() => setCopiedReset(false), 2000);
+    } else {
+      toast({ title: "Nao foi possivel copiar", description: "Copie manualmente o texto.", variant: "destructive" });
+    }
   };
 
   // ── Groups ────────────────────────────────────────────────────────────────────
