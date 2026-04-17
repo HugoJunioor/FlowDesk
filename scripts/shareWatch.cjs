@@ -1,8 +1,11 @@
 /**
  * Watcher para modo "share" (producao + acesso remoto):
- *  - Executa syncSlack a cada 5 minutos
+ *  - Aguarda 5 minutos, executa syncSlack
  *  - Quando src/data/realDemands.ts muda, dispara "npm run build"
  *  - O preview server (rodando em paralelo) serve os arquivos novos no refresh
+ *
+ * NOTA: o sync inicial ja foi feito antes do build pelo script "npm run share".
+ * Este watcher cuida apenas das atualizacoes periodicas.
  *
  * Uso: via npm run share
  */
@@ -46,7 +49,12 @@ function runBuild() {
   child.on('exit', (code) => {
     building = false;
     if (code === 0) {
-      console.log(`[${fmt()}] [build] Bundle atualizado. Peca pro usuario dar F5 no navegador.`);
+      console.log('');
+      console.log('╔══════════════════════════════════════════════════════╗');
+      console.log(`║  [${fmt()}] DEMANDAS ATUALIZADAS!                  ║`);
+      console.log('║  Peca pro usuario no navegador dar F5 (Ctrl+R).     ║');
+      console.log('╚══════════════════════════════════════════════════════╝');
+      console.log('');
     } else {
       console.log(`[${fmt()}] [build] Falha no build (code ${code}).`);
     }
@@ -75,14 +83,12 @@ function runSync() {
   });
 }
 
-// Primeira execucao
-runSync();
-
-// Loop
+// NAO executa sync imediatamente - foi feito antes do build pelo "npm run share"
+// Agenda primeira execucao em 5 minutos
 setInterval(runSync, INTERVAL_MS);
 
-console.log(`\n═══════════════════════════════════════════════════`);
-console.log(`  FlowDesk — Share Watcher`);
-console.log(`  Sync do Slack + rebuild automatico a cada 5 minutos`);
+console.log(`\n═══════════════════════════════════════════════════════`);
+console.log(`  FlowDesk — Share Watcher ativo`);
+console.log(`  Proximo sync em 5 minutos, depois a cada 5 min`);
 console.log(`  Ctrl+C para interromper`);
-console.log(`═══════════════════════════════════════════════════\n`);
+console.log(`═══════════════════════════════════════════════════════\n`);
