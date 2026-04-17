@@ -57,6 +57,7 @@
     "dotenv": "^17.4.1",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "js-sha256": "^0.11.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "pg": "^8.20.0",

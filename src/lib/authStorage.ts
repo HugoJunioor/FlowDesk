@@ -1,3 +1,4 @@
+import { sha256 } from "js-sha256";
 import type { FlowDeskUser, UserRole } from "@/types/auth";
 
 const USERS_KEY = "fd_users_v2";
@@ -7,12 +8,40 @@ const SESSION_DURATION = 8 * 60 * 60 * 1000;
 
 // ── Crypto ────────────────────────────────────────────────────────────────────
 
+/**
+ * Gera SHA-256 em hex. Usa crypto.subtle (nativo) quando disponivel,
+ * com fallback para js-sha256 em contextos nao-seguros (HTTP via IP de rede).
+ * O output e identico em ambos os caminhos.
+ */
 export async function hashPassword(str: string): Promise<string> {
-  const data = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    try {
+      const data = new TextEncoder().encode(str);
+      const buf = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    } catch { /* fall through */ }
+  }
+  return sha256(str);
+}
+
+/** Gera UUID v4. Usa crypto.randomUUID quando disponivel, com fallback puro JS. */
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try { return crypto.randomUUID(); } catch { /* fall through */ }
+  }
+  // Fallback RFC 4122 v4
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
 }
 
 // ── Password generation ───────────────────────────────────────────────────────
@@ -150,7 +179,7 @@ export async function createUser(data: {
   const passwordHash = await hashPassword(tempPassword);
 
   const user: FlowDeskUser = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     login,
     email: data.email.toLowerCase().trim(),
     name: data.name.trim(),
