@@ -13,6 +13,12 @@ export default defineConfig({
       overlay: false,
     },
   },
+  preview: {
+    host: "0.0.0.0",
+    port: 8080,
+    strictPort: true,
+    allowedHosts: true,
+  },
   plugins: [react()],
   resolve: {
     alias: {
