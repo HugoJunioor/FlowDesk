@@ -76,14 +76,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const changePassword = useCallback(
     async (newPassword: string) => {
-      if (!currentUser) return { success: false, error: "Não autenticado" };
-      await changeUserPassword(currentUser.id, newPassword);
+      if (!currentUser) return { success: false, error: "Sessão expirada. Faça login novamente." };
+      const saved = await changeUserPassword(currentUser.id, newPassword);
+      if (!saved) return { success: false, error: "Não foi possível salvar a senha. Tente novamente." };
       const updated = getUserById(currentUser.id);
-      if (updated) {
-        setCurrentUser(updated);
-        setMustChangePassword(false);
-        setSession(updated);
-      }
+      if (!updated) return { success: false, error: "Erro ao atualizar sessão. Faça login novamente." };
+      setCurrentUser(updated);
+      setSession(updated);
+      setMustChangePassword(false);
       return { success: true };
     },
     [currentUser]

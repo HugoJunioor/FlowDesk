@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ const Login = () => {
 
   const { login, mustChangePassword, changePassword } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // After login, if mustChangePassword is true, switch to change_password view
   const currentView = mustChangePassword ? "change_password" : view;
@@ -44,6 +46,8 @@ const Login = () => {
     setIsLoading(false);
     if (!result.success) {
       toast({ title: "Erro ao entrar", description: result.error, variant: "destructive" });
+    } else {
+      navigate("/", { replace: true });
     }
   };
 
@@ -74,26 +78,31 @@ const Login = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      toast({ title: "Preencha os campos", variant: "destructive" });
+      toast({ title: "Preencha os dois campos de senha.", variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "As senhas não coincidem", variant: "destructive" });
+      toast({ title: "As senhas não coincidem.", description: "Verifique e tente novamente.", variant: "destructive" });
       return;
     }
     const strength = getPasswordStrength(newPassword);
     if (!strength.isStrong) {
       toast({
-        title: "Senha muito fraca",
+        title: "Senha muito fraca.",
         description: "Use letras maiúsculas, minúsculas, números e símbolos.",
         variant: "destructive",
       });
       return;
     }
     setChangingPassword(true);
-    await changePassword(newPassword);
+    const result = await changePassword(newPassword);
     setChangingPassword(false);
+    if (!result.success) {
+      toast({ title: "Erro ao salvar senha.", description: result.error, variant: "destructive" });
+      return;
+    }
     toast({ title: "Senha criada com sucesso!", description: "Bem-vindo ao FlowDesk." });
+    navigate("/", { replace: true });
   };
 
   // ── Shared brand panel ───────────────────────────────────────────────────────
