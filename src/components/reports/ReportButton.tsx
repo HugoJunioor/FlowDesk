@@ -35,7 +35,7 @@ const ReportButton = ({ demands, filters, source, variant = "outline", size = "s
         : "";
       const subtitle = clientFilterValue
         ? clientFilterValue
-        : "Just";
+        : "Equipe";
 
       const html = generateInteractiveReport({
         title,

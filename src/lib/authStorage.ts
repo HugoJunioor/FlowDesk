@@ -90,7 +90,7 @@ export async function initializeAuth(): Promise<void> {
     const master: FlowDeskUser = {
       id: "master-001",
       login: "master",
-      email: "admin@wearejust.it",
+      email: "admin@company.com",
       name: "Administrador",
       role: "master",
       status: "active",
@@ -291,7 +291,10 @@ export function clearSession(): void {
 // ── Email validation ──────────────────────────────────────────────────────────
 
 export function isJustEmail(email: string): boolean {
-  return email.trim().toLowerCase().endsWith("@wearejust.it");
+  // Domínio configurável via variável de ambiente ou aceita qualquer e-mail corporativo
+  const domain = import.meta.env?.VITE_ALLOWED_EMAIL_DOMAIN || "";
+  if (!domain) return email.includes("@") && email.includes(".");
+  return email.trim().toLowerCase().endsWith(`@${domain}`);
 }
 
 // ── CPF validation ────────────────────────────────────────────────────────────
