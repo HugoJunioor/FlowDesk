@@ -19,6 +19,13 @@ export default defineConfig({
     port: 8080,
     strictPort: true,
     allowedHosts: true,
+    headers: {
+      // Forca o navegador a sempre buscar versao mais recente (sem cache)
+      // Essencial no modo share para que o F5 pegue novos builds imediatamente
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    },
   },
   plugins: [react()],
   resolve: {
