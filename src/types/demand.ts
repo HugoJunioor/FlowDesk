@@ -117,6 +117,11 @@ export interface SlackDemand {
     detectedAt: string;
   };
   manualStatusOverride?: boolean;
+  slaFirstResponse?: number | null;
+  slaStatus?: string | null;
+  slaResolutionStatus?: string | null;
+  resolutionHours?: number | null;
+  expirationReason?: string | null;
   autoClassification?: {
     priority: DemandPriority;
     confidence: "alta" | "media" | "baixa";

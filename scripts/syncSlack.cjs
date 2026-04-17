@@ -12,14 +12,25 @@ const NOW = Date.now() / 1000;
 // Team members (internal) - will be detected by checking if they're in the workspace
 const TEAM_MEMBERS_CACHE = {};
 
+// Equipe Just (time interno). Qualquer usuario fora dessa lista = cliente externo.
+const JUST_TEAM_NAMES = new Set([
+  'Hugo Cordeiro Junior', 'Daniel Bichof', 'Bruna Queiroz',
+  'Cezar Felipe', 'Tiago Silva', 'Rafael Cursino',
+  'Gabriel', 'Schai Bock', 'Vinicius Nunes', 'Erick Sousa', 'Luiza',
+]);
+
 async function isTeamMember(userId) {
   if (TEAM_MEMBERS_CACHE[userId] !== undefined) return TEAM_MEMBERS_CACHE[userId];
   try {
     const info = await client.users.info({ user: userId });
     // Bot users and the workflow bot are not team members for our purposes
     const isBot = info.user.is_bot || info.user.id === 'USLACKBOT';
-    TEAM_MEMBERS_CACHE[userId] = !isBot;
-    return !isBot;
+    if (isBot) { TEAM_MEMBERS_CACHE[userId] = false; return false; }
+    const realName = info.user.real_name || info.user.profile?.real_name || '';
+    const displayName = info.user.profile?.display_name || '';
+    const isTeam = JUST_TEAM_NAMES.has(realName) || JUST_TEAM_NAMES.has(displayName);
+    TEAM_MEMBERS_CACHE[userId] = isTeam;
+    return isTeam;
   } catch {
     TEAM_MEMBERS_CACHE[userId] = false;
     return false;
@@ -115,7 +126,7 @@ async function fetchChannelMessages(channelId, channelName) {
 
       // Check for ✅ reaction on parent message
       const parentCheckReaction = (msg.reactions || []).some(r =>
-        ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+        ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'].includes(r.name)
       );
 
       // Get thread replies
@@ -131,14 +142,14 @@ async function fetchChannelMessages(channelId, channelName) {
           // Parent message (index 0) - check reactions from full API response
           const parentFull = replies.messages[0];
           const parentHasCheck = parentCheckReaction || (parentFull.reactions || []).some(r =>
-            ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+            ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'].includes(r.name)
           );
 
           // If parent has check reaction, inject a synthetic "conclusion" reply
           if (parentHasCheck) {
             // Find who reacted with check
             const checkReaction = (parentFull.reactions || msg.reactions || []).find(r =>
-              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'].includes(r.name)
             );
             const reactorId = checkReaction?.users?.[0];
             const reactorName = reactorId ? await getUserName(reactorId) : 'Equipe';
@@ -161,7 +172,7 @@ async function fetchChannelMessages(channelId, channelName) {
 
             // Check for ✅ reaction on this reply
             const hasCheckReaction = (reply.reactions || []).some(r =>
-              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+              ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'].includes(r.name)
             );
 
             threadReplies.push({
@@ -178,7 +189,7 @@ async function fetchChannelMessages(channelId, channelName) {
       } else if (parentCheckReaction) {
         // No replies but parent has check reaction
         const checkReaction = (msg.reactions || []).find(r =>
-          ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check'].includes(r.name)
+          ['white_check_mark', 'heavy_check_mark', 'ballot_box_with_check', 'check', 'large_green_circle'].includes(r.name)
         );
         const reactorId = checkReaction?.users?.[0];
         const reactorName = reactorId ? await getUserName(reactorId) : 'Equipe';
@@ -360,8 +371,9 @@ async function main() {
     );
     const teamReplies = replies.filter(r => r.isTeamMember);
 
-    // Caso 0: Ultimo check reaction de membro da equipe = conclusao
-    const checks = replies.filter(r => r.hasCheckReaction && r.isTeamMember);
+    // Caso 0: Ultimo check reaction na thread = conclusao
+    // Nao filtra por isTeamMember: equipe reage com check em mensagens do cliente para fechar
+    const checks = replies.filter(r => r.hasCheckReaction);
     if (checks.length > 0) {
       d.status = 'concluida';
       d.completedAt = checks[checks.length - 1].timestamp;

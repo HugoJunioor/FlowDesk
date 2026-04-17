@@ -90,9 +90,10 @@ export function analyzeThreadStatus(demand: SlackDemand): StatusAnalysisResult |
 
   if (teamReplies.length === 0) return null;
 
-  // Caso 0 (PRIORIDADE MAXIMA): Buscar o ULTIMO check reaction na thread inteira
-  // O ultimo comentario com check = conclusao, independente de msgs posteriores sem check
-  const checksInThread = allReplies.filter((r) => r.hasCheckReaction && r.isTeamMember);
+  // Caso 0 (PRIORIDADE MAXIMA): Buscar o ULTIMO reaction de conclusao na thread inteira
+  // Aceita check (historicas) e circulo verde (novas) como marcador de conclusao
+  // Nao filtra por isTeamMember: reacoes sao adicionadas pela equipe em mensagens do cliente
+  const checksInThread = allReplies.filter((r) => r.hasCheckReaction);
   if (checksInThread.length > 0) {
     const lastCheck = checksInThread[checksInThread.length - 1];
     return {

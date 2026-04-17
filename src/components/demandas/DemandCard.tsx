@@ -1,7 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Building2, MessageCircle, Clock, Info, Sparkles } from "lucide-react";
+import { ExternalLink, Building2, MessageCircle, Clock, Info, Sparkles, Circle } from "lucide-react";
+import CopyLinkButton from "./CopyLinkButton";
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
 import { format } from "date-fns";
@@ -124,7 +125,8 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
         {/* Badges: status + priority + type */}
         <div className="mt-3 pt-3 border-t border-border space-y-2">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="secondary" className={`text-[10px] ${status.bg} ${status.color}`}>
+            <Badge variant="secondary" className={`text-[10px] ${status.bg} ${status.color} flex items-center gap-1`}>
+              {demand.status === "concluida" && <Circle size={8} fill="currentColor" />}
               {status.label}
             </Badge>
             {demand.statusAnalysis && !demand.manualStatusOverride && (
@@ -153,19 +155,22 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
           )}
         </div>
 
-        {/* Footer: assignee + slack link */}
+        {/* Footer: assignee + slack link + copy */}
         <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
           <span>{demand.assignee?.name || "Sem responsavel"}</span>
-          <a
-            href={demand.slackPermalink}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-0.5 hover:text-primary transition-colors"
-          >
-            <ExternalLink size={10} />
-            Slack
-          </a>
+          <div className="flex items-center gap-1.5">
+            <CopyLinkButton url={demand.slackPermalink} size={10} />
+            <a
+              href={demand.slackPermalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-0.5 hover:text-primary transition-colors"
+            >
+              <ExternalLink size={10} />
+              Slack
+            </a>
+          </div>
         </div>
       </CardContent>
     </Card>
