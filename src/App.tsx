@@ -8,15 +8,27 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Demandas from "./pages/Demandas.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
+import UserManagement from "./pages/UserManagement.tsx";
+import Profile from "./pages/Profile.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, mustChangePassword, currentUser, initialized } = useAuth();
 
-  if (!isAuthenticated) {
+  // Wait for localStorage init
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Not logged in or must change password → Login page handles both flows
+  if (!isAuthenticated || mustChangePassword) {
     return <Login />;
   }
 
@@ -25,6 +37,10 @@ const AppRoutes = () => {
       <Route path="/" element={<Index />} />
       <Route path="/demandas" element={<Demandas />} />
       <Route path="/configuracoes" element={<Configuracoes />} />
+      <Route path="/perfil" element={<Profile />} />
+      {currentUser?.role === "master" && (
+        <Route path="/usuarios" element={<UserManagement />} />
+      )}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
