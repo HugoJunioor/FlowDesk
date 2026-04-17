@@ -71,8 +71,9 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
   // Sem interacao 24h: demandas abertas sem nenhuma atividade nas ultimas 24h
   const semInteracao = demands.filter((d) => {
     if (d.status === "concluida" || d.status === "expirada") return false;
-    const lastTs = d.threadReplies.length > 0
-      ? Math.max(...d.threadReplies.map(r => new Date(r.timestamp).getTime()))
+    const replies = d.threadReplies || [];
+    const lastTs = replies.length > 0
+      ? Math.max(...replies.map(r => new Date(r.timestamp).getTime()))
       : new Date(d.createdAt).getTime();
     const hoursSinceLast = (now.getTime() - lastTs) / 3600000;
     return hoursSinceLast > 24;
