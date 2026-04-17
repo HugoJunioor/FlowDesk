@@ -33,6 +33,9 @@ src/data/realDemands.ts
 src/data/historicalDemands.ts
 src/data/historicalDemands.json
 
+# Shared state (users, overrides, groups — local only)
+data/
+
 # Local branding (company-specific)
 src/config/branding.local.ts
 public/just-logo.*

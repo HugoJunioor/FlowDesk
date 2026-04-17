@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const stateSyncPlugin = require("./scripts/stateSync.cjs");
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -27,7 +29,7 @@ export default defineConfig({
       "Expires": "0",
     },
   },
-  plugins: [react()],
+  plugins: [react(), stateSyncPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
