@@ -5,8 +5,6 @@ import {
   ChevronLeft,
   Menu,
   LogOut,
-  Moon,
-  Sun,
   X,
   Workflow,
   MessageSquare,
@@ -14,7 +12,6 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
 import { branding } from "@/config/brandingLoader";
 
 const navItems = [
@@ -32,7 +29,6 @@ interface AppSidebarProps {
 const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppSidebarProps) => {
   const location = useLocation();
   const { username, logout, currentUser } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const isMaster = currentUser?.role === "master";
 
   const initials = username
@@ -173,15 +169,6 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
 
         {/* Footer */}
         <div className="p-2 border-t border-sidebar-border space-y-1">
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
-          >
-            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-            {!collapsed && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
-          </button>
-
           <NavLink
             to="/configuracoes"
             onClick={() => setMobileOpen(false)}
