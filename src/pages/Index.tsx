@@ -3,22 +3,53 @@ import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import {
   AlertTriangle, CheckCircle2, Clock, Inbox, Building2,
-  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap,
+  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
+import { SlackDemand } from "@/types/demand";
+
+/** Verifica SLA de resolucao: usa valor da planilha (historico) ou calcula em runtime (abril+) */
+function isSlaBreached(d: SlackDemand): boolean {
+  if (d.slaResolutionStatus) return d.slaResolutionStatus === "expirado";
+  if (d.priority === "sem_classificacao") return false;
+  const config = PRIORITY_CONFIG[d.priority];
+  if (!config?.sla) return false;
+  if (d.status === "concluida" && d.completedAt) {
+    return new Date(d.completedAt) > addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+  }
+  if (d.status !== "concluida" && d.status !== "expirada") {
+    return new Date() > addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+  }
+  return d.status === "expirada";
+}
+function isSlaCompliant(d: SlackDemand): boolean {
+  // Dados históricos: usar APENAS o campo armazenado como fonte de verdade
+  if (d.slaResolutionStatus === "atendido") return true;
+  if (d.slaResolutionStatus === "expirado") return false;
+  // Demandas em tempo real (abril+): calcular dinamicamente
+  if (d.priority === "sem_classificacao") return true;
+  const config = PRIORITY_CONFIG[d.priority];
+  if (!config?.sla) return true;
+  if (d.status === "concluida" && d.completedAt) {
+    return new Date(d.completedAt) <= addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+  }
+  if (d.status === "expirada") return false;
+  return new Date() <= addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
+}
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
+import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 
 type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
@@ -74,15 +105,17 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+const MONTH_NAMES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
 const Dashboard = () => {
   const [period, setPeriod] = useState<Period>("mensal");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [client, setClient] = useState("");
   const [assignee, setAssignee] = useState("");
-  const [fromOpen, setFromOpen] = useState(false);
-  const [toOpen, setToOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
 
   // Chart local filters
   const [pieFilter, setPieFilter] = useState<PieFilter>("all");
@@ -141,69 +174,46 @@ const Dashboard = () => {
   const p1Count = filtered.filter((d) => d.priority === "p1").length;
 
   const withSla = filtered.filter((d) => d.priority !== "sem_classificacao");
-  const slaCompliant = withSla.filter((d) => {
-    const config = PRIORITY_CONFIG[d.priority];
-    if (!config.sla) return true;
-    if (d.status === "concluida" && d.completedAt) {
-      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-      return new Date(d.completedAt) <= due;
-    }
-    if (d.status === "expirada") return false;
-    const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-    return new Date() <= due;
-  });
-  const slaRate = withSla.length > 0 ? Math.round((slaCompliant.length / withSla.length) * 100) : 100;
+  const slaCompliant = withSla.filter((d) => isSlaCompliant(d));
+  const slaRate = withSla.length > 0 ? Math.floor((slaCompliant.length / withSla.length) * 100) : 100;
 
   // SLA de primeira resposta (real, baseado em threadReplies)
   const firstResponseData = useMemo(() => {
-    const demandsWithResponse = filtered
-      .filter((d) => !isExcludedFromFirstResponseSla(d))
-      .map((d) => ({ demand: d, minutes: getFirstResponseMinutes(d.createdAt, d.threadReplies) }))
-      .filter((r) => r.minutes !== null) as { demand: typeof filtered[0]; minutes: number }[];
+    const eligible = filtered.filter((d) => !isExcludedFromFirstResponseSla(d) && d.priority !== "sem_classificacao");
 
-    const avg = demandsWithResponse.length > 0
-      ? Math.round(demandsWithResponse.reduce((sum, r) => sum + r.minutes, 0) / demandsWithResponse.length)
-      : 0;
+    let ok = 0;
+    let breach = 0;
+    let sumMins = 0;
+    let countMins = 0;
 
-    // Dentro do SLA de resposta?
-    const withinSla = demandsWithResponse.filter((r) => {
-      const config = PRIORITY_CONFIG[r.demand.priority];
-      if (r.demand.priority === "sem_classificacao" || !config.sla) return true;
-      const slaResponseMinutes = parseResponseSla(config.sla.response);
-      return r.minutes <= slaResponseMinutes;
-    });
+    for (const d of eligible) {
+      const config = PRIORITY_CONFIG[d.priority];
+      if (!config?.sla) continue;
+      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+      if (frMins !== null) {
+        sumMins += frMins;
+        countMins++;
+        const slaRespMins = parseResponseSla(config.sla.response);
+        if (frMins <= slaRespMins) ok++;
+        else breach++;
+      } else if (d.slaResolutionStatus === "atendido" || d.slaResolutionStatus === "expirado") {
+        // Dado histórico sem registro de resposta: conta como violação
+        breach++;
+      }
+    }
 
-    const rate = demandsWithResponse.length > 0
-      ? Math.round((withinSla.length / demandsWithResponse.length) * 100) : 100;
+    const total = ok + breach;
+    const avg = countMins > 0 ? Math.round(sumMins / countMins) : 0;
+    const rate = total > 0 ? Math.floor((ok / total) * 100) : 100;
 
-    return { avg, rate, total: demandsWithResponse.length };
+    return { avg, rate, total };
   }, [filtered]);
 
   // SLA de resolucao no prazo
   const resolutionSlaData = useMemo(() => {
     const concluded = filtered.filter((d) => d.status === "concluida" && d.completedAt && d.priority !== "sem_classificacao");
-    const withinSla = concluded.filter((d) => {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config.sla) return true;
-      const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-      return new Date(d.completedAt!) <= due;
-    });
-    // Total de SLA estourado: concluidas fora do prazo + abertas/andamento que já passaram
-    const now = new Date();
-    const breached = filtered.filter((d) => {
-      if (d.priority === "sem_classificacao") return false;
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config.sla) return false;
-      if (d.status === "concluida" && d.completedAt) {
-        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-        return new Date(d.completedAt) > due;
-      }
-      if (d.status !== "concluida" && d.status !== "expirada") {
-        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-        return now > due;
-      }
-      return d.status === "expirada";
-    }).length;
+    const withinSla = concluded.filter((d) => isSlaCompliant(d));
+    const breached = filtered.filter((d) => isSlaBreached(d)).length;
     const rate = concluded.length > 0 ? Math.round((withinSla.length / concluded.length) * 100) : 100;
     return { rate, breached, total: concluded.length };
   }, [filtered]);
@@ -238,17 +248,7 @@ const Dashboard = () => {
   const clientSlaData = useMemo(() => {
     return clients.map((c) => {
       const clientDemands = filtered.filter((d) => extractClientName(d.slackChannel) === c && d.priority !== "sem_classificacao");
-      const compliant = clientDemands.filter((d) => {
-        const config = PRIORITY_CONFIG[d.priority];
-        if (!config.sla) return true;
-        if (d.status === "concluida" && d.completedAt) {
-          const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-          return new Date(d.completedAt) <= due;
-        }
-        if (d.status === "expirada") return false;
-        const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-        return new Date() <= due;
-      });
+      const compliant = clientDemands.filter((d) => isSlaCompliant(d));
       const rate = clientDemands.length > 0 ? Math.round((compliant.length / clientDemands.length) * 100) : 100;
       return { name: c, rate, total: clientDemands.length };
     }).filter((c) => c.total > 0);
@@ -286,7 +286,9 @@ const Dashboard = () => {
                 demands={filtered}
                 source="dashboard"
                 filters={{
-                  Período: period === "personalizado" ? `${customFrom || "?"} a ${customTo || "?"}` : period === "anual" ? `${selectedYear}` : period,
+                  Período: period === "personalizado"
+                    ? (customFrom ? `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][customFrom.getMonth()]}/${customFrom.getFullYear()}` : "personalizado")
+                    : period === "anual" ? `${selectedYear}` : period,
                   ...(client ? { Cliente: client } : {}),
                   ...(assignee ? { Responsável: assignee } : {}),
                 }}
@@ -323,29 +325,66 @@ const Dashboard = () => {
             )}
 
             {period === "personalizado" && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">De:</span>
                 <Popover open={fromOpen} onOpenChange={setFromOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 text-xs">
-                      <CalendarDays size={13} className="mr-1" />
-                      {customFrom ? format(customFrom, "dd/MM", { locale: ptBR }) : "De"}
+                    <Button variant="outline" size="sm" className="h-8 min-w-[120px] justify-start text-xs font-normal">
+                      <CalendarDays size={13} className="mr-1.5 text-muted-foreground" />
+                      {customFrom ? format(customFrom, "dd/MM/yyyy", { locale: ptBR }) : "Início"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={customFrom} onSelect={(d) => { setCustomFrom(d || undefined); setFromOpen(false); }} locale={ptBR} initialFocus />
+                    <Calendar
+                      mode="single"
+                      selected={customFrom}
+                      onSelect={(date) => { if (date) { setCustomFrom(startOfDay(date)); setFromOpen(false); } }}
+                      locale={ptBR}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
+                <span className="text-xs text-muted-foreground">Até:</span>
                 <Popover open={toOpen} onOpenChange={setToOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 text-xs">
-                      <CalendarDays size={13} className="mr-1" />
-                      {customTo ? format(customTo, "dd/MM", { locale: ptBR }) : "Ate"}
+                    <Button variant="outline" size="sm" className="h-8 min-w-[120px] justify-start text-xs font-normal">
+                      <CalendarDays size={13} className="mr-1.5 text-muted-foreground" />
+                      {customTo ? format(customTo, "dd/MM/yyyy", { locale: ptBR }) : "Fim"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={customTo} onSelect={(d) => { setCustomTo(d || undefined); setToOpen(false); }} locale={ptBR} initialFocus />
+                    <Calendar
+                      mode="single"
+                      selected={customTo}
+                      onSelect={(date) => { if (date) { setCustomTo(endOfDay(date)); setToOpen(false); } }}
+                      locale={ptBR}
+                      initialFocus
+                    />
                   </PopoverContent>
                 </Popover>
+                <Select
+                  value=""
+                  onValueChange={(v) => {
+                    const [y, m] = v.split("-").map(Number);
+                    const from = startOfMonth(new Date(y, m, 1));
+                    setCustomFrom(from);
+                    setCustomTo(endOfMonth(from));
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[110px] text-xs">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: new Date().getMonth() + 1 }, (_, i) => {
+                      const y = new Date().getFullYear();
+                      return (
+                        <SelectItem key={i} value={`${y}-${i}`}>
+                          {MONTH_NAMES_PT[i]}/{y}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -400,6 +439,7 @@ const Dashboard = () => {
             </Card>
           ))}
         </div>
+
 
         {/* Charts row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
@@ -567,7 +607,7 @@ const Dashboard = () => {
                 return (
                   <div key={d.id} className={`p-3 rounded-lg border-l-[3px] ${pConfig.border} bg-muted/30`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="secondary" className={`text-[10px] ${pConfig.bg} ${pConfig.color}`}>
@@ -581,15 +621,29 @@ const Dashboard = () => {
                           </span>
                         </div>
                       </div>
-                      {d.status === "expirada" ? (
-                        <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] shrink-0 animate-pulse">
-                          Expirado
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="bg-warning/10 text-warning text-[10px] shrink-0">
-                          Critico
-                        </Badge>
-                      )}
+                      <div className="flex flex-col items-center gap-2.5 shrink-0">
+                        {d.status === "expirada" ? (
+                          <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse">
+                            Expirado
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-warning/10 text-warning text-[10px]">
+                            Critico
+                          </Badge>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={d.slackPermalink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                            title="Abrir no Slack"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                          <CopyLinkButton url={d.slackPermalink} size={13} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
