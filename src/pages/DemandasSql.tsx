@@ -12,7 +12,6 @@ import {
   getAverageHandlingMinutes,
   getAverageInProgressMinutes,
   formatHandlingTime,
-  getHandlingMinutes,
 } from "@/lib/sqlSla";
 import SqlDemandList from "@/components/demandas/SqlDemandList";
 import DemandKanban from "@/components/demandas/DemandKanban";
@@ -241,31 +240,6 @@ const DemandasSql = () => {
     };
   }, [demands]);
 
-  // === Aprovacao manual ===
-  const handleApprove = useCallback((demandId: string) => {
-    const now = new Date().toISOString();
-    setDemands((prev) =>
-      prev.map((d) =>
-        d.id === demandId
-          ? ({ ...d, status: "em_andamento" as const, approvedAt: now, manualStatusOverride: true } as SlackDemand)
-          : d
-      )
-    );
-    setSelected((prev) =>
-      prev && prev.id === demandId
-        ? ({ ...prev, status: "em_andamento" as const, approvedAt: now, manualStatusOverride: true } as SlackDemand)
-        : prev
-    );
-    const overrides = loadSqlOverrides();
-    overrides[demandId] = {
-      ...overrides[demandId],
-      status: "em_andamento",
-      manualStatusOverride: true,
-      approvedAt: now,
-    };
-    saveSqlOverrides(overrides);
-    toast({ title: "Demanda aprovada", description: "Status: Em andamento" });
-  }, [toast]);
 
   // Recarrega automaticamente quando a janela ganha foco (caso outro sync tenha rolado)
   useEffect(() => {
@@ -462,7 +436,7 @@ const DemandasSql = () => {
             </TabsList>
 
             <TabsContent value="lista" className="mt-4">
-              <SqlDemandList demands={filtered} onSelect={openDemand} onApprove={handleApprove} />
+              <SqlDemandList demands={filtered} onSelect={openDemand} />
             </TabsContent>
             <TabsContent value="kanban" className="mt-4">
               <DemandKanban demands={filtered} onSelect={openDemand} />

@@ -1,58 +1,55 @@
 import { SlackDemand } from "@/types/demand";
+import { getBusinessMinutesBetween } from "@/lib/businessHours";
 
 /**
  * Utilitarios de SLA do modulo SQL.
- * O tempo de atendimento e calculado de approvedAt (primeira resposta da equipe
- * ou aprovacao manual via botao) ate completedAt.
+ * O tempo de atendimento e calculado de approvedAt (mensagem com "aprovado")
+ * ate completedAt, considerando APENAS horario comercial (Seg-Sex 8-18,
+ * excluindo feriados).
  */
 
-/** Retorna o timestamp de aprovacao de uma demanda.
- *  Prioridade: override manual > primeira resposta da equipe > null */
+/** Retorna o timestamp de aprovacao de uma demanda (vem do sync automatico). */
 export function getApprovedAt(d: SlackDemand): string | null {
-  // Override manual (botao "Aprovar") tem prioridade
-  if ((d as SlackDemand & { approvedAt?: string }).approvedAt) {
-    return (d as SlackDemand & { approvedAt?: string }).approvedAt || null;
-  }
-  // Primeira resposta da equipe na thread
-  const replies = d.threadReplies || [];
-  const firstTeamReply = replies
-    .filter((r) => r.isTeamMember)
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0];
-  return firstTeamReply?.timestamp || null;
+  const typed = d as SlackDemand & { approvedAt?: string };
+  return typed.approvedAt || null;
 }
 
-/** Tempo de atendimento em minutos. Retorna null se nao aplicavel. */
+/**
+ * Tempo de atendimento em minutos UTEIS (horario comercial).
+ * Seg-Sex 8h-18h, excluindo feriados. Retorna null se sem aprovacao.
+ */
 export function getHandlingMinutes(d: SlackDemand): number | null {
   const approved = getApprovedAt(d);
   if (!approved) return null;
 
+  const start = new Date(approved);
+
   if (d.status === "concluida" && d.completedAt) {
-    const ms = new Date(d.completedAt).getTime() - new Date(approved).getTime();
-    return Math.max(0, Math.round(ms / 60000));
+    return getBusinessMinutesBetween(start, new Date(d.completedAt));
   }
 
-  // Em andamento: tempo decorrido desde a aprovacao
+  // Em andamento: tempo util decorrido desde a aprovacao
   if (d.status === "em_andamento") {
-    const ms = Date.now() - new Date(approved).getTime();
-    return Math.max(0, Math.round(ms / 60000));
+    return getBusinessMinutesBetween(start, new Date());
   }
 
   return null;
 }
 
-/** Formata minutos como "2h 30min", "1d 4h", "45min" */
+/** Formata minutos uteis como "2d 3h 45min", "4h 30min", "45min" */
 export function formatHandlingTime(minutes: number | null): string {
   if (minutes === null || minutes === undefined) return "—";
   if (minutes < 1) return "< 1min";
-  if (minutes < 60) return `${minutes}min`;
-  if (minutes < 1440) {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}min` : `${h}h`;
-  }
-  const d = Math.floor(minutes / 1440);
-  const h = Math.floor((minutes % 1440) / 60);
-  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  const MINUTES_PER_DAY = 600; // 10h uteis por dia
+  const days = Math.floor(minutes / MINUTES_PER_DAY);
+  const remAfterDays = minutes % MINUTES_PER_DAY;
+  const hours = Math.floor(remAfterDays / 60);
+  const mins = remAfterDays % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0 && days === 0) parts.push(`${mins}min`);
+  return parts.length > 0 ? parts.join(" ") : "< 1min";
 }
 
 /** Media de tempo de atendimento das demandas concluidas (em minutos) */
