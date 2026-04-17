@@ -1,6 +1,11 @@
 export type UserRole = "master" | "user";
 export type UserStatus = "active" | "blocked";
 
+export interface UserThemePreferences {
+  mode: "light" | "dark";
+  colorTheme: string;
+}
+
 export interface FlowDeskUser {
   id: string;
   login: string;
@@ -14,6 +19,7 @@ export interface FlowDeskUser {
   isFirstAccess: boolean;
   passwordResetRequested: boolean;
   groups: string[];
+  themePreferences?: UserThemePreferences;
   createdAt: string;
   createdBy: string;
   updatedAt?: string;

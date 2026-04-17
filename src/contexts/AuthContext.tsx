@@ -10,6 +10,7 @@ import {
   clearSession,
   changeUserPassword,
 } from "@/lib/authStorage";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [currentUser, setCurrentUser] = useState<FlowDeskUser | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const { loadForUser, clearUser: clearUserTheme } = useTheme();
 
   useEffect(() => {
     initializeAuth().then(() => {
@@ -39,13 +41,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (user && user.status === "active") {
           setCurrentUser(user);
           setMustChangePassword(user.isFirstAccess);
+          loadForUser(user.id, user.themePreferences);
         } else {
           clearSession();
         }
       }
       setInitialized(true);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = useCallback(async (loginInput: string, password: string) => {
     if (!loginInput || !password) {
@@ -65,14 +68,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(user);
     setCurrentUser(user);
     setMustChangePassword(user.isFirstAccess);
+    loadForUser(user.id, user.themePreferences);
     return { success: true };
-  }, []);
+  }, [loadForUser]);
 
   const logout = useCallback(() => {
     clearSession();
     setCurrentUser(null);
     setMustChangePassword(false);
-  }, []);
+    clearUserTheme();
+  }, [clearUserTheme]);
 
   const changePassword = useCallback(
     async (newPassword: string) => {
