@@ -4,11 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, Database, Inbox, Clock, CheckCircle2, Loader2, Search } from "lucide-react";
+import { RefreshCw, Database, Inbox, Clock, CheckCircle2, Loader2, Search, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SlackDemand, ClosureFields, DemandPriority, CATEGORY_OPTIONS, DemandCategory } from "@/types/demand";
 import { getProcessedSqlDemands } from "@/data/sqlDemandsLoader";
-import DemandList from "@/components/demandas/DemandList";
+import {
+  getAverageHandlingMinutes,
+  getAverageInProgressMinutes,
+  formatHandlingTime,
+  getHandlingMinutes,
+} from "@/lib/sqlSla";
+import SqlDemandList from "@/components/demandas/SqlDemandList";
 import DemandKanban from "@/components/demandas/DemandKanban";
 import DemandByDate from "@/components/demandas/DemandByDate";
 import DemandByAssignee from "@/components/demandas/DemandByAssignee";
@@ -23,6 +29,7 @@ const SQL_OVERRIDES_KEY = "fd_sql_demand_overrides";
 type SqlOverride = {
   status?: string;
   completedAt?: string | null;
+  approvedAt?: string | null;
   manualStatusOverride?: boolean;
   assignee?: string | null;
   closure?: Partial<ClosureFields>;
@@ -222,8 +229,43 @@ const DemandasSql = () => {
     const abertas = demands.filter((d) => d.status === "aberta").length;
     const andamento = demands.filter((d) => d.status === "em_andamento").length;
     const concluidas = demands.filter((d) => d.status === "concluida").length;
-    return { abertas, andamento, concluidas, total: demands.length };
+    const avgHandling = getAverageHandlingMinutes(demands);
+    const avgInProgress = getAverageInProgressMinutes(demands);
+    return {
+      abertas,
+      andamento,
+      concluidas,
+      total: demands.length,
+      avgHandling,
+      avgInProgress,
+    };
   }, [demands]);
+
+  // === Aprovacao manual ===
+  const handleApprove = useCallback((demandId: string) => {
+    const now = new Date().toISOString();
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId
+          ? ({ ...d, status: "em_andamento" as const, approvedAt: now, manualStatusOverride: true } as SlackDemand)
+          : d
+      )
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId
+        ? ({ ...prev, status: "em_andamento" as const, approvedAt: now, manualStatusOverride: true } as SlackDemand)
+        : prev
+    );
+    const overrides = loadSqlOverrides();
+    overrides[demandId] = {
+      ...overrides[demandId],
+      status: "em_andamento",
+      manualStatusOverride: true,
+      approvedAt: now,
+    };
+    saveSqlOverrides(overrides);
+    toast({ title: "Demanda aprovada", description: "Status: Em andamento" });
+  }, [toast]);
 
   // Recarrega automaticamente quando a janela ganha foco (caso outro sync tenha rolado)
   useEffect(() => {
@@ -267,7 +309,7 @@ const DemandasSql = () => {
         </div>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Card
             className="border border-border shadow-sm cursor-pointer hover:shadow-md transition-all"
             onClick={() => setStatusFilter("all")}
@@ -333,6 +375,32 @@ const DemandasSql = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* SLA - Tempo medio de atendimento (concluidas) */}
+          <Card className="border border-border shadow-sm" title="Tempo medio entre a aprovacao e a conclusao (SLA)">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-info/10 shrink-0">
+                <Timer size={18} className="text-info" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-foreground">{formatHandlingTime(stats.avgHandling)}</p>
+                <p className="text-xs text-muted-foreground">Tempo médio SLA</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tempo medio das que estao em andamento */}
+          <Card className="border border-border shadow-sm" title="Tempo medio desde a aprovacao para demandas em andamento">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-warning/10 shrink-0">
+                <Clock size={18} className="text-warning" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-foreground">{formatHandlingTime(stats.avgInProgress)}</p>
+                <p className="text-xs text-muted-foreground">Em atendimento</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Busca */}
@@ -394,7 +462,7 @@ const DemandasSql = () => {
             </TabsList>
 
             <TabsContent value="lista" className="mt-4">
-              <DemandList demands={filtered} onSelect={openDemand} />
+              <SqlDemandList demands={filtered} onSelect={openDemand} onApprove={handleApprove} />
             </TabsContent>
             <TabsContent value="kanban" className="mt-4">
               <DemandKanban demands={filtered} onSelect={openDemand} />
