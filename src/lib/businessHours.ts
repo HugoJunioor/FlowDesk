@@ -13,15 +13,52 @@ export function isExcludedFromFirstResponseSla(d: SlackDemand): boolean {
 /**
  * Calcula minutos uteis entre duas datas
  * Horario comercial: Seg-Sex 8h-18h (10h/dia = 600min/dia)
+ * Exclui feriados nacionais, estaduais (SP) e municipais (Campinas)
  */
 
 const START_HOUR = 8;
 const END_HOUR = 18;
 const MINUTES_PER_DAY = (END_HOUR - START_HOUR) * 60; // 600
 
+/**
+ * Feriados Campinas/SP por ano.
+ * Formato: "YYYY-MM-DD" em horario local (BRT).
+ * Inclui nacionais, estaduais (SP) e municipais (Campinas).
+ * Pontos facultativos amplamente adotados (Carnaval, Corpus Christi) tambem entram.
+ */
+const HOLIDAYS: Record<number, Set<string>> = {
+  2026: new Set([
+    "2026-01-01", // Confraternizacao Universal
+    "2026-02-16", // Carnaval (segunda)
+    "2026-02-17", // Carnaval (terca)
+    "2026-04-03", // Sexta-feira Santa
+    "2026-04-21", // Tiradentes
+    "2026-05-01", // Dia do Trabalho
+    "2026-06-04", // Corpus Christi
+    "2026-07-09", // Revolucao Constitucionalista (SP)
+    "2026-08-12", // Feriado municipal Campinas
+    "2026-09-07", // Independencia do Brasil
+    "2026-10-12", // Nossa Senhora Aparecida
+    "2026-11-02", // Finados
+    "2026-11-20", // Consciencia Negra
+    "2026-12-08", // Nossa Senhora da Conceicao (Campinas)
+    "2026-12-25", // Natal
+  ]),
+};
+
+function isHoliday(date: Date): boolean {
+  const year = date.getFullYear();
+  const holidays = HOLIDAYS[year];
+  if (!holidays) return false;
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return holidays.has(`${year}-${mm}-${dd}`);
+}
+
 function isBusinessDay(date: Date): boolean {
   const day = date.getDay();
-  return day >= 1 && day <= 5;
+  if (day === 0 || day === 6) return false;
+  return !isHoliday(date);
 }
 
 function getBusinessMinutesInDay(date: Date, fromMinute: number, toMinute: number): number {
@@ -143,9 +180,15 @@ export function formatBusinessTime(minutes: number): string {
 
 /**
  * SLA de primeira resposta: minutos uteis entre criacao e primeira resposta da equipe.
+ * Se slaFirstResponseOverride for fornecido (dados historicos da planilha), usa diretamente.
  * Retorna null se nao ha resposta da equipe.
  */
-export function getFirstResponseMinutes(createdAt: string, threadReplies: { timestamp: string; isTeamMember: boolean }[]): number | null {
+export function getFirstResponseMinutes(createdAt: string, threadReplies: { timestamp: string; isTeamMember: boolean }[], slaFirstResponseOverride?: number | null): number | null {
+  // Dados historicos com SLA pre-calculado da planilha
+  if (slaFirstResponseOverride !== undefined && slaFirstResponseOverride !== null) {
+    return slaFirstResponseOverride;
+  }
+
   const teamReplies = threadReplies
     .filter((r) => r.isTeamMember)
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());

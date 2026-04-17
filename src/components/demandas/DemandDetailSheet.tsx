@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, CheckCircle2, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2 } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, Circle, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -16,6 +16,7 @@ import {
 import { extractClientName } from "@/data/demandsLoader";
 import { addBusinessHours, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, getBusinessMinutesBetween } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
+import CopyLinkButton from "./CopyLinkButton";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -72,8 +73,9 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
   const status = STATUS_CONFIG[demand.status];
   const client = extractClientName(demand.slackChannel);
 
-  // Check if SLA is expired automatically
+  // Check if SLA is expired: usa slaResolutionStatus da planilha (historico) ou calcula em runtime
   const isSlaBreach = (() => {
+    if (demand.slaResolutionStatus) return demand.slaResolutionStatus === "expirado";
     if (demand.priority === "sem_classificacao") return false;
     if (demand.status === "concluida") return false;
     const config = PRIORITY_CONFIG[demand.priority];
@@ -298,7 +300,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             {showCompleteForm && (
               <div className="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 space-y-3">
                 <p className="text-xs font-medium text-success flex items-center gap-1">
-                  <CheckCircle2 size={12} />
+                  <Circle size={12} fill="currentColor" />
                   Informe a data e horario da conclusao
                 </p>
                 <div className="flex gap-2">
@@ -334,7 +336,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" className="h-8 text-xs flex-1" onClick={handleConfirmComplete}>
-                    <CheckCircle2 size={13} className="mr-1" />
+                    <Circle size={13} fill="currentColor" className="mr-1" />
                     Confirmar Conclusao
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCompleteForm(false)}>
@@ -467,13 +469,16 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
 
           {/* SLA */}
           {demand.priority !== "sem_classificacao" && priority.sla && (() => {
-            const firstRespMinutes = getFirstResponseMinutes(demand.createdAt, demand.threadReplies);
+            const firstRespMinutes = getFirstResponseMinutes(demand.createdAt, demand.threadReplies, demand.slaFirstResponse);
             const slaRespMinutes = parseResponseSla(priority.sla.response);
             const firstRespOk = firstRespMinutes !== null ? firstRespMinutes <= slaRespMinutes : null;
 
             const resolutionMinutes = getResolutionMinutes(demand.createdAt, demand.completedAt);
             const slaResMinutes = priority.sla.resolutionHours * 60;
-            const resolutionOk = resolutionMinutes !== null ? resolutionMinutes <= slaResMinutes : null;
+            // Usa slaResolutionStatus da planilha (historico) ou calcula em runtime (abril+)
+            const resolutionOk = demand.slaResolutionStatus
+              ? demand.slaResolutionStatus === "atendido"
+              : (resolutionMinutes !== null ? resolutionMinutes <= slaResMinutes : null);
 
             return (
               <>
@@ -632,13 +637,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               </div>
 
               {/* Motivo de expiracao - so aparece quando SLA expirado */}
-              {(demand.status === "expirada" || (() => {
-                if (demand.priority === "sem_classificacao") return false;
-                const cfg = PRIORITY_CONFIG[demand.priority];
-                if (!cfg.sla) return false;
-                const due = addBusinessHours(new Date(demand.createdAt), cfg.sla.resolutionHours);
-                return new Date() > due;
-              })()) && (
+              {isSlaBreach && (
                 <div>
                   <label className="text-[11px] text-destructive flex items-center gap-1">
                     Motivo de expiracao (SLA estourado)
@@ -766,6 +765,7 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
               <a href={demand.taskLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate">
                 Task vinculada
               </a>
+              <CopyLinkButton url={demand.taskLink} size={12} />
             </div>
           )}
 
@@ -789,12 +789,15 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
             <span className="text-xs text-muted-foreground">
               Canal: <span className="font-medium text-foreground">{demand.slackChannel}</span>
             </span>
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
-              <a href={demand.slackPermalink} target="_blank" rel="noopener noreferrer">
-                <ExternalLink size={12} />
-                Abrir no Slack
-              </a>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <CopyLinkButton url={demand.slackPermalink} size={12} />
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
+                <a href={demand.slackPermalink} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={12} />
+                  Abrir no Slack
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
       </SheetContent>
