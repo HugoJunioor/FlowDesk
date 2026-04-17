@@ -18,7 +18,12 @@ const path = require('path');
 
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
-const CHANNEL_NAME = 'operacoes-sql';
+// Aceita tanto com quanto sem acento ('operacoes-sql' ou 'operações-sql')
+const CHANNEL_NAME_CANDIDATES = ['operações-sql', 'operacoes-sql'];
+
+function normalize(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
 // Janeiro 2026 00:00 UTC-3
 const OLDEST = new Date('2026-01-01T00:00:00-03:00').getTime() / 1000;
 const NOW = Date.now() / 1000;
@@ -118,7 +123,7 @@ async function fetchAllReplies(channelId, threadTs) {
   return all;
 }
 
-async function fetchSqlMessages(channelId) {
+async function fetchSqlMessages(channelId, CHANNEL_NAME_ACTUAL) {
   const demands = [];
   let cursor;
 
@@ -187,7 +192,7 @@ async function fetchSqlMessages(channelId) {
         hasTask: false,
         taskLink: '',
         tags: ['sql'],
-        slackChannel: `#${CHANNEL_NAME}`,
+        slackChannel: `#${CHANNEL_NAME_ACTUAL}`,
         slackPermalink: `https://${process.env.SLACK_WORKSPACE || 'workspace'}.slack.com/archives/${channelId}/p${msg.ts.replace('.', '')}`,
         replies: msg.reply_count || 0,
         threadReplies,
@@ -239,26 +244,40 @@ async function main() {
   console.log('Conectando ao Slack...');
   const auth = await client.auth.test();
   console.log(`Workspace: ${auth.team} | Bot: ${auth.user}`);
-  console.log(`Canal: #${CHANNEL_NAME} | Periodo: 01/01/2026 ate hoje\n`);
+  console.log(`Canal: #operacoes-sql (ou #operações-sql) | Periodo: 01/01/2026 ate hoje\n`);
 
   await prefetchUsers();
 
-  // Buscar o ID do canal
-  const channelsResult = await client.conversations.list({ types: 'public_channel', limit: 500 });
-  const channel = channelsResult.channels.find((c) => c.name === CHANNEL_NAME);
+  // Buscar o canal (aceita com ou sem acento, paginacao completa)
+  let channel = null;
+  let cursor;
+  do {
+    const r = await client.conversations.list({ types: 'public_channel', limit: 1000, cursor });
+    for (const c of r.channels || []) {
+      const norm = normalize(c.name);
+      if (CHANNEL_NAME_CANDIDATES.some((cand) => normalize(cand) === norm)) {
+        channel = c;
+        break;
+      }
+    }
+    if (channel) break;
+    cursor = r.response_metadata?.next_cursor;
+  } while (cursor);
+
   if (!channel) {
-    console.error(`Canal #${CHANNEL_NAME} nao encontrado.`);
+    console.error(`Canal nao encontrado. Candidatos: ${CHANNEL_NAME_CANDIDATES.join(', ')}`);
     console.error('Verifique se o bot foi adicionado ao canal.');
     process.exit(1);
   }
+  console.log(`  Canal encontrado: #${channel.name} (id=${channel.id})`);
 
   console.log(`Buscando mensagens de #${channel.name}...`);
   let demands;
   try {
-    demands = await fetchSqlMessages(channel.id);
+    demands = await fetchSqlMessages(channel.id, channel.name);
   } catch (err) {
     if (err.data?.error === 'not_in_channel') {
-      console.error(`O bot nao esta no canal #${CHANNEL_NAME}. Adicione-o com /invite @flowdesk`);
+      console.error(`O bot nao esta no canal #${channel.name}. Adicione-o com /invite @flowdesk`);
       process.exit(1);
     }
     throw err;
