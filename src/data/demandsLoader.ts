@@ -7,13 +7,22 @@ import { classifyClosureFields } from "@/lib/closureClassifier";
 /**
  * Carrega demandas: tenta realDemands (dados reais, gitignored),
  * senao usa mockDemands (dados genericos de demo).
+ * Tambem carrega historicalDemands (Jan-Mar, importados da planilha + Slack).
  */
 
 // Vite glob: busca realDemands.ts se existir (eager = sync)
 const realModules = import.meta.glob<{ mockDemands: SlackDemand[] }>("./realDemands.ts", { eager: true });
 const realModule = Object.values(realModules)[0];
 
-export const baseDemands: SlackDemand[] = realModule?.mockDemands ?? demoData;
+// Vite glob: busca historicalDemands.ts se existir (eager = sync)
+const histModules = import.meta.glob<{ historicalDemands: SlackDemand[] }>("./historicalDemands.ts", { eager: true });
+const histModule = Object.values(histModules)[0];
+
+const currentDemands: SlackDemand[] = realModule?.mockDemands ?? demoData;
+const historicalDemands: SlackDemand[] = histModule?.historicalDemands ?? [];
+
+// Combinar: historicos (ja concluidos, sem reprocessamento) + atuais
+export const baseDemands: SlackDemand[] = [...currentDemands];
 export const isRealData = !!realModule;
 
 // === PROCESSAMENTO COMPARTILHADO ===
@@ -101,13 +110,19 @@ function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
 
 /** Demandas completamente processadas: classificadas, com status analisado, closure e overrides */
 export function getProcessedDemands(): SlackDemand[] {
+  // Processar demandas atuais (abril+): classificar, analisar status, closure
   const classified = autoClassifyDemands(baseDemands);
   const analyzed = processDemandsStatus(classified);
   const withClosure = analyzed.map((d) => ({
     ...d,
     closure: d.closure || classifyClosureFields(d),
   }));
-  return applyOverrides(withClosure);
+  const currentProcessed = applyOverrides(withClosure);
+
+  // Historicos (Jan-Mar): ja vem prontos da planilha+Slack, apenas aplicar overrides locais
+  const historicalProcessed = applyOverrides(historicalDemands);
+
+  return [...currentProcessed, ...historicalProcessed];
 }
 
 export { extractClientName };
