@@ -277,8 +277,9 @@ const Demandas = () => {
           }
           case "sem_interacao": {
             if (d.status === "concluida" || d.status === "expirada") return false;
-            const lastTs = d.threadReplies.length > 0
-              ? Math.max(...d.threadReplies.map(r => new Date(r.timestamp).getTime()))
+            const replies = d.threadReplies || [];
+            const lastTs = replies.length > 0
+              ? Math.max(...replies.map(r => new Date(r.timestamp).getTime()))
               : new Date(d.createdAt).getTime();
             const hoursSinceLast = (now.getTime() - lastTs) / 3600000;
             if (hoursSinceLast <= 24) return false;
