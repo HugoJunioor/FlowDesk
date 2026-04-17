@@ -178,7 +178,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
 
       {/* Custom date pickers - shown when personalizado is active */}
       {filters.periodPreset === "personalizado" && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground shrink-0">De:</span>
           <Popover open={fromOpen} onOpenChange={setFromOpen}>
             <PopoverTrigger asChild>
@@ -198,7 +198,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             </PopoverContent>
           </Popover>
 
-          <span className="text-xs text-muted-foreground shrink-0">Ate:</span>
+          <span className="text-xs text-muted-foreground shrink-0">Até:</span>
           <Popover open={toOpen} onOpenChange={setToOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 min-w-[120px] sm:min-w-[140px] justify-start text-xs font-normal">
@@ -216,6 +216,32 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
               />
             </PopoverContent>
           </Popover>
+
+          {/* Mês Select: atalho para selecionar mês inteiro */}
+          <Select
+            value=""
+            onValueChange={(v) => {
+              const [y, m] = v.split("-").map(Number);
+              const from = startOfMonth(new Date(y, m, 1));
+              const to = endOfMonth(from);
+              update({ dateFrom: from.toISOString(), dateTo: to.toISOString(), periodPreset: "personalizado" });
+            }}
+          >
+            <SelectTrigger className="h-9 w-[120px] text-xs">
+              <SelectValue placeholder="Mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: new Date().getMonth() + 1 }, (_, i) => {
+                const year = new Date().getFullYear();
+                const names = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+                return (
+                  <SelectItem key={i} value={`${year}-${i}`}>
+                    {names[i]}/{year}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
       )}
 

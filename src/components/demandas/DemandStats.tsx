@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap, MessageCircleOff } from "lucide-react";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
@@ -29,11 +29,16 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
   }).length;
   const concluidas = demands.filter((d) => d.status === "concluida").length;
 
-  // SLA Estourado: concluidas fora do prazo de resolucao
+  // SLA Estourado: usa slaResolutionStatus da planilha quando disponivel (historico),
+  // senao calcula em runtime (demandas atuais)
   const slaBreach = demands.filter((d) => {
     if (d.priority === "sem_classificacao") return false;
     const config = PRIORITY_CONFIG[d.priority];
     if (!config.sla) return false;
+    // Dados historicos: usar veredicto da planilha diretamente (verificação estrita)
+    if (d.slaResolutionStatus === "expirado") return true;
+    if (d.slaResolutionStatus === "atendido") return false;
+    // Demandas atuais: calcular em runtime
     if (d.status === "concluida" && d.completedAt) {
       const due = addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
       return new Date(d.completedAt) > due;
@@ -52,7 +57,7 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     if (isExcludedFromFirstResponseSla(d)) return false;
     const config = PRIORITY_CONFIG[d.priority];
     if (!config.sla) return false;
-    const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
+    const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
     if (mins === null) {
       // Sem resposta ainda - verificar se ja passou do prazo de resposta
       const slaMinutes = parseResponseSla(config.sla.response);
@@ -63,6 +68,16 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     return mins > slaMinutes;
   }).length;
 
+  // Sem interacao 24h: demandas abertas sem nenhuma atividade nas ultimas 24h
+  const semInteracao = demands.filter((d) => {
+    if (d.status === "concluida" || d.status === "expirada") return false;
+    const lastTs = d.threadReplies.length > 0
+      ? Math.max(...d.threadReplies.map(r => new Date(r.timestamp).getTime()))
+      : new Date(d.createdAt).getTime();
+    const hoursSinceLast = (now.getTime() - lastTs) / 3600000;
+    return hoursSinceLast > 24;
+  }).length;
+
   const stats = [
     { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
     { key: "urgentes", title: "P1 Criticos", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
@@ -70,10 +85,19 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     { key: "concluidas", title: "Concluídas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
     { key: "sla_estourado", title: "SLA Estourado", value: slaBreach, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
     { key: "resposta_atrasada", title: "1a Resp. Atrasada", value: firstResponseBreach, icon: Zap, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
+    {
+      key: "sem_interacao",
+      title: "Sem Interação 24h",
+      value: semInteracao,
+      icon: MessageCircleOff,
+      color: semInteracao > 0 ? "text-destructive" : "text-muted-foreground",
+      bg: semInteracao > 0 ? "bg-destructive/10" : "bg-muted",
+      ring: semInteracao > 0 ? "ring-destructive/30" : "ring-muted-foreground/30",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
       {stats.map((stat) => {
         const isActive = activeFilter === stat.key;
         return (

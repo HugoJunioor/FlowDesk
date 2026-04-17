@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Calendar, Signal, Users } from "lucide-react";
+import { LayoutGrid, Calendar, Signal, Users, List } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
@@ -16,6 +17,8 @@ function parseResponseSla(sla: string): number {
 import DemandStats from "@/components/demandas/DemandStats";
 import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
+import DemandList from "@/components/demandas/DemandList";
+import DemandListGrouped from "@/components/demandas/DemandListGrouped";
 import DemandByDate from "@/components/demandas/DemandByDate";
 import DemandByPriority from "@/components/demandas/DemandByPriority";
 import DemandByAssignee from "@/components/demandas/DemandByAssignee";
@@ -59,6 +62,10 @@ const Demandas = () => {
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "lista">(() =>
+    (localStorage.getItem("fd_view_mode") as "cards" | "lista") ?? "cards"
+  );
+  const [activeTab, setActiveTab] = useState("kanban");
   const [customAssignees, setCustomAssignees] = useState<string[]>(loadCustomAssignees);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("fd_custom_categories") || "[]"); } catch { return []; }
@@ -176,14 +183,30 @@ const Demandas = () => {
 
   const handleStatClick = useCallback((statKey: string) => {
     setFilters((prev) => ({
-      ...EMPTY_FILTERS,
+      ...prev,
       statFilter: prev.statFilter === statKey ? "" : statKey,
     }));
   }, []);
 
-  // Demandas filtradas pelo período (para os quadros de stats)
-  const periodFiltered = useMemo(() => {
+  // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
+  const statsFiltered = useMemo(() => {
     return demands.filter((d) => {
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const match =
+          d.title.toLowerCase().includes(q) ||
+          d.description.toLowerCase().includes(q) ||
+          d.tags.some((t) => t.includes(q)) ||
+          d.assignee?.name.toLowerCase().includes(q) ||
+          extractClientName(d.slackChannel).toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (filters.priority !== "all" && d.priority !== filters.priority) return false;
+      if (filters.status !== "all" && d.status !== filters.status) return false;
+      if (filters.assignee && d.assignee?.name !== filters.assignee) return false;
+      if (filters.category !== "all" && d.closure?.category !== filters.category) return false;
+      if (filters.supportLevel !== "all" && d.closure?.supportLevel !== filters.supportLevel) return false;
+      if (filters.client && extractClientName(d.slackChannel) !== filters.client) return false;
       if (filters.dateFrom) {
         const from = new Date(filters.dateFrom);
         from.setHours(0, 0, 0, 0);
@@ -196,7 +219,7 @@ const Demandas = () => {
       }
       return true;
     });
-  }, [filters.dateFrom, filters.dateTo, demands]);
+  }, [filters, demands]);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -222,6 +245,9 @@ const Demandas = () => {
             break;
           }
           case "sla_estourado": {
+            // Usa slaResolutionStatus da planilha (historico jan-mar) ou calcula runtime (abril+)
+            if (d.slaResolutionStatus === "atendido") return false;
+            if (d.slaResolutionStatus === "expirado") break;
             if (d.priority === "sem_classificacao") return false;
             const cfg = PRIORITY_CONFIG[d.priority];
             if (!cfg.sla) return false;
@@ -239,7 +265,7 @@ const Demandas = () => {
             if (isExcludedFromFirstResponseSla(d)) return false;
             const cfg2 = PRIORITY_CONFIG[d.priority];
             if (!cfg2.sla) return false;
-            const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies);
+            const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
             const slaMinutes = parseResponseSla(cfg2.sla.response);
             if (mins === null) {
               const elapsed = (now.getTime() - new Date(d.createdAt).getTime()) / 60000;
@@ -247,6 +273,15 @@ const Demandas = () => {
             } else {
               if (mins <= slaMinutes) return false;
             }
+            break;
+          }
+          case "sem_interacao": {
+            if (d.status === "concluida" || d.status === "expirada") return false;
+            const lastTs = d.threadReplies.length > 0
+              ? Math.max(...d.threadReplies.map(r => new Date(r.timestamp).getTime()))
+              : new Date(d.createdAt).getTime();
+            const hoursSinceLast = (now.getTime() - lastTs) / 3600000;
+            if (hoursSinceLast <= 24) return false;
             break;
           }
         }
@@ -338,8 +373,8 @@ const Demandas = () => {
                 ...(filters.assignee ? { Responsável: filters.assignee } : {}),
                 ...(filters.client ? { Cliente: filters.client } : {}),
                 ...(filters.category !== "all" ? { Categoria: filters.category } : {}),
-                ...(filters.dateFrom ? { "Data de": filters.dateFrom } : {}),
-                ...(filters.dateTo ? { "Data até": filters.dateTo } : {}),
+                ...(filters.dateFrom ? { "De": new Date(filters.dateFrom).toLocaleDateString("pt-BR") } : {}),
+                ...(filters.dateTo ? { "Até": new Date(filters.dateTo).toLocaleDateString("pt-BR") } : {}),
                 ...(filters.statFilter ? { Filtro: filters.statFilter } : {}),
               }}
             />
@@ -349,7 +384,7 @@ const Demandas = () => {
 
         {/* Stats - clicaveis */}
         <DemandStats
-          demands={periodFiltered}
+          demands={statsFiltered}
           activeFilter={filters.statFilter}
           onFilterClick={handleStatClick}
         />
@@ -362,9 +397,30 @@ const Demandas = () => {
           clients={clients}
         />
 
-        {/* Tabs */}
-        <Tabs defaultValue="kanban">
-          <TabsList className="mb-4 w-full sm:w-auto flex-wrap h-auto gap-1 p-1">
+        {/* View mode + Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Row 1: Cards / Lista toggle */}
+          <div className="flex items-center gap-2 mb-2">
+            <Button
+              size="sm"
+              variant={viewMode === "cards" ? "default" : "outline"}
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => { setViewMode("cards"); localStorage.setItem("fd_view_mode", "cards"); }}
+            >
+              <LayoutGrid size={14} /> Cards
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "lista" ? "default" : "outline"}
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => { setViewMode("lista"); localStorage.setItem("fd_view_mode", "lista"); }}
+            >
+              <List size={14} /> Lista
+            </Button>
+          </div>
+
+          {/* Row 2: Grouping tabs — sempre visíveis */}
+          <TabsList className="w-auto flex-wrap h-auto gap-1 p-1 mb-4">
             <TabsTrigger value="kanban" className="gap-1 text-[11px] sm:text-xs px-2 sm:px-3">
               <LayoutGrid size={14} /> <span className="hidden sm:inline">Visao</span> Geral
             </TabsTrigger>
@@ -379,17 +435,26 @@ const Demandas = () => {
             </TabsTrigger>
           </TabsList>
 
+          {/* Conteúdo: cards ou lista agrupada */}
           <TabsContent value="kanban">
-            <DemandKanban demands={sorted} onSelect={setSelected} />
+            {viewMode === "lista"
+              ? <DemandList demands={sorted} onSelect={setSelected} />
+              : <DemandKanban demands={sorted} onSelect={setSelected} />}
           </TabsContent>
           <TabsContent value="date">
-            <DemandByDate demands={sorted} onSelect={setSelected} />
+            {viewMode === "lista"
+              ? <DemandListGrouped demands={sorted} onSelect={setSelected} groupBy="date" />
+              : <DemandByDate demands={sorted} onSelect={setSelected} />}
           </TabsContent>
           <TabsContent value="priority">
-            <DemandByPriority demands={sorted} onSelect={setSelected} />
+            {viewMode === "lista"
+              ? <DemandListGrouped demands={sorted} onSelect={setSelected} groupBy="priority" />
+              : <DemandByPriority demands={sorted} onSelect={setSelected} />}
           </TabsContent>
           <TabsContent value="assignee">
-            <DemandByAssignee demands={sorted} onSelect={setSelected} />
+            {viewMode === "lista"
+              ? <DemandListGrouped demands={sorted} onSelect={setSelected} groupBy="assignee" />
+              : <DemandByAssignee demands={sorted} onSelect={setSelected} />}
           </TabsContent>
         </Tabs>
 
