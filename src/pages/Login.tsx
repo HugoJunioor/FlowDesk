@@ -56,7 +56,7 @@ const Login = () => {
       return;
     }
     if (!isJustEmail(forgotEmail)) {
-      toast({ title: "E-mail inválido", description: "Use um e-mail @wearejust.it", variant: "destructive" });
+      toast({ title: "E-mail inválido", description: "Use um e-mail corporativo válido.", variant: "destructive" });
       return;
     }
     setForgotLoading(true);
@@ -225,7 +225,7 @@ const Login = () => {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="email"
-                      placeholder="seu@wearejust.it"
+                      placeholder="seu@empresa.com"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       className="pl-10"
@@ -362,11 +362,7 @@ const Login = () => {
         )}
 
         <p className="text-xs text-white/50 lg:text-muted-foreground mt-6 text-center">
-          Powered by{" "}
-          <a href="https://www.wearejust.it" target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline text-white/70 lg:text-foreground">
-            Just
-          </a>
-          . 2026
+          FlowDesk &middot; 2026
         </p>
       </div>
     </div>

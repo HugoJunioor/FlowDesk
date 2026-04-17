@@ -1294,7 +1294,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
 </div>
 
 <div class="footer">
-  Relatório gerado automaticamente por <a href="https://www.wearejust.it" target="_blank"><strong>${escapeHtml(brandName)}</strong></a> &middot; ${now.getFullYear()}
+  Relatório gerado automaticamente por <strong>${escapeHtml(brandName)}</strong> &middot; ${now.getFullYear()}
   <br>Os dados refletem o momento da exportação e podem ter sido atualizados desde então.
 </div>
 
