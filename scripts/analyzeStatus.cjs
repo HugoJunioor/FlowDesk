@@ -260,7 +260,7 @@ const output = `import { SlackDemand } from "@/types/demand";
 
 export const mockDemands: SlackDemand[] = ${JSON.stringify(demands, null, 2)};
 
-/** Extrai nome do cliente do canal Slack (ex: #cliente-vspay -> Vspay) */
+/** Extrai nome do cliente do canal Slack (ex: #cliente-acme -> Acme) */
 export function extractClientName(channel: string): string {
   const match = channel.match(/#cliente-(.+)/);
   if (!match) return channel;
