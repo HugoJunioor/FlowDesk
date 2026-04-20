@@ -11,6 +11,7 @@ import {
   changeUserPassword,
 } from "@/lib/authStorage";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<FlowDeskUser | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const { loadForUser, clearUser: clearUserTheme } = useTheme();
+  const { loadForUser: loadLangForUser, clearUser: clearUserLang } = useLanguage();
 
   useEffect(() => {
     initializeAuth().then(() => {
@@ -42,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setCurrentUser(user);
           setMustChangePassword(user.isFirstAccess);
           loadForUser(user.id, user.themePreferences);
+          loadLangForUser(user.id, user.language);
         } else {
           clearSession();
         }
@@ -69,15 +72,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentUser(user);
     setMustChangePassword(user.isFirstAccess);
     loadForUser(user.id, user.themePreferences);
+    loadLangForUser(user.id, user.language);
     return { success: true };
-  }, [loadForUser]);
+  }, [loadForUser, loadLangForUser]);
 
   const logout = useCallback(() => {
     clearSession();
     setCurrentUser(null);
     setMustChangePassword(false);
     clearUserTheme();
-  }, [clearUserTheme]);
+    clearUserLang();
+  }, [clearUserTheme, clearUserLang]);
 
   const changePassword = useCallback(
     async (newPassword: string) => {

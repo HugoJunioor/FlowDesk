@@ -1,5 +1,6 @@
 export type UserRole = "master" | "user";
 export type UserStatus = "active" | "blocked";
+export type Language = "pt-BR" | "en-US" | "es-ES";
 
 export interface UserThemePreferences {
   mode: "light" | "dark";
@@ -20,6 +21,8 @@ export interface FlowDeskUser {
   passwordResetRequested: boolean;
   groups: string[];
   themePreferences?: UserThemePreferences;
+  /** Idioma preferencial. Default: pt-BR */
+  language?: Language;
   createdAt: string;
   createdBy: string;
   updatedAt?: string;
