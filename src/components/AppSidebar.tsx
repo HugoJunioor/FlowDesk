@@ -9,14 +9,17 @@ import {
   Workflow,
   MessageSquare,
   Users,
+  ShieldCheck,
   UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { branding } from "@/config/brandingLoader";
+import type { ModuleId } from "@/types/permissions";
 
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/demandas", icon: MessageSquare, label: "Demandas" },
+const navItems: { to: string; icon: typeof LayoutDashboard; label: string; module: ModuleId }[] = [
+  { to: "/", icon: LayoutDashboard, label: "Dashboard", module: "dashboard" },
+  { to: "/demandas", icon: MessageSquare, label: "Demandas", module: "demandas" },
 ];
 
 interface AppSidebarProps {
@@ -29,7 +32,9 @@ interface AppSidebarProps {
 const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppSidebarProps) => {
   const location = useLocation();
   const { username, logout, currentUser } = useAuth();
+  const { canSee } = usePermissions();
   const isMaster = currentUser?.role === "master";
+  const visibleNavItems = navItems.filter((item) => canSee(item.module));
 
   const initials = username
     ? username.slice(0, 2).toUpperCase()
@@ -96,7 +101,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
               <NavLink
@@ -134,6 +139,25 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               )}
               <Users size={20} className={location.pathname === "/usuarios" ? "text-sidebar-primary" : ""} />
               {!collapsed && <span>Usuários</span>}
+            </NavLink>
+          )}
+
+          {/* Master-only: Grupos */}
+          {isMaster && (
+            <NavLink
+              to="/grupos"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                location.pathname === "/grupos"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              {location.pathname === "/grupos" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
+              )}
+              <ShieldCheck size={20} className={location.pathname === "/grupos" ? "text-sidebar-primary" : ""} />
+              {!collapsed && <span>Grupos</span>}
             </NavLink>
           )}
         </nav>
