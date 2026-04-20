@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, Workflow } from "lucide-react";
 import AppSidebar from "./AppSidebar";
 import { branding } from "@/config/brandingLoader";
@@ -7,9 +7,39 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = "fd_sidebar_collapsed";
+
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const [collapsed, setCollapsed] = useState(false);
+  // Estado persistido — senao seria resetado a cada mudanca de rota
+  // (AppLayout re-instanciado por cada pagina) e a sidebar abriria sozinha.
+  const [collapsed, setCollapsedState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const setCollapsed = (v: boolean) => {
+    setCollapsedState(v);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(v));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Se a preferencia mudar em outro tab, sincroniza
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SIDEBAR_COLLAPSED_KEY && e.newValue !== null) {
+        setCollapsedState(e.newValue === "true");
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
