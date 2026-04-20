@@ -81,7 +81,7 @@ const DemandasSql = () => {
     setDemands(getProcessedSqlDemands());
   }, []);
 
-  // === SYNC SOB DEMANDA ===
+  // === SYNC SOB DEMANDA (forca sync + rebuild + reload automatico) ===
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -89,16 +89,27 @@ const DemandasSql = () => {
       const result = await res.json();
       if (result.ok) {
         toast({
-          title: "Sincronização concluída",
-          description: "Recarregue a página para ver as demandas atualizadas.",
+          title: "Demandas atualizadas",
+          description: "Recarregando a página...",
         });
         setLastSync(new Date());
+        // Recarrega para exibir o bundle novo com dados atualizados.
+        // Pequeno delay para o toast aparecer antes do reload.
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
       } else {
         toast({
           title: "Erro ao sincronizar",
-          description: result.error || result.stderr || "Tente novamente.",
+          description:
+            result.error ||
+            (result.stage === "build"
+              ? "Sync OK, mas o rebuild falhou."
+              : result.stderr) ||
+            "Tente novamente.",
           variant: "destructive",
         });
+        setSyncing(false);
       }
     } catch (err) {
       toast({
@@ -106,7 +117,6 @@ const DemandasSql = () => {
         description: String(err),
         variant: "destructive",
       });
-    } finally {
       setSyncing(false);
     }
   };
