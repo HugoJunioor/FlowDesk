@@ -37,6 +37,11 @@ src/data/sqlDemands.ts
 # Shared state (users, overrides, groups — local only)
 /data/
 
+# Arquivos locais de trabalho (rascunhos, respostas, tickets)
+/.claude/
+/resposta-*.md
+/ticket-*.md
+
 # Local branding (company-specific)
 src/config/branding.local.ts
 public/just-logo.*
