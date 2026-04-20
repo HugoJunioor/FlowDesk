@@ -26,22 +26,22 @@ export interface ColorTheme {
 
 export const COLOR_THEMES: ColorTheme[] = [
   { id: "oceano", label: "Oceano", previewColor: "#3b72b5" },
-  { id: "violeta", label: "Violeta", previewColor: "#7c3aed" },
-  { id: "rosa", label: "Rosa", previewColor: "#e11d6a" },
-  { id: "esmeralda", label: "Esmeralda", previewColor: "#059669" },
-  { id: "ambar", label: "Âmbar", previewColor: "#d97706" },
-  { id: "rubi", label: "Rubi", previewColor: "#dc2626" },
-  { id: "turquesa", label: "Turquesa", previewColor: "#0d9488" },
-  { id: "lavanda", label: "Lavanda", previewColor: "#7c5cbf" },
-  { id: "safira", label: "Safira", previewColor: "#4f46e5" },
+  { id: "violeta", label: "Violeta", previewColor: "#8b5cf6", hasGradient: true },
+  { id: "rosa", label: "Rosa", previewColor: "#ec4899", hasGradient: true },
+  { id: "esmeralda", label: "Esmeralda", previewColor: "#10b981", hasGradient: true },
+  { id: "ambar", label: "Âmbar", previewColor: "#f59e0b", hasGradient: true },
+  { id: "rubi", label: "Rubi", previewColor: "#ef4444", hasGradient: true },
+  { id: "turquesa", label: "Turquesa", previewColor: "#06b6d4", hasGradient: true },
+  { id: "lavanda", label: "Lavanda", previewColor: "#a78bfa" },
+  { id: "safira", label: "Safira", previewColor: "#6366f1", hasGradient: true },
   { id: "grafite", label: "Grafite", previewColor: "#4b5563" },
-  // Novos
+  // Especiais
   { id: "neon", label: "Neon", previewColor: "#a855f7", hasGradient: true },
   { id: "aurora", label: "Aurora", previewColor: "#14b8a6", hasGradient: true },
-  { id: "midnight", label: "Midnight", previewColor: "#1e40af" },
-  { id: "coral", label: "Coral", previewColor: "#f43f5e" },
-  { id: "menta", label: "Menta", previewColor: "#10b981" },
-  { id: "cereja", label: "Cereja", previewColor: "#be123c" },
+  { id: "midnight", label: "Midnight", previewColor: "#3b82f6", hasGradient: true },
+  { id: "coral", label: "Coral", previewColor: "#fb7185", hasGradient: true },
+  { id: "menta", label: "Menta", previewColor: "#34d399" },
+  { id: "cereja", label: "Cereja", previewColor: "#e11d48", hasGradient: true },
 ];
 
 export const DEFAULT_COLOR_THEME: ColorThemeId = "oceano";
