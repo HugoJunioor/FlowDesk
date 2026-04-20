@@ -59,28 +59,50 @@ function readBody(req) {
 // Controle para nao rodar 2 syncs SQL em paralelo
 let sqlSyncInProgress = false;
 
-function runSqlSync() {
+/** Roda um script node e resolve com { ok, code, stdout, stderr } */
+function runScript(cmd, args, cwd) {
   return new Promise((resolve) => {
-    if (sqlSyncInProgress) {
-      resolve({ ok: false, error: "Sync ja em andamento" });
-      return;
-    }
-    sqlSyncInProgress = true;
-    const script = path.join(__dirname, "syncSqlChannel.cjs");
-    const root = path.join(__dirname, "..");
-    const child = spawn("node", [script], { cwd: root, stdio: "pipe" });
+    const child = spawn(cmd, args, { cwd, stdio: "pipe", shell: true });
     let stdout = "", stderr = "";
     child.stdout.on("data", (d) => (stdout += d.toString()));
     child.stderr.on("data", (d) => (stderr += d.toString()));
-    child.on("exit", (code) => {
-      sqlSyncInProgress = false;
-      resolve({ ok: code === 0, code, stdout, stderr });
-    });
-    child.on("error", (err) => {
-      sqlSyncInProgress = false;
-      resolve({ ok: false, error: err.message });
-    });
+    child.on("exit", (code) => resolve({ ok: code === 0, code, stdout, stderr }));
+    child.on("error", (err) => resolve({ ok: false, error: err.message }));
   });
+}
+
+/**
+ * Executa sync do canal SQL e, em seguida, rebuild do bundle para que
+ * a proxima requisicao do navegador ja receba os dados atualizados.
+ * Assim o botao "Atualizar" pode dar location.reload() direto.
+ */
+async function runSqlSyncAndRebuild() {
+  if (sqlSyncInProgress) {
+    return { ok: false, error: "Sync ja em andamento" };
+  }
+  sqlSyncInProgress = true;
+  try {
+    const root = path.join(__dirname, "..");
+
+    // 1) Sync do canal
+    const syncScript = path.join(__dirname, "syncSqlChannel.cjs");
+    const syncResult = await runScript("node", [syncScript], root);
+    if (!syncResult.ok) {
+      return { ok: false, stage: "sync", ...syncResult };
+    }
+
+    // 2) Rebuild do bundle (para preview mode)
+    // Em dev mode o Vite HMR atualiza sozinho; build extra nao atrapalha.
+    const buildResult = await runScript("npm", ["run", "build"], root);
+    return {
+      ok: buildResult.ok,
+      stage: buildResult.ok ? "done" : "build",
+      syncStdout: syncResult.stdout,
+      buildStderr: buildResult.stderr,
+    };
+  } finally {
+    sqlSyncInProgress = false;
+  }
 }
 
 function handler(req, res, next) {
@@ -95,7 +117,7 @@ function handler(req, res, next) {
       res.statusCode = 405;
       return res.end(JSON.stringify({ error: "Use POST" }));
     }
-    return runSqlSync().then((result) => {
+    return runSqlSyncAndRebuild().then((result) => {
       res.setHeader("Content-Type", "application/json");
       res.statusCode = result.ok ? 200 : 500;
       res.end(JSON.stringify(result));
