@@ -396,6 +396,7 @@ async function main() {
     if (checks.length > 0) {
       d.status = 'concluida';
       d.completedAt = checks[checks.length - 1].timestamp;
+      d.closureSource = 'green_circle';  // fechada AGORA com 🟢
       statusConcluida++;
       continue;
     }
@@ -407,6 +408,7 @@ async function main() {
     if (prev) {
       d.status = prev.status;
       d.completedAt = prev.completedAt;
+      d.closureSource = 'preserved';  // concluida antiga, preservada
       statusPreservadas++;
       continue;
     }

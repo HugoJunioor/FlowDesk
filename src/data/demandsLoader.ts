@@ -93,11 +93,14 @@ function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
     const ov = overrides[d.id];
     if (!ov) return d;
 
-    // REGRA: se o sync detectou conclusao no Slack (via 🟢),
-    // isso tem prioridade sobre override manual anterior.
-    // Assim, quando alguem reage com circulo verde depois de o sistema
-    // ja ter sido marcado manualmente, o 🟢 prevalece.
-    const syncConcludedViaReaction = d.status === "concluida" && d.completedAt;
+    // REGRA: so sobrepor override manual se a conclusao foi detectada AGORA
+    // via circulo verde na thread (closureSource === 'green_circle').
+    // Se a demanda esta como concluida apenas por preservacao do sync
+    // anterior, o override do usuario prevalece (ele deve ter reaberto
+    // conscientemente).
+    const closureSource = (d as SlackDemand & { closureSource?: string }).closureSource;
+    const syncConcludedViaReaction =
+      d.status === "concluida" && d.completedAt && closureSource === "green_circle";
     const hasManualStatus = ov.manualStatusOverride && ov.status && !syncConcludedViaReaction;
 
     return {
