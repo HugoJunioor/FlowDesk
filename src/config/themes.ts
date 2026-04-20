@@ -36,7 +36,7 @@ export const COLOR_THEMES: ColorTheme[] = [
   { id: "safira", label: "Safira", previewColor: "#4f46e5" },
   { id: "grafite", label: "Grafite", previewColor: "#4b5563" },
   // Novos
-  { id: "neon", label: "Neon", previewColor: "#e91e8c", hasGradient: true },
+  { id: "neon", label: "Neon", previewColor: "#a855f7", hasGradient: true },
   { id: "aurora", label: "Aurora", previewColor: "#14b8a6", hasGradient: true },
   { id: "midnight", label: "Midnight", previewColor: "#1e40af" },
   { id: "coral", label: "Coral", previewColor: "#f43f5e" },
