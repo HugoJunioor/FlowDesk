@@ -17,6 +17,7 @@ const SYNCED_KEYS = [
   "fd_demand_overrides",
   "fd_sql_demand_overrides",
   "fd_groups",
+  "fd_group_permissions",
   "fd_auto_assign_rules",
   "fd_support_members",
 ] as const;
