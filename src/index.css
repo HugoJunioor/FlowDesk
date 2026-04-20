@@ -144,7 +144,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 270 58% 60%;
+  --primary: 270 85% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -201,7 +201,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 340 72% 58%;
+  --primary: 340 90% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -258,7 +258,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 155 60% 48%;
+  --primary: 155 80% 58%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -372,7 +372,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 355 70% 56%;
+  --primary: 355 88% 65%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -429,7 +429,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 175 60% 48%;
+  --primary: 175 82% 55%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -543,7 +543,7 @@
   --card-foreground: 210 14% 90%;
   --popover: 222 18% 10%;
   --popover-foreground: 210 14% 90%;
-  --primary: 235 62% 62%;
+  --primary: 235 85% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 16%;
   --secondary-foreground: 210 14% 90%;
@@ -768,6 +768,128 @@
   background-image: linear-gradient(90deg, hsl(170 85% 58%), hsl(200 75% 65%), hsl(150 65% 58%));
 }
 
+/* ── Gradientes nos h1 dos temas vibrantes ───────────────────────── */
+
+/* Violeta: violeta -> roxo -> indigo */
+.theme-violeta h1 {
+  background-image: linear-gradient(90deg, hsl(270 75% 55%), hsl(290 75% 55%), hsl(240 75% 58%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-violeta.dark h1 {
+  background-image: linear-gradient(90deg, hsl(270 85% 68%), hsl(290 85% 68%), hsl(240 85% 68%));
+}
+
+/* Rosa: rosa -> magenta -> roxo */
+.theme-rosa h1 {
+  background-image: linear-gradient(90deg, hsl(340 85% 55%), hsl(320 85% 58%), hsl(295 80% 60%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-rosa.dark h1 {
+  background-image: linear-gradient(90deg, hsl(340 90% 68%), hsl(320 90% 70%), hsl(295 85% 70%));
+}
+
+/* Esmeralda: esmeralda -> verde-agua -> azul-petroleo */
+.theme-esmeralda h1 {
+  background-image: linear-gradient(90deg, hsl(155 80% 40%), hsl(170 70% 45%), hsl(190 75% 48%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-esmeralda.dark h1 {
+  background-image: linear-gradient(90deg, hsl(155 75% 55%), hsl(170 70% 58%), hsl(190 75% 62%));
+}
+
+/* Ambar: amarelo -> laranja -> vermelho (por-do-sol) */
+.theme-ambar h1 {
+  background-image: linear-gradient(90deg, hsl(45 95% 55%), hsl(25 90% 55%), hsl(5 85% 58%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-ambar.dark h1 {
+  background-image: linear-gradient(90deg, hsl(45 95% 62%), hsl(25 90% 62%), hsl(5 85% 65%));
+}
+
+/* Rubi: vermelho -> magenta -> rosa */
+.theme-rubi h1 {
+  background-image: linear-gradient(90deg, hsl(355 85% 55%), hsl(335 85% 58%), hsl(315 80% 60%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-rubi.dark h1 {
+  background-image: linear-gradient(90deg, hsl(355 90% 65%), hsl(335 90% 68%), hsl(315 85% 70%));
+}
+
+/* Turquesa: ciano -> turquesa -> verde-agua */
+.theme-turquesa h1 {
+  background-image: linear-gradient(90deg, hsl(190 85% 48%), hsl(175 80% 42%), hsl(160 75% 45%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-turquesa.dark h1 {
+  background-image: linear-gradient(90deg, hsl(190 85% 58%), hsl(175 80% 58%), hsl(160 75% 58%));
+}
+
+/* Safira: indigo -> azul -> ciano */
+.theme-safira h1 {
+  background-image: linear-gradient(90deg, hsl(240 80% 55%), hsl(220 85% 55%), hsl(200 85% 55%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-safira.dark h1 {
+  background-image: linear-gradient(90deg, hsl(240 85% 68%), hsl(220 90% 68%), hsl(200 90% 68%));
+}
+
+/* Midnight: azul-marinho -> azul-royal -> ciano-profundo */
+.theme-midnight h1 {
+  background-image: linear-gradient(90deg, hsl(230 85% 50%), hsl(215 85% 55%), hsl(200 80% 55%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-midnight.dark h1 {
+  background-image: linear-gradient(90deg, hsl(230 90% 65%), hsl(215 90% 68%), hsl(200 85% 68%));
+}
+
+/* Coral: coral -> rosa -> laranja-salmao */
+.theme-coral h1 {
+  background-image: linear-gradient(90deg, hsl(355 85% 60%), hsl(335 80% 60%), hsl(15 85% 58%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-coral.dark h1 {
+  background-image: linear-gradient(90deg, hsl(355 90% 70%), hsl(335 85% 70%), hsl(15 90% 68%));
+}
+
+/* Cereja: bordo -> vermelho-cereja -> rosa-escuro */
+.theme-cereja h1 {
+  background-image: linear-gradient(90deg, hsl(348 80% 45%), hsl(355 85% 50%), hsl(335 75% 50%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-cereja.dark h1 {
+  background-image: linear-gradient(90deg, hsl(348 85% 60%), hsl(355 90% 62%), hsl(335 85% 62%));
+}
+
 /* ── Midnight (azul marinho profundo) ── */
 .theme-midnight {
   --background: 225 22% 97%;
@@ -803,7 +925,7 @@
   --card-foreground: 225 20% 90%;
   --popover: 225 38% 8%;
   --popover-foreground: 225 20% 90%;
-  --primary: 225 70% 62%;
+  --primary: 225 88% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 225 28% 14%;
   --secondary-foreground: 225 20% 90%;
@@ -860,7 +982,7 @@
   --card-foreground: 10 20% 90%;
   --popover: 10 28% 8%;
   --popover-foreground: 10 20% 90%;
-  --primary: 10 82% 64%;
+  --primary: 10 90% 68%;
   --primary-foreground: 0 0% 100%;
   --secondary: 10 22% 14%;
   --secondary-foreground: 10 20% 90%;
@@ -974,7 +1096,7 @@
   --card-foreground: 345 20% 90%;
   --popover: 348 28% 8%;
   --popover-foreground: 345 20% 90%;
-  --primary: 348 72% 54%;
+  --primary: 348 88% 62%;
   --primary-foreground: 0 0% 100%;
   --secondary: 348 22% 14%;
   --secondary-foreground: 345 20% 90%;
