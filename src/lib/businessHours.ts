@@ -21,35 +21,83 @@ const END_HOUR = 18;
 const MINUTES_PER_DAY = (END_HOUR - START_HOUR) * 60; // 600
 
 /**
- * Feriados Campinas/SP por ano.
- * Formato: "YYYY-MM-DD" em horario local (BRT).
- * Inclui nacionais, estaduais (SP) e municipais (Campinas).
- * Pontos facultativos amplamente adotados (Carnaval, Corpus Christi) tambem entram.
+ * Calculo da Pascoa (algoritmo Meeus/Jones/Butcher) — funciona para qualquer ano.
+ * Base para feriados moveis (Carnaval, Sexta Santa, Corpus Christi).
  */
-const HOLIDAYS: Record<number, Set<string>> = {
-  2026: new Set([
-    "2026-01-01", // Confraternizacao Universal
-    "2026-02-16", // Carnaval (segunda)
-    "2026-02-17", // Carnaval (terca)
-    "2026-04-03", // Sexta-feira Santa
-    "2026-04-21", // Tiradentes
-    "2026-05-01", // Dia do Trabalho
-    "2026-06-04", // Corpus Christi
-    "2026-07-09", // Revolucao Constitucionalista (SP)
-    "2026-08-12", // Feriado municipal Campinas
-    "2026-09-07", // Independencia do Brasil
-    "2026-10-12", // Nossa Senhora Aparecida
-    "2026-11-02", // Finados
-    "2026-11-20", // Consciencia Negra
-    "2026-12-08", // Nossa Senhora da Conceicao (Campinas)
-    "2026-12-25", // Natal
-  ]),
-};
+function computeEaster(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3=Marco, 4=Abril
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function fmt(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+/**
+ * Gera conjunto de feriados (Campinas/SP) para um ano especifico.
+ * Inclui nacionais, estaduais SP e municipais Campinas,
+ * + pontos facultativos amplamente adotados (Carnaval, Corpus Christi).
+ */
+function generateHolidaysForYear(year: number): Set<string> {
+  const easter = computeEaster(year);
+  return new Set([
+    `${year}-01-01`,                // Confraternizacao Universal
+    fmt(addDays(easter, -48)),      // Carnaval (segunda)
+    fmt(addDays(easter, -47)),      // Carnaval (terca)
+    fmt(addDays(easter, -2)),       // Sexta-feira Santa
+    `${year}-04-21`,                // Tiradentes
+    `${year}-05-01`,                // Dia do Trabalho
+    fmt(addDays(easter, 60)),       // Corpus Christi
+    `${year}-07-09`,                // Revolucao Constitucionalista (SP)
+    `${year}-08-12`,                // Feriado municipal Campinas
+    `${year}-09-07`,                // Independencia do Brasil
+    `${year}-10-12`,                // Nossa Senhora Aparecida
+    `${year}-11-02`,                // Finados
+    `${year}-11-15`,                // Proclamacao da Republica
+    `${year}-11-20`,                // Consciencia Negra (nacional desde 2024)
+    `${year}-12-08`,                // Nossa Senhora da Conceicao (Campinas)
+    `${year}-12-25`,                // Natal
+  ]);
+}
+
+/**
+ * Cache de feriados por ano. Preenchido sob demanda.
+ * Cobre qualquer ano consultado — nunca "expira".
+ */
+const HOLIDAY_CACHE: Record<number, Set<string>> = {};
+
+function getHolidaysForYear(year: number): Set<string> {
+  if (!HOLIDAY_CACHE[year]) {
+    HOLIDAY_CACHE[year] = generateHolidaysForYear(year);
+  }
+  return HOLIDAY_CACHE[year];
+}
 
 function isHoliday(date: Date): boolean {
   const year = date.getFullYear();
-  const holidays = HOLIDAYS[year];
-  if (!holidays) return false;
+  const holidays = getHolidaysForYear(year);
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
   return holidays.has(`${year}-${mm}-${dd}`);
