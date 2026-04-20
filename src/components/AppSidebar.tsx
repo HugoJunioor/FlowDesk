@@ -81,14 +81,14 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               {branding.logo ? (
                 <div className="flex items-center gap-3">
                   <img src={branding.logo} alt={branding.name} className="h-8 w-auto shrink-0" />
-                  <span className="text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
+                  <span className="text-sidebar-primary font-semibold text-lg tracking-tight">
                     {branding.name}
                   </span>
                 </div>
               ) : (
                 <>
                   <Workflow size={20} className="text-sidebar-primary shrink-0" />
-                  <span className="ml-2 text-sidebar-primary-foreground font-semibold text-lg tracking-tight">
+                  <span className="ml-2 text-sidebar-primary font-semibold text-lg tracking-tight">
                     {branding.name}
                   </span>
                 </>
