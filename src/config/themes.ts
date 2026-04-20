@@ -14,7 +14,7 @@ export type ColorThemeId =
   | "midnight"
   | "coral"
   | "menta"
-  | "cereja";
+  | "flamengo";
 
 export interface ColorTheme {
   id: ColorThemeId;
@@ -41,7 +41,7 @@ export const COLOR_THEMES: ColorTheme[] = [
   { id: "midnight", label: "Midnight", previewColor: "#3b82f6", hasGradient: true },
   { id: "coral", label: "Coral", previewColor: "#fb7185", hasGradient: true },
   { id: "menta", label: "Menta", previewColor: "#34d399" },
-  { id: "cereja", label: "Cereja", previewColor: "#e11d48", hasGradient: true },
+  { id: "flamengo", label: "Flamengo", previewColor: "#E40521", hasGradient: true },
 ];
 
 export const DEFAULT_COLOR_THEME: ColorThemeId = "oceano";
