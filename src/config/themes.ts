@@ -8,12 +8,20 @@ export type ColorThemeId =
   | "turquesa"
   | "lavanda"
   | "safira"
-  | "grafite";
+  | "grafite"
+  | "neon"
+  | "aurora"
+  | "midnight"
+  | "coral"
+  | "menta"
+  | "cereja";
 
 export interface ColorTheme {
   id: ColorThemeId;
   label: string;
   previewColor: string;
+  /** Usa gradiente nos titulos principais (efeito neon). */
+  hasGradient?: boolean;
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -27,6 +35,13 @@ export const COLOR_THEMES: ColorTheme[] = [
   { id: "lavanda", label: "Lavanda", previewColor: "#7c5cbf" },
   { id: "safira", label: "Safira", previewColor: "#4f46e5" },
   { id: "grafite", label: "Grafite", previewColor: "#4b5563" },
+  // Novos
+  { id: "neon", label: "Neon", previewColor: "#e91e8c", hasGradient: true },
+  { id: "aurora", label: "Aurora", previewColor: "#14b8a6", hasGradient: true },
+  { id: "midnight", label: "Midnight", previewColor: "#1e40af" },
+  { id: "coral", label: "Coral", previewColor: "#f43f5e" },
+  { id: "menta", label: "Menta", previewColor: "#10b981" },
+  { id: "cereja", label: "Cereja", previewColor: "#be123c" },
 ];
 
 export const DEFAULT_COLOR_THEME: ColorThemeId = "oceano";
