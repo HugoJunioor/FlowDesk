@@ -13,13 +13,19 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { branding } from "@/config/brandingLoader";
 import type { ModuleId } from "@/types/permissions";
 
-const navItems: { to: string; icon: typeof LayoutDashboard; label: string; module: ModuleId }[] = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard", module: "dashboard" },
-  { to: "/demandas", icon: MessageSquare, label: "Demandas", module: "demandas" },
+const navItems: {
+  to: string;
+  icon: typeof LayoutDashboard;
+  labelKey: string;
+  module: ModuleId;
+}[] = [
+  { to: "/", icon: LayoutDashboard, labelKey: "nav.dashboard", module: "dashboard" },
+  { to: "/demandas", icon: MessageSquare, labelKey: "nav.demands", module: "demandas" },
 ];
 
 interface AppSidebarProps {
@@ -33,6 +39,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
   const location = useLocation();
   const { username, logout, currentUser } = useAuth();
   const { canSee } = usePermissions();
+  const { t } = useLanguage();
   const isMaster = currentUser?.role === "master";
   const visibleNavItems = navItems.filter((item) => canSee(item.module));
 
@@ -118,7 +125,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
                 )}
                 <item.icon size={20} className={isActive ? "text-sidebar-primary" : ""} />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span>{t(item.labelKey)}</span>}
               </NavLink>
             );
           })}
@@ -138,7 +145,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
               )}
               <Users size={20} className={location.pathname === "/usuarios" ? "text-sidebar-primary" : ""} />
-              {!collapsed && <span>Usuários</span>}
+              {!collapsed && <span>{t("nav.users")}</span>}
             </NavLink>
           )}
 
@@ -157,7 +164,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
               )}
               <ShieldCheck size={20} className={location.pathname === "/grupos" ? "text-sidebar-primary" : ""} />
-              {!collapsed && <span>Grupos</span>}
+              {!collapsed && <span>{t("nav.groups")}</span>}
             </NavLink>
           )}
         </nav>
@@ -199,14 +206,14 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
           >
             <Settings size={20} />
-            {!collapsed && <span>Configuracoes</span>}
+            {!collapsed && <span>{t("nav.settings")}</span>}
           </NavLink>
           <button
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-destructive transition-colors w-full"
           >
             <LogOut size={20} />
-            {!collapsed && <span>Sair</span>}
+            {!collapsed && <span>{t("nav.logout")}</span>}
           </button>
         </div>
       </aside>

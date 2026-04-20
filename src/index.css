@@ -622,6 +622,370 @@
   --sidebar-muted: 218 6% 42%;
 }
 
+/* ── Neon (cyberpunk: rosa magenta + ciano, fundo bem escuro) ── */
+.theme-neon {
+  --background: 330 22% 96%;
+  --card: 320 18% 99%;
+  --card-foreground: 330 30% 14%;
+  --popover: 320 18% 99%;
+  --popover-foreground: 330 30% 14%;
+  --primary: 330 80% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 325 22% 92%;
+  --secondary-foreground: 330 30% 14%;
+  --muted: 325 16% 95%;
+  --muted-foreground: 325 14% 46%;
+  --accent: 190 80% 90%;
+  --accent-foreground: 330 30% 14%;
+  --border: 325 18% 88%;
+  --input: 325 18% 88%;
+  --ring: 330 80% 52%;
+  --sidebar-background: 270 40% 8%;
+  --sidebar-foreground: 325 20% 82%;
+  --sidebar-primary: 330 85% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 270 30% 14%;
+  --sidebar-accent-foreground: 325 25% 92%;
+  --sidebar-border: 270 30% 16%;
+  --sidebar-ring: 330 85% 62%;
+  --sidebar-muted: 325 20% 55%;
+}
+.theme-neon.dark {
+  --background: 270 40% 5%;
+  --foreground: 325 25% 92%;
+  --card: 270 35% 8%;
+  --card-foreground: 325 25% 92%;
+  --popover: 270 35% 8%;
+  --popover-foreground: 325 25% 92%;
+  --primary: 330 85% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 270 25% 15%;
+  --secondary-foreground: 325 25% 92%;
+  --muted: 270 20% 12%;
+  --muted-foreground: 325 20% 65%;
+  --accent: 190 70% 18%;
+  --accent-foreground: 190 90% 92%;
+  --border: 270 25% 18%;
+  --input: 270 25% 18%;
+  --ring: 330 85% 62%;
+  --sidebar-background: 270 45% 4%;
+  --sidebar-foreground: 325 20% 82%;
+  --sidebar-primary: 330 90% 68%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 270 30% 12%;
+  --sidebar-accent-foreground: 325 25% 92%;
+  --sidebar-border: 270 30% 14%;
+  --sidebar-ring: 330 90% 68%;
+  --sidebar-muted: 325 20% 55%;
+}
+
+/* Efeito gradient nos titulos h1 dentro do tema Neon */
+.theme-neon h1 {
+  background-image: linear-gradient(90deg, hsl(330 90% 62%), hsl(270 80% 65%), hsl(190 85% 55%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-neon.dark h1 {
+  background-image: linear-gradient(90deg, hsl(330 95% 68%), hsl(280 85% 72%), hsl(190 90% 62%));
+}
+
+/* ── Aurora (ciano + turquesa + verde, boreal) ── */
+.theme-aurora {
+  --background: 180 18% 97%;
+  --card: 180 16% 99%;
+  --card-foreground: 195 30% 14%;
+  --popover: 180 16% 99%;
+  --popover-foreground: 195 30% 14%;
+  --primary: 180 72% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 180 20% 92%;
+  --secondary-foreground: 195 30% 14%;
+  --muted: 180 14% 95%;
+  --muted-foreground: 185 14% 46%;
+  --accent: 160 60% 90%;
+  --accent-foreground: 195 30% 14%;
+  --border: 180 18% 89%;
+  --input: 180 18% 89%;
+  --ring: 180 72% 38%;
+  --sidebar-background: 195 45% 11%;
+  --sidebar-foreground: 180 18% 80%;
+  --sidebar-primary: 170 75% 50%;
+  --sidebar-primary-foreground: 195 45% 8%;
+  --sidebar-accent: 195 35% 16%;
+  --sidebar-accent-foreground: 180 22% 90%;
+  --sidebar-border: 195 30% 18%;
+  --sidebar-ring: 170 75% 50%;
+  --sidebar-muted: 185 16% 52%;
+}
+.theme-aurora.dark {
+  --background: 195 45% 6%;
+  --foreground: 180 20% 90%;
+  --card: 195 40% 9%;
+  --card-foreground: 180 20% 90%;
+  --popover: 195 40% 9%;
+  --popover-foreground: 180 20% 90%;
+  --primary: 170 75% 50%;
+  --primary-foreground: 195 45% 8%;
+  --secondary: 195 30% 14%;
+  --secondary-foreground: 180 20% 90%;
+  --muted: 195 28% 12%;
+  --muted-foreground: 185 18% 62%;
+  --accent: 150 40% 18%;
+  --accent-foreground: 150 75% 90%;
+  --border: 195 30% 16%;
+  --input: 195 30% 16%;
+  --ring: 170 75% 50%;
+  --sidebar-background: 195 45% 5%;
+  --sidebar-foreground: 180 18% 80%;
+  --sidebar-primary: 170 80% 58%;
+  --sidebar-primary-foreground: 195 45% 8%;
+  --sidebar-accent: 195 35% 12%;
+  --sidebar-accent-foreground: 180 22% 90%;
+  --sidebar-border: 195 30% 14%;
+  --sidebar-ring: 170 80% 58%;
+  --sidebar-muted: 185 16% 52%;
+}
+.theme-aurora h1 {
+  background-image: linear-gradient(90deg, hsl(170 80% 45%), hsl(200 70% 55%), hsl(150 60% 50%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+.theme-aurora.dark h1 {
+  background-image: linear-gradient(90deg, hsl(170 85% 58%), hsl(200 75% 65%), hsl(150 65% 58%));
+}
+
+/* ── Midnight (azul marinho profundo) ── */
+.theme-midnight {
+  --background: 225 22% 97%;
+  --card: 225 18% 99%;
+  --card-foreground: 225 32% 12%;
+  --popover: 225 18% 99%;
+  --popover-foreground: 225 32% 12%;
+  --primary: 225 72% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 225 22% 92%;
+  --secondary-foreground: 225 32% 12%;
+  --muted: 225 16% 95%;
+  --muted-foreground: 225 14% 46%;
+  --accent: 225 22% 90%;
+  --accent-foreground: 225 32% 12%;
+  --border: 225 18% 89%;
+  --input: 225 18% 89%;
+  --ring: 225 72% 38%;
+  --sidebar-background: 225 42% 10%;
+  --sidebar-foreground: 225 18% 80%;
+  --sidebar-primary: 225 70% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 225 32% 16%;
+  --sidebar-accent-foreground: 225 22% 90%;
+  --sidebar-border: 225 28% 18%;
+  --sidebar-ring: 225 70% 58%;
+  --sidebar-muted: 225 16% 52%;
+}
+.theme-midnight.dark {
+  --background: 225 42% 5%;
+  --foreground: 225 20% 90%;
+  --card: 225 38% 8%;
+  --card-foreground: 225 20% 90%;
+  --popover: 225 38% 8%;
+  --popover-foreground: 225 20% 90%;
+  --primary: 225 70% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 225 28% 14%;
+  --secondary-foreground: 225 20% 90%;
+  --muted: 225 24% 12%;
+  --muted-foreground: 225 18% 62%;
+  --accent: 225 28% 14%;
+  --accent-foreground: 225 22% 90%;
+  --border: 225 28% 16%;
+  --input: 225 28% 16%;
+  --ring: 225 70% 62%;
+  --sidebar-background: 225 48% 4%;
+  --sidebar-foreground: 225 18% 80%;
+  --sidebar-primary: 225 75% 66%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 225 32% 11%;
+  --sidebar-accent-foreground: 225 22% 90%;
+  --sidebar-border: 225 28% 13%;
+  --sidebar-ring: 225 75% 66%;
+  --sidebar-muted: 225 16% 52%;
+}
+
+/* ── Coral (laranja rosado quente) ── */
+.theme-coral {
+  --background: 10 22% 97%;
+  --card: 12 18% 99%;
+  --card-foreground: 10 30% 14%;
+  --popover: 12 18% 99%;
+  --popover-foreground: 10 30% 14%;
+  --primary: 10 78% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 10 22% 92%;
+  --secondary-foreground: 10 30% 14%;
+  --muted: 10 16% 95%;
+  --muted-foreground: 10 14% 46%;
+  --accent: 10 22% 90%;
+  --accent-foreground: 10 30% 14%;
+  --border: 10 18% 88%;
+  --input: 10 18% 88%;
+  --ring: 10 78% 58%;
+  --sidebar-background: 10 32% 14%;
+  --sidebar-foreground: 10 18% 80%;
+  --sidebar-primary: 10 82% 64%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 10 24% 20%;
+  --sidebar-accent-foreground: 10 22% 90%;
+  --sidebar-border: 10 22% 22%;
+  --sidebar-ring: 10 82% 64%;
+  --sidebar-muted: 10 14% 52%;
+}
+.theme-coral.dark {
+  --background: 10 32% 5%;
+  --foreground: 10 20% 90%;
+  --card: 10 28% 8%;
+  --card-foreground: 10 20% 90%;
+  --popover: 10 28% 8%;
+  --popover-foreground: 10 20% 90%;
+  --primary: 10 82% 64%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 10 22% 14%;
+  --secondary-foreground: 10 20% 90%;
+  --muted: 10 18% 12%;
+  --muted-foreground: 10 18% 62%;
+  --accent: 10 22% 14%;
+  --accent-foreground: 10 22% 90%;
+  --border: 10 22% 16%;
+  --input: 10 22% 16%;
+  --ring: 10 82% 64%;
+  --sidebar-background: 10 34% 5%;
+  --sidebar-foreground: 10 18% 80%;
+  --sidebar-primary: 10 85% 68%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 10 24% 12%;
+  --sidebar-accent-foreground: 10 22% 90%;
+  --sidebar-border: 10 22% 14%;
+  --sidebar-ring: 10 85% 68%;
+  --sidebar-muted: 10 14% 52%;
+}
+
+/* ── Menta (verde menta suave e fresco) ── */
+.theme-menta {
+  --background: 148 20% 97%;
+  --card: 150 18% 99%;
+  --card-foreground: 150 30% 14%;
+  --popover: 150 18% 99%;
+  --popover-foreground: 150 30% 14%;
+  --primary: 150 58% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 148 22% 92%;
+  --secondary-foreground: 150 30% 14%;
+  --muted: 148 14% 95%;
+  --muted-foreground: 150 14% 46%;
+  --accent: 148 22% 90%;
+  --accent-foreground: 150 30% 14%;
+  --border: 148 18% 88%;
+  --input: 148 18% 88%;
+  --ring: 150 58% 42%;
+  --sidebar-background: 150 30% 13%;
+  --sidebar-foreground: 148 16% 80%;
+  --sidebar-primary: 150 62% 55%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 150 22% 19%;
+  --sidebar-accent-foreground: 148 20% 90%;
+  --sidebar-border: 150 22% 21%;
+  --sidebar-ring: 150 62% 55%;
+  --sidebar-muted: 150 14% 52%;
+}
+.theme-menta.dark {
+  --background: 150 30% 5%;
+  --foreground: 148 20% 90%;
+  --card: 150 26% 8%;
+  --card-foreground: 148 20% 90%;
+  --popover: 150 26% 8%;
+  --popover-foreground: 148 20% 90%;
+  --primary: 150 62% 55%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 22% 14%;
+  --secondary-foreground: 148 20% 90%;
+  --muted: 150 18% 12%;
+  --muted-foreground: 150 18% 62%;
+  --accent: 150 22% 14%;
+  --accent-foreground: 148 22% 90%;
+  --border: 150 22% 16%;
+  --input: 150 22% 16%;
+  --ring: 150 62% 55%;
+  --sidebar-background: 150 32% 4%;
+  --sidebar-foreground: 148 16% 80%;
+  --sidebar-primary: 150 65% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 150 24% 11%;
+  --sidebar-accent-foreground: 148 20% 90%;
+  --sidebar-border: 150 22% 13%;
+  --sidebar-ring: 150 65% 60%;
+  --sidebar-muted: 150 14% 52%;
+}
+
+/* ── Cereja (vermelho bordô, elegante) ── */
+.theme-cereja {
+  --background: 345 20% 97%;
+  --card: 348 18% 99%;
+  --card-foreground: 348 30% 14%;
+  --popover: 348 18% 99%;
+  --popover-foreground: 348 30% 14%;
+  --primary: 348 72% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 345 22% 92%;
+  --secondary-foreground: 348 30% 14%;
+  --muted: 345 14% 95%;
+  --muted-foreground: 345 14% 46%;
+  --accent: 345 22% 90%;
+  --accent-foreground: 348 30% 14%;
+  --border: 345 18% 88%;
+  --input: 345 18% 88%;
+  --ring: 348 72% 42%;
+  --sidebar-background: 348 32% 12%;
+  --sidebar-foreground: 345 16% 80%;
+  --sidebar-primary: 348 72% 54%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 348 24% 18%;
+  --sidebar-accent-foreground: 345 20% 90%;
+  --sidebar-border: 348 22% 20%;
+  --sidebar-ring: 348 72% 54%;
+  --sidebar-muted: 345 14% 52%;
+}
+.theme-cereja.dark {
+  --background: 348 32% 5%;
+  --foreground: 345 20% 90%;
+  --card: 348 28% 8%;
+  --card-foreground: 345 20% 90%;
+  --popover: 348 28% 8%;
+  --popover-foreground: 345 20% 90%;
+  --primary: 348 72% 54%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 348 22% 14%;
+  --secondary-foreground: 345 20% 90%;
+  --muted: 348 18% 12%;
+  --muted-foreground: 345 18% 62%;
+  --accent: 348 22% 14%;
+  --accent-foreground: 345 22% 90%;
+  --border: 348 22% 16%;
+  --input: 348 22% 16%;
+  --ring: 348 72% 54%;
+  --sidebar-background: 348 34% 4%;
+  --sidebar-foreground: 345 16% 80%;
+  --sidebar-primary: 348 75% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 348 24% 11%;
+  --sidebar-accent-foreground: 345 20% 90%;
+  --sidebar-border: 348 22% 13%;
+  --sidebar-ring: 348 75% 58%;
+  --sidebar-muted: 345 14% 52%;
+}
+
 @layer base {
   * {
     @apply border-border;
