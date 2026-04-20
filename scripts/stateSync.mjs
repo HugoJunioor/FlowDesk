@@ -23,6 +23,7 @@ export const SYNCED_KEYS = [
   "fd_demand_overrides",
   "fd_sql_demand_overrides",  // overrides do modulo SQL (isolado)
   "fd_groups",
+  "fd_group_permissions",      // permissoes por grupo (modulos x acoes)
   "fd_auto_assign_rules",
   "fd_support_members",
 ];

@@ -10,6 +10,7 @@ import Demandas from "./pages/Demandas.tsx";
 import DemandasSql from "./pages/DemandasSql.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import UserManagement from "./pages/UserManagement.tsx";
+import GroupsManagement from "./pages/GroupsManagement.tsx";
 import Profile from "./pages/Profile.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -42,6 +43,9 @@ const AppRoutes = () => {
       <Route path="/perfil" element={<Profile />} />
       {currentUser?.role === "master" && (
         <Route path="/usuarios" element={<UserManagement />} />
+      )}
+      {currentUser?.role === "master" && (
+        <Route path="/grupos" element={<GroupsManagement />} />
       )}
       <Route path="*" element={<NotFound />} />
     </Routes>
