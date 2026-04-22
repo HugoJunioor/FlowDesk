@@ -5,6 +5,7 @@ import { ptBR } from "date-fns/locale";
 import { Building2, ExternalLink } from "lucide-react";
 import ExpirationCountdown from "@/components/demandas/ExpirationCountdown";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
+import StaleBadge from "./StaleBadge";
 
 interface DemandListProps {
   demands: SlackDemand[];
@@ -14,6 +15,7 @@ interface DemandListProps {
 const HEADERS = [
   { label: "Prior.", width: "w-[40px] flex-shrink-0" },
   { label: "Título", width: "flex-1 min-w-0" },
+  { label: "Inatividade", width: "w-[130px] flex-shrink-0 text-center" },
   { label: "Cliente", width: "w-[120px] flex-shrink-0" },
   { label: "Tipo", width: "w-[100px] flex-shrink-0" },
   { label: "Status", width: "w-[90px] flex-shrink-0" },
@@ -92,6 +94,11 @@ const DemandList = ({ demands, onSelect }: DemandListProps) => {
                       </div>
                     </>
                   )}
+                </div>
+
+                {/* Sem interacao > 24h (badge piscante) */}
+                <div className="w-[130px] flex-shrink-0 flex justify-center">
+                  <StaleBadge demand={d} compact />
                 </div>
 
                 {/* Client */}
