@@ -141,6 +141,8 @@ const DemandList = ({ demands, onSelect }: DemandListProps) => {
                       createdAt={d.createdAt}
                       status={d.status}
                       priority={d.priority}
+                      completedAt={d.completedAt}
+                      expirationReason={d.closure?.expirationReason}
                       compact={true}
                     />
                   ) : (

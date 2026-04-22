@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, AlertTriangle } from "lucide-react";
+import { Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { getBusinessTimeInfo, addBusinessHours } from "@/lib/businessHours";
 
@@ -10,13 +10,50 @@ interface ExpirationCountdownProps {
   status: string;
   priority?: DemandPriority;
   compact?: boolean;
+  /** completedAt eh usado para detectar se a demanda concluida estourou SLA */
+  completedAt?: string | null;
+  /** Motivo da expiracao (fd_demand_overrides.closure.expirationReason) */
+  expirationReason?: string;
 }
 
-const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = false }: ExpirationCountdownProps) => {
+const ExpirationCountdown = ({
+  dueDate,
+  createdAt,
+  status,
+  priority,
+  compact = false,
+  completedAt,
+  expirationReason,
+}: ExpirationCountdownProps) => {
+  // Concluida: verifica se estourou SLA (tempo de conclusao > prazo)
   if (status === "concluida") {
+    let breachedWhenCompleted = false;
+    if (completedAt && priority && priority !== "sem_classificacao") {
+      const cfg = PRIORITY_CONFIG[priority];
+      if (cfg?.sla) {
+        const dueAt = addBusinessHours(new Date(createdAt), cfg.sla.resolutionHours);
+        if (new Date(completedAt) > dueAt) breachedWhenCompleted = true;
+      }
+    }
+    if (breachedWhenCompleted) {
+      return (
+        <div className="flex flex-col gap-0.5">
+          <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] w-fit">
+            <AlertTriangle size={10} className="mr-1" />
+            Concluída fora do SLA
+          </Badge>
+          {expirationReason && (
+            <span className="text-[10px] text-destructive/80 italic">
+              Motivo: {expirationReason}
+            </span>
+          )}
+        </div>
+      );
+    }
     return (
       <Badge variant="secondary" className="bg-success/10 text-success text-[10px]">
-        Concluida
+        <CheckCircle2 size={10} className="mr-1" />
+        Concluída
       </Badge>
     );
   }
@@ -36,13 +73,20 @@ const ExpirationCountdown = ({ dueDate, createdAt, status, priority, compact = f
 
   const info = getBusinessTimeInfo(createdAt, effectiveDueDate);
 
-  // SLA expirado: badge sem barra
+  // SLA expirado: badge sem barra (+ motivo se houver)
   if (info.isExpired || status === "expirada") {
     return (
-      <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse">
-        <AlertTriangle size={10} className="mr-1" />
-        SLA Expirado
-      </Badge>
+      <div className="flex flex-col gap-0.5">
+        <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse w-fit">
+          <AlertTriangle size={10} className="mr-1" />
+          SLA Expirado
+        </Badge>
+        {expirationReason && (
+          <span className="text-[10px] text-destructive/80 italic">
+            Motivo: {expirationReason}
+          </span>
+        )}
+      </div>
     );
   }
 
