@@ -8,6 +8,7 @@ import { extractClientName } from "@/data/mockDemands";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ExpirationCountdown from "./ExpirationCountdown";
+import StaleBadge from "./StaleBadge";
 
 interface DemandCardProps {
   demand: SlackDemand;
@@ -112,6 +113,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
               {demand.replies}
             </span>
           )}
+          <StaleBadge demand={demand} compact className="ml-auto" />
         </div>
 
         {/* Last team reply */}
