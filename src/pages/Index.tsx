@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,35 +18,12 @@ import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { SlackDemand } from "@/types/demand";
-
-/** Verifica SLA de resolucao: usa valor da planilha (historico) ou calcula em runtime (abril+) */
-function isSlaBreached(d: SlackDemand): boolean {
-  if (d.slaResolutionStatus) return d.slaResolutionStatus === "expirado";
-  if (d.priority === "sem_classificacao") return false;
-  const config = PRIORITY_CONFIG[d.priority];
-  if (!config?.sla) return false;
-  if (d.status === "concluida" && d.completedAt) {
-    return new Date(d.completedAt) > addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-  }
-  if (d.status !== "concluida" && d.status !== "expirada") {
-    return new Date() > addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-  }
-  return d.status === "expirada";
-}
-function isSlaCompliant(d: SlackDemand): boolean {
-  // Dados históricos: usar APENAS o campo armazenado como fonte de verdade
-  if (d.slaResolutionStatus === "atendido") return true;
-  if (d.slaResolutionStatus === "expirado") return false;
-  // Demandas em tempo real (abril+): calcular dinamicamente
-  if (d.priority === "sem_classificacao") return true;
-  const config = PRIORITY_CONFIG[d.priority];
-  if (!config?.sla) return true;
-  if (d.status === "concluida" && d.completedAt) {
-    return new Date(d.completedAt) <= addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-  }
-  if (d.status === "expirada") return false;
-  return new Date() <= addBusinessHours(new Date(d.createdAt), config.sla.resolutionHours);
-}
+import {
+  isSlaBreached,
+  isSlaCompliant,
+  computeDemandMetrics,
+  parseResponseSla,
+} from "@/lib/slaCalculator";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
@@ -54,14 +31,6 @@ import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
 type BarStatusFilter = "all" | "abertas" | "concluidas" | "expiradas";
-
-// Parse SLA response string ("15 min", "1 hora", "4 horas") to minutes
-function parseResponseSla(sla: string): number {
-  const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
-  if (!match) return 60;
-  const val = parseInt(match[1]);
-  return match[2].startsWith("hora") ? val * 60 : val;
-}
 
 const PIE_COLORS: Record<string, string> = { P1: "#ef4444", P2: "#f59e0b", P3: "#3b82f6" };
 const BAR_COLORS = { abertas: "#3b82f6", concluidas: "#22c55e", expiradas: "#ef4444" };
@@ -121,7 +90,21 @@ const Dashboard = () => {
   const [pieFilter, setPieFilter] = useState<PieFilter>("all");
   const [barStatusFilter, setBarStatusFilter] = useState<BarStatusFilter>("all");
 
-  const allDemands = useMemo(() => getProcessedDemands(), []);
+  // Recalcula sempre que overrides mudarem (mesmo em outras telas/abas)
+  const [refreshTick, setRefreshTick] = useState(0);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "fd_demand_overrides") setRefreshTick((t) => t + 1);
+    };
+    const onFocus = () => setRefreshTick((t) => t + 1);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+  const allDemands = useMemo(() => getProcessedDemands(), [refreshTick]);
 
   const clients = useMemo(() => {
     const set = new Set<string>();
@@ -164,59 +147,27 @@ const Dashboard = () => {
       if (assignee && d.assignee?.name !== assignee) return false;
       return true;
     });
-  }, [period, client, assignee, customFrom, customTo, selectedYear]);
+  }, [period, client, assignee, customFrom, customTo, selectedYear, allDemands]);
 
   // === METRICS (from global filtered) ===
   const total = filtered.length;
-  const abertas = filtered.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
-  const concluidas = filtered.filter((d) => d.status === "concluida").length;
-  const expiradas = filtered.filter((d) => d.status === "expirada").length;
-  const p1Count = filtered.filter((d) => d.priority === "p1").length;
-
-  const withSla = filtered.filter((d) => d.priority !== "sem_classificacao");
-  const slaCompliant = withSla.filter((d) => isSlaCompliant(d));
-  const slaRate = withSla.length > 0 ? Math.floor((slaCompliant.length / withSla.length) * 100) : 100;
-
-  // SLA de primeira resposta (real, baseado em threadReplies)
-  const firstResponseData = useMemo(() => {
-    const eligible = filtered.filter((d) => !isExcludedFromFirstResponseSla(d) && d.priority !== "sem_classificacao");
-
-    let ok = 0;
-    let breach = 0;
-    let sumMins = 0;
-    let countMins = 0;
-
-    for (const d of eligible) {
-      const config = PRIORITY_CONFIG[d.priority];
-      if (!config?.sla) continue;
-      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
-      if (frMins !== null) {
-        sumMins += frMins;
-        countMins++;
-        const slaRespMins = parseResponseSla(config.sla.response);
-        if (frMins <= slaRespMins) ok++;
-        else breach++;
-      } else if (d.slaResolutionStatus === "atendido" || d.slaResolutionStatus === "expirado") {
-        // Dado histórico sem registro de resposta: conta como violação
-        breach++;
-      }
-    }
-
-    const total = ok + breach;
-    const avg = countMins > 0 ? Math.round(sumMins / countMins) : 0;
-    const rate = total > 0 ? Math.floor((ok / total) * 100) : 100;
-
-    return { avg, rate, total };
-  }, [filtered]);
-
-  // SLA de resolucao no prazo
-  const resolutionSlaData = useMemo(() => {
-    const concluded = filtered.filter((d) => d.status === "concluida" && d.completedAt && d.priority !== "sem_classificacao");
-    const withinSla = concluded.filter((d) => isSlaCompliant(d));
-    const breached = filtered.filter((d) => isSlaBreached(d)).length;
-    const rate = concluded.length > 0 ? Math.round((withinSla.length / concluded.length) * 100) : 100;
-    return { rate, breached, total: concluded.length };
-  }, [filtered]);
+  // Metricas centralizadas — mesma logica usada pelos relatorios BI/Excel
+  const metrics = useMemo(() => computeDemandMetrics(filtered), [filtered]);
+  const abertas = metrics.abertas + metrics.emAndamento;
+  const concluidas = metrics.concluidas;
+  const expiradas = metrics.expiradas;
+  const p1Count = metrics.p1Count;
+  const slaRate = metrics.slaResolutionRate;
+  const firstResponseData = {
+    avg: metrics.slaFirstResponseAvgMinutes,
+    rate: metrics.slaFirstResponseRate,
+    total: metrics.slaFirstResponseOk + metrics.slaFirstResponseBreach,
+  };
+  const resolutionSlaData = {
+    rate: metrics.slaResolutionRate,
+    breached: metrics.slaBreachedCount,
+    total: metrics.slaResolutionTotal,
+  };
 
   // === PIE CHART DATA (exclude sem_classificacao, apply local filter) ===
   const pieData = useMemo(() => {

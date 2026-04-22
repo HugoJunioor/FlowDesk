@@ -3,6 +3,7 @@
 import * as XLSX from "xlsx-js-style";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { getFirstResponseMinutes, getResolutionMinutes } from "./businessHours";
+import { isSlaCompliant } from "./slaCalculator";
 
 // ── Cell style constants ──────────────────────────────────────────────────────
 // xlsx-js-style uses 6-char hex (no alpha prefix)
@@ -103,20 +104,17 @@ function parseResponseSla(sla: string): number {
   return match[2].toLowerCase().startsWith("hora") ? val * 60 : val;
 }
 
-/** Compute runtime SLA resolution status for demands that lack it */
+/**
+ * Compute runtime SLA resolution status usando a MESMA logica do dashboard
+ * (horas uteis + feriados). Retorna atendido/expirado/aberto.
+ */
 function computeResolutionStatus(d: SlackDemand): "atendido" | "expirado" | "aberto" {
   if (d.slaResolutionStatus === "atendido" || d.slaResolutionStatus === "expirado") {
     return d.slaResolutionStatus;
   }
   if (d.status === "expirada") return "expirado";
-  const cfg = PRIORITY_CONFIG[d.priority];
-  if (!cfg || !cfg.sla) return "aberto";
-  const slaHours = cfg.sla.resolutionHours;
   if (d.status === "concluida" && d.completedAt) {
-    const created = new Date(d.createdAt).getTime();
-    const completed = new Date(d.completedAt).getTime();
-    const elapsed = (completed - created) / 3_600_000;
-    return elapsed <= slaHours ? "atendido" : "expirado";
+    return isSlaCompliant(d) ? "atendido" : "expirado";
   }
   return "aberto";
 }

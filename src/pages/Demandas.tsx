@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -64,6 +64,20 @@ const Demandas = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
+
+  // Revalida quando overrides mudarem em outra aba/dispositivo
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "fd_demand_overrides") setDemands(getProcessedDemands());
+    };
+    const onFocus = () => setDemands(getProcessedDemands());
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "lista">(() =>
