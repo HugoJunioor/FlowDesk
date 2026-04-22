@@ -1,5 +1,6 @@
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandPriority } from "@/types/demand";
 import { getFirstResponseMinutes, getResolutionMinutes, isExcludedFromFirstResponseSla } from "./businessHours";
+import { computeDemandMetrics, isSlaBreached as isSlaBreachedCommon, parseResponseSla } from "./slaCalculator";
 import { branding } from "@/config/brandingLoader";
 
 interface ReportOptions {
@@ -8,15 +9,6 @@ interface ReportOptions {
   filters?: Record<string, string>;
   demands: SlackDemand[];
   generatedFrom: "dashboard" | "demandas";
-}
-
-function parseResponseSla(slaStr: string): number {
-  if (!slaStr) return Infinity;
-  const lower = slaStr.toLowerCase();
-  const num = parseFloat(lower);
-  if (lower.includes("hora")) return num * 60;
-  if (lower.includes("min")) return num;
-  return Infinity;
 }
 
 function formatMinutes(mins: number | null): string {
@@ -52,83 +44,34 @@ function statusLabel(s: string): string {
   return map[s] || s;
 }
 
-function isSlaBreachedDemand(d: SlackDemand): boolean {
-  if (d.slaResolutionStatus) return d.slaResolutionStatus === "expirado";
-  if (d.priority === "sem_classificacao") return false;
-  const cfg = PRIORITY_CONFIG[d.priority];
-  if (!cfg?.sla) return false;
-  if (d.status === "concluida" && d.completedAt) {
-    return getResolutionMinutes(d.createdAt, d.completedAt)! > cfg.sla.resolutionHours * 60;
-  }
-  return d.status === "expirada";
-}
+// Reexporta isSlaBreached do calculator central, garantindo que o BI
+// calcule o mesmo que o Dashboard.
+const isSlaBreachedDemand = isSlaBreachedCommon;
 
 export function generateInteractiveReport(options: ReportOptions): string {
   const { title, subtitle, filters, demands, generatedFrom } = options;
   const now = new Date();
   const brandName = branding.name || "FlowDesk";
 
-  // === COMPUTE METRICS ===
-  const total = demands.length;
-  const abertas = demands.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
-  const concluidas = demands.filter((d) => d.status === "concluida").length;
-  const expiradas = demands.filter((d) => d.status === "expirada").length;
-  const emAndamento = demands.filter((d) => d.status === "em_andamento").length;
-  const p1Count = demands.filter((d) => d.priority === "p1").length;
-  const p2Count = demands.filter((d) => d.priority === "p2").length;
-  const p3Count = demands.filter((d) => d.priority === "p3").length;
-
-  // SLA calculations
-  const withSla = demands.filter((d) => d.priority !== "sem_classificacao" && PRIORITY_CONFIG[d.priority]?.sla);
-
-  let slaResOk = 0;
-  let slaResBreach = 0;
-  let slaRespOk = 0;
-  let slaRespBreach = 0;
-  let totalFirstResp = 0;
-  let sumFirstResp = 0;
-
-  for (const d of withSla) {
-    const cfg = PRIORITY_CONFIG[d.priority];
-    if (!cfg?.sla) continue;
-
-    // Resolution SLA: dados históricos usam APENAS campo armazenado; abril+ calcula dinamicamente
-    if (d.slaResolutionStatus === "atendido") {
-      slaResOk++;
-    } else if (d.slaResolutionStatus === "expirado") {
-      slaResBreach++;
-    } else {
-      // Sem status armazenado: cálculo dinâmico para demandas em tempo real
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
-      if (resMins !== null) {
-        if (resMins <= cfg.sla.resolutionHours * 60) slaResOk++;
-        else slaResBreach++;
-      } else if (d.status === "expirada") {
-        slaResBreach++;
-      }
-    }
-
-    // First response SLA (exclui conciliação e remessa SITEF)
-    if (!isExcludedFromFirstResponseSla(d)) {
-      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
-      if (frMins !== null) {
-        totalFirstResp++;
-        sumFirstResp += frMins;
-        const slaRespMins = parseResponseSla(cfg.sla.response);
-        if (frMins <= slaRespMins) slaRespOk++;
-        else slaRespBreach++;
-      } else if (d.slaResolutionStatus === "atendido" || d.slaResolutionStatus === "expirado") {
-        // Dados históricos sem registro de resposta: conta como violação (sem resposta = atraso)
-        slaRespBreach++;
-      }
-    }
-  }
-
-  const avgFirstResp = totalFirstResp > 0 ? sumFirstResp / totalFirstResp : 0;
-  // Count of SLA-breached demands (for the table button badge, includes concluídas)
-  const slaBreachedCount = demands.filter((d) => isSlaBreachedDemand(d)).length;
-  const slaResRate = withSla.length > 0 ? Math.floor((slaResOk / withSla.length) * 100) : 0;
-  const slaRespRate = slaRespOk + slaRespBreach > 0 ? Math.floor((slaRespOk / (slaRespOk + slaRespBreach)) * 100) : 0;
+  // === METRICS — mesma logica do dashboard (fonte unica de verdade) ===
+  const metrics = computeDemandMetrics(demands);
+  const total = metrics.total;
+  const abertas = metrics.abertas + metrics.emAndamento;
+  const concluidas = metrics.concluidas;
+  const expiradas = metrics.expiradas;
+  const emAndamento = metrics.emAndamento;
+  const p1Count = metrics.p1Count;
+  const p2Count = metrics.p2Count;
+  const p3Count = metrics.p3Count;
+  const slaBreachedCount = metrics.slaBreachedCount;
+  const slaResRate = metrics.slaResolutionRate;
+  const slaRespRate = metrics.slaFirstResponseRate;
+  const avgFirstResp = metrics.slaFirstResponseAvgMinutes;
+  const totalFirstResp = metrics.slaFirstResponseOk + metrics.slaFirstResponseBreach;
+  // withSla mantido pois eh usado em outros trechos de agregacao
+  const withSla = demands.filter(
+    (d) => d.priority !== "sem_classificacao" && PRIORITY_CONFIG[d.priority]?.sla
+  );
 
   // Status distribution
   const statusData = {
