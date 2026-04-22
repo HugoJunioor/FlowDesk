@@ -146,13 +146,15 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
             </Badge>
           </div>
 
-          {/* Countdown */}
-          {demand.priority !== "sem_classificacao" && demand.status !== "concluida" && demand.status !== "expirada" && (
+          {/* Countdown / SLA status (inclui concluidas fora do prazo com motivo) */}
+          {demand.priority !== "sem_classificacao" && (
             <ExpirationCountdown
               dueDate={demand.dueDate || ""}
               createdAt={demand.createdAt}
               status={demand.status}
               priority={demand.priority}
+              completedAt={demand.completedAt}
+              expirationReason={demand.closure?.expirationReason}
             />
           )}
         </div>

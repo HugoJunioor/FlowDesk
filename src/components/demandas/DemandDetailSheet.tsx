@@ -150,6 +150,8 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                 createdAt={demand.createdAt}
                 status={demand.status}
                 priority={demand.priority}
+                completedAt={demand.completedAt}
+                expirationReason={demand.closure?.expirationReason}
               />
             </div>
           )}
