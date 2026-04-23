@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users, List, Database } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
-import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS } from "@/types/demand";
+import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS } from "@/types/demand";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 
 function parseResponseSla(sla: string): number {
@@ -36,6 +36,8 @@ type DemandOverride = {
   completedAt?: string | null;
   manualStatusOverride?: boolean;
   closure?: Partial<ClosureFields>;
+  taskLink?: string;
+  hasTask?: boolean;
 };
 
 function loadOverrides(): Record<string, DemandOverride> {
@@ -88,6 +90,9 @@ const Demandas = () => {
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("fd_custom_categories") || "[]"); } catch { return []; }
   });
+  const [customExpirationReasons, setCustomExpirationReasons] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("fd_custom_expiration_reasons") || "[]"); } catch { return []; }
+  });
 
   const assignees = useMemo(() => {
     const set = new Set<string>(customAssignees);
@@ -117,6 +122,23 @@ const Demandas = () => {
       if (prev.includes(name)) return prev;
       const updated = [...prev, name];
       localStorage.setItem("fd_custom_categories", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const allExpirationReasons = useMemo(() => {
+    const base = [...EXPIRATION_REASON_OPTIONS];
+    customExpirationReasons.forEach((r) => {
+      if (!base.includes(r as ExpirationReason)) base.push(r as ExpirationReason);
+    });
+    return base;
+  }, [customExpirationReasons]);
+
+  const handleAddExpirationReason = useCallback((name: string) => {
+    setCustomExpirationReasons((prev) => {
+      if (prev.includes(name)) return prev;
+      const updated = [...prev, name];
+      localStorage.setItem("fd_custom_expiration_reasons", JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -196,6 +218,23 @@ const Demandas = () => {
     const overrides = loadOverrides();
     const existing = overrides[demandId] || {};
     overrides[demandId] = { ...existing, closure: { ...(existing as any).closure, ...partial } };
+    saveOverrides(overrides);
+  }, []);
+
+  /** Salva link da task no override — permite editar o campo vindo do Slack. */
+  const handleTaskLinkChange = useCallback((demandId: string, taskLink: string) => {
+    const trimmed = taskLink.trim();
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId ? { ...d, taskLink: trimmed, hasTask: !!trimmed } : d
+      )
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId ? { ...prev, taskLink: trimmed, hasTask: !!trimmed } : prev
+    );
+    const overrides = loadOverrides();
+    const existing = overrides[demandId] || {};
+    overrides[demandId] = { ...existing, taskLink: trimmed, hasTask: !!trimmed };
     saveOverrides(overrides);
   }, []);
 
@@ -504,6 +543,9 @@ const Demandas = () => {
           onClosureChange={handleClosureChange}
           categories={allCategories}
           onAddCategory={handleAddCategory}
+          expirationReasons={allExpirationReasons}
+          onAddExpirationReason={handleAddExpirationReason}
+          onTaskLinkChange={handleTaskLinkChange}
         />
       </div>
     </AppLayout>
