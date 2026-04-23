@@ -30,6 +30,8 @@ type SqlOverride = {
   completedAt?: string | null;
   approvedAt?: string | null;
   manualStatusOverride?: boolean;
+  taskLink?: string;
+  hasTask?: boolean;
   assignee?: string | null;
   closure?: Partial<ClosureFields>;
 };
@@ -199,6 +201,21 @@ const DemandasSql = () => {
       if ((prev as string[]).includes(name)) return prev;
       return [...prev, name as DemandCategory];
     });
+  }, []);
+
+  const handleTaskLinkChange = useCallback((demandId: string, taskLink: string) => {
+    const trimmed = taskLink.trim();
+    setDemands((prev) =>
+      prev.map((d) =>
+        d.id === demandId ? { ...d, taskLink: trimmed, hasTask: !!trimmed } : d
+      )
+    );
+    setSelected((prev) =>
+      prev && prev.id === demandId ? { ...prev, taskLink: trimmed, hasTask: !!trimmed } : prev
+    );
+    const overrides = loadSqlOverrides();
+    overrides[demandId] = { ...overrides[demandId], taskLink: trimmed, hasTask: !!trimmed };
+    saveSqlOverrides(overrides);
   }, []);
 
   const handleAssigneeChange = useCallback((demandId: string, assignee: string | null) => {
@@ -473,6 +490,7 @@ const DemandasSql = () => {
         onClosureChange={handleClosureChange}
         categories={customCategories}
         onAddCategory={handleAddCategory}
+        onTaskLinkChange={handleTaskLinkChange}
       />
     </AppLayout>
   );

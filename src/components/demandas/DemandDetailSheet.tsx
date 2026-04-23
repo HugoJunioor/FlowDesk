@@ -37,9 +37,30 @@ interface DemandDetailSheetProps {
   onClosureChange: (demandId: string, closure: Partial<ClosureFields>) => void;
   categories: DemandCategory[];
   onAddCategory: (name: string) => void;
+  /** Lista completa de motivos de expiracao (built-in + customizados) */
+  expirationReasons?: string[];
+  /** Callback para cadastrar novo motivo */
+  onAddExpirationReason?: (name: string) => void;
+  /** Callback para salvar o link da task */
+  onTaskLinkChange?: (demandId: string, taskLink: string) => void;
 }
 
-const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeChange, onStatusChange, onPriorityChange, onAddAssignee, onClosureChange, categories, onAddCategory }: DemandDetailSheetProps) => {
+const DemandDetailSheet = ({
+  demand,
+  open,
+  onOpenChange,
+  assignees,
+  onAssigneeChange,
+  onStatusChange,
+  onPriorityChange,
+  onAddAssignee,
+  onClosureChange,
+  categories,
+  onAddCategory,
+  expirationReasons,
+  onAddExpirationReason,
+  onTaskLinkChange,
+}: DemandDetailSheetProps) => {
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
@@ -50,6 +71,11 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const newCategoryRef = useRef<HTMLInputElement>(null);
+  const [showAddReason, setShowAddReason] = useState(false);
+  const [newReasonName, setNewReasonName] = useState("");
+  const newReasonRef = useRef<HTMLInputElement>(null);
+  const [showTaskEdit, setShowTaskEdit] = useState(false);
+  const [taskLinkDraft, setTaskLinkDraft] = useState("");
 
   // Reset forms when demand changes
   useEffect(() => {
@@ -58,6 +84,10 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
     setNewAssigneeName("");
     setShowAddCategory(false);
     setNewCategoryName("");
+    setShowAddReason(false);
+    setNewReasonName("");
+    setShowTaskEdit(false);
+    setTaskLinkDraft(demand?.taskLink || "");
     setCompleteObservation("");
     if (demand) {
       const now = new Date();
@@ -649,18 +679,74 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
                   </label>
                   <Select
                     value={demand.closure?.expirationReason || "_none_"}
-                    onValueChange={(v) => onClosureChange(demand.id, { expirationReason: (v === "_none_" ? "" : v) as ExpirationReason })}
+                    onValueChange={(v) => {
+                      if (v === "__add_new_reason__") {
+                        setShowAddReason(true);
+                        setTimeout(() => newReasonRef.current?.focus(), 100);
+                      } else {
+                        onClosureChange(demand.id, { expirationReason: (v === "_none_" ? "" : v) as ExpirationReason });
+                      }
+                    }}
                   >
                     <SelectTrigger className="w-full h-9 mt-1 text-sm">
                       <SelectValue placeholder="Selecionar..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none_">Selecionar...</SelectItem>
-                      {EXPIRATION_REASON_OPTIONS.map((r) => (
+                      {(expirationReasons ?? EXPIRATION_REASON_OPTIONS).map((r) => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
+                      {onAddExpirationReason && (
+                        <SelectItem value="__add_new_reason__">
+                          <span className="flex items-center gap-1.5 text-primary">
+                            <Plus size={12} /> Adicionar motivo...
+                          </span>
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
+                  {showAddReason && (
+                    <div className="mt-2 flex gap-2">
+                      <Input
+                        ref={newReasonRef}
+                        placeholder="Nome do motivo"
+                        className="h-9 flex-1"
+                        value={newReasonName}
+                        onChange={(e) => setNewReasonName(e.target.value)}
+                        maxLength={60}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newReasonName.trim()) {
+                            onAddExpirationReason?.(newReasonName.trim());
+                            onClosureChange(demand.id, { expirationReason: newReasonName.trim() as ExpirationReason });
+                            setNewReasonName("");
+                            setShowAddReason(false);
+                          }
+                          if (e.key === "Escape") setShowAddReason(false);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="h-9 text-xs"
+                        disabled={!newReasonName.trim()}
+                        onClick={() => {
+                          onAddExpirationReason?.(newReasonName.trim());
+                          onClosureChange(demand.id, { expirationReason: newReasonName.trim() as ExpirationReason });
+                          setNewReasonName("");
+                          setShowAddReason(false);
+                        }}
+                      >
+                        Adicionar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 text-xs"
+                        onClick={() => { setShowAddReason(false); setNewReasonName(""); }}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -760,16 +846,86 @@ const DemandDetailSheet = ({ demand, open, onOpenChange, assignees, onAssigneeCh
 
           <Separator />
 
-          {/* Task link */}
-          {demand.hasTask && demand.taskLink && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-              <Link2 size={14} className="text-muted-foreground" />
-              <a href={demand.taskLink} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate">
-                Task vinculada
-              </a>
-              <CopyLinkButton url={demand.taskLink} size={12} />
+          {/* Task associada (editavel) */}
+          <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Link2 size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-[11px] font-medium text-foreground">Task associada</span>
+              </div>
+              {onTaskLinkChange && !showTaskEdit && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setTaskLinkDraft(demand.taskLink || "");
+                    setShowTaskEdit(true);
+                  }}
+                >
+                  {demand.taskLink ? "Editar" : "Adicionar"}
+                </Button>
+              )}
             </div>
-          )}
+            {showTaskEdit ? (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://app.clickup.com/... (ou outra URL)"
+                  className="h-8 text-xs flex-1"
+                  value={taskLinkDraft}
+                  onChange={(e) => setTaskLinkDraft(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onTaskLinkChange?.(demand.id, taskLinkDraft.trim());
+                      setShowTaskEdit(false);
+                    }
+                    if (e.key === "Escape") {
+                      setShowTaskEdit(false);
+                      setTaskLinkDraft(demand.taskLink || "");
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    onTaskLinkChange?.(demand.id, taskLinkDraft.trim());
+                    setShowTaskEdit(false);
+                  }}
+                >
+                  Salvar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    setShowTaskEdit(false);
+                    setTaskLinkDraft(demand.taskLink || "");
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : demand.taskLink ? (
+              <div className="flex items-center gap-2">
+                <a
+                  href={demand.taskLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline truncate flex-1"
+                >
+                  {demand.taskLink}
+                </a>
+                <CopyLinkButton url={demand.taskLink} size={12} />
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground italic">
+                Nenhuma task vinculada. Cole o link da task do ClickUp, Jira, etc.
+              </p>
+            )}
+          </div>
 
           {/* Tags */}
           {demand.tags.length > 0 && (
