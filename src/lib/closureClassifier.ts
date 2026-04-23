@@ -140,12 +140,39 @@ export function classifyExpirationReason(demand: SlackDemand): { value: Expirati
     const lastReply = allReplies[allReplies.length - 1];
     const secondLast = allReplies.length > 1 ? allReplies[allReplies.length - 2] : null;
 
-    // Team replied last = waiting for client
+    // Team replied last = analisar o que disse
     if (lastReply.isTeamMember) {
       const lastText = lastReply.text.toLowerCase();
-      if (lastText.includes("pode verificar") || lastText.includes("pode testar") || lastText.includes("pode conferir")) {
+
+      // Equipe pediu para o CLIENTE verificar/testar = aguardando feedback do cliente
+      if (
+        lastText.includes("pode verificar") ||
+        lastText.includes("pode testar") ||
+        lastText.includes("pode conferir") ||
+        lastText.includes("pode validar") ||
+        lastText.includes("tenta novamente") ||
+        lastText.includes("tente novamente")
+      ) {
         return { value: "Demora para validar a correcao", confidence: "alta" };
       }
+
+      // Equipe prometeu verificar/retornar e nao voltou = falta de retorno DA EQUIPE
+      const teamPromisedReturn =
+        /\bvou\s+(verificar|conferir|analisar|olhar|checar|avaliar|investigar|ver)\b/i.test(lastReply.text) ||
+        /\bvamos\s+(verificar|conferir|analisar|olhar|checar|avaliar|investigar)\b/i.test(lastReply.text) ||
+        /\bretorno\s+(em breve|assim que|logo|em seguida|mais tarde)\b/i.test(lastReply.text) ||
+        /\bja\s+te\s+retorno\b/i.test(lastReply.text) ||
+        /\bja\s+retorno\b/i.test(lastReply.text) ||
+        /\bvou\s+dar\s+uma\s+olhada\b/i.test(lastReply.text) ||
+        /\bem\s+analise\b/i.test(lastReply.text) ||
+        /\bestou\s+(verificando|analisando|olhando|checando)\b/i.test(lastReply.text) ||
+        /\bencaminhe?i?\s+(para|ao|internamente)\b/i.test(lastReply.text) ||
+        /\bescale?i?\s+(para|internamente|com a equipe)\b/i.test(lastReply.text);
+
+      if (teamPromisedReturn) {
+        return { value: "Falta de retorno da equipe", confidence: "alta" };
+      }
+
       return { value: "Falta de retorno do cliente", confidence: "media" };
     }
 
