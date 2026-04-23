@@ -10,7 +10,7 @@ import {
   Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } from "recharts";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -590,22 +590,26 @@ const Dashboard = () => {
           <div className="space-y-4 lg:space-y-6">
             {/* Demandas por Cliente - mes a mes */}
             <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 space-y-1">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Building2 size={16} className="text-primary" />
-                  Demandas por Cliente — mês a mês
+                  Demandas por Cliente
                   {client && <span className="text-xs text-muted-foreground font-normal">({client})</span>}
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Barra empilhada por cliente. Se filtrar cliente específico, mostra apenas os dados dele.
+                </p>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={monthlyClientData} barCategoryGap="20%">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={monthlyClientData} barCategoryGap="20%" margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
                     <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="square" iconSize={10} />
                     {monthlyClientKeys.map((key, idx) => {
-                      const palette = ["#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#ef4444", "#06b6d4", "#94a3b8"];
+                      const palette = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#06b6d4", "#94a3b8"];
                       return (
                         <Bar
                           key={key}
@@ -624,23 +628,26 @@ const Dashboard = () => {
 
             {/* Prioridade - mes a mes */}
             <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 space-y-1">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <ShieldAlert size={16} className="text-warning" />
-                  Prioridade — mês a mês
+                  Por Prioridade
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Barra empilhada por prioridade (P1 / P2 / P3).
+                </p>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={monthlyPriorityData} barCategoryGap="20%">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={monthlyPriorityData} barCategoryGap="20%" margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
                     <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="P1" name="P1 Crítica" fill="#ef4444" stackId="prio" />
-                    <Bar dataKey="P2" name="P2 Alta" fill="#f59e0b" stackId="prio" />
-                    <Bar dataKey="P3" name="P3 Média" fill="#3b82f6" stackId="prio" />
-                    <Bar dataKey="Sem classif." name="Sem classif." fill="#94a3b8" stackId="prio" radius={[3, 3, 0, 0]} />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="square" iconSize={10} />
+                    <Bar dataKey="P1" name="P1 (Crítico)" fill="#ef4444" stackId="prio" />
+                    <Bar dataKey="P2" name="P2 (Alto)" fill="#f59e0b" stackId="prio" />
+                    <Bar dataKey="P3" name="P3 (Normal)" fill="#3b82f6" stackId="prio" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -648,35 +655,55 @@ const Dashboard = () => {
 
             {/* SLA de Resolucao - mes a mes */}
             <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 space-y-1">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <TrendingUp size={16} className="text-success" />
-                  Atingimento de SLA — mês a mês
+                  SLA de Resolução — % de atingimento mensal
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Percentual de SLA de resolução atingido em cada mês. Linha de meta em 90%.
+                </p>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={monthlySlaData} barCategoryGap="25%">
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={monthlySlaData} barCategoryGap="25%" margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
                     <YAxis
                       stroke="hsl(var(--muted-foreground))"
                       style={{ fontSize: 11 }}
-                      domain={[0, 100]}
+                      domain={[70, 100]}
                       tickFormatter={(v) => `${v}%`}
                     />
                     <Tooltip
                       contentStyle={tooltipStyle}
                       formatter={(value: number, _n, entry) => [
-                        `${value}% (${(entry as { payload?: { total: number } }).payload?.total ?? 0} demandas)`,
-                        "Atingimento",
+                        `${value}%`,
+                        `% SLA atingido (${(entry as { payload?: { total: number } }).payload?.total ?? 0} demandas)`,
                       ]}
                     />
-                    <Bar dataKey="rate" name="Atingimento" radius={[3, 3, 0, 0]}>
+                    <Legend
+                      wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
+                      iconType="square"
+                      iconSize={10}
+                      payload={[
+                        { value: "Atingiu meta (≥90%)", type: "square", color: "#22c55e" },
+                        { value: "Abaixo da meta (<90%)", type: "square", color: "#f59e0b" },
+                        { value: "Meta 90%", type: "line", color: "#ef4444" },
+                      ]}
+                    />
+                    <ReferenceLine
+                      y={90}
+                      stroke="#ef4444"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      ifOverflow="extendDomain"
+                    />
+                    <Bar dataKey="rate" name="% SLA atingido" radius={[3, 3, 0, 0]}>
                       {monthlySlaData.map((d, idx) => (
                         <Cell
                           key={idx}
-                          fill={d.rate >= 90 ? "#22c55e" : d.rate >= 75 ? "#f59e0b" : d.rate > 0 ? "#ef4444" : "#94a3b8"}
+                          fill={d.rate >= 90 ? "#22c55e" : d.rate > 0 ? "#f59e0b" : "#94a3b8"}
                         />
                       ))}
                     </Bar>
