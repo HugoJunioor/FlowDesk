@@ -80,7 +80,7 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
   });
 }
 
-function loadOverrides(): Record<string, { status?: string; priority?: string; assignee?: string | null; completedAt?: string | null; manualStatusOverride?: boolean; closure?: Partial<ClosureFields> }> {
+function loadOverrides(): Record<string, { status?: string; priority?: string; assignee?: string | null; completedAt?: string | null; manualStatusOverride?: boolean; closure?: Partial<ClosureFields>; taskLink?: string; hasTask?: boolean }> {
   try {
     const stored = localStorage.getItem("fd_demand_overrides");
     return stored ? JSON.parse(stored) : {};
@@ -119,6 +119,8 @@ function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
         : d.completedAt,
       manualStatusOverride: syncConcludedViaReaction ? false : ov.manualStatusOverride || false,
       closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
+      taskLink: ov.taskLink !== undefined ? ov.taskLink : d.taskLink,
+      hasTask: ov.hasTask !== undefined ? ov.hasTask : d.hasTask,
     };
   });
 }

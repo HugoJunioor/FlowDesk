@@ -23,6 +23,8 @@ function loadSqlOverrides(): Record<
     approvedAt?: string | null;
     manualStatusOverride?: boolean;
     assignee?: string | null;
+    taskLink?: string;
+    hasTask?: boolean;
   }
 > {
   try {
@@ -45,6 +47,8 @@ export function applySqlOverrides(demands: SlackDemand[]): SlackDemand[] {
       assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
       completedAt: ov.completedAt !== undefined ? ov.completedAt : d.completedAt,
       manualStatusOverride: ov.manualStatusOverride || false,
+      taskLink: ov.taskLink !== undefined ? ov.taskLink : d.taskLink,
+      hasTask: ov.hasTask !== undefined ? ov.hasTask : d.hasTask,
     };
     // Propaga approvedAt (tanto do override quanto do arquivo)
     if (ov.approvedAt) {
