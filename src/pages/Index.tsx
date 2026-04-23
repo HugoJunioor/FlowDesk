@@ -63,13 +63,68 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={tooltipStyle}>
-      <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
+      <p style={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}>{label}</p>
       {payload.map((p: any, i: number) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: 2 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: p.fill, display: "inline-block" }} />
-          <span>{p.name}: {p.value}</span>
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            marginTop: 2,
+            color: "hsl(var(--foreground))",
+          }}
+        >
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 2,
+              backgroundColor: p.color || p.fill,
+              display: "inline-block",
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ color: "hsl(var(--muted-foreground))" }}>{p.name}:</span>
+          <span style={{ fontWeight: 600 }}>{p.value}</span>
         </div>
       ))}
+    </div>
+  );
+};
+
+/** Tooltip especifico do grafico de SLA — mostra % + total de demandas. */
+const CustomSlaTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const data = payload[0];
+  const total = data.payload?.total ?? 0;
+  const rate = data.value;
+  const color = rate >= 90 ? "#22c55e" : rate > 0 ? "#f59e0b" : "#94a3b8";
+  return (
+    <div style={tooltipStyle}>
+      <p style={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}>{label}</p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 2,
+            backgroundColor: color,
+            display: "inline-block",
+          }}
+        />
+        <span style={{ fontWeight: 600 }}>{rate}%</span>
+        <span style={{ color: "hsl(var(--muted-foreground))" }}>
+          ({total} {total === 1 ? "demanda" : "demandas"})
+        </span>
+      </div>
     </div>
   );
 };
@@ -606,7 +661,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
                     <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="square" iconSize={10} />
                     {monthlyClientKeys.map((key, idx) => {
                       const palette = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#06b6d4", "#94a3b8"];
@@ -643,7 +698,7 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
                     <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="square" iconSize={10} />
                     <Bar dataKey="P1" name="P1 (Crítico)" fill="#ef4444" stackId="prio" />
                     <Bar dataKey="P2" name="P2 (Alto)" fill="#f59e0b" stackId="prio" />
@@ -675,13 +730,7 @@ const Dashboard = () => {
                       domain={[70, 100]}
                       tickFormatter={(v) => `${v}%`}
                     />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value: number, _n, entry) => [
-                        `${value}%`,
-                        `% SLA atingido (${(entry as { payload?: { total: number } }).payload?.total ?? 0} demandas)`,
-                      ]}
-                    />
+                    <Tooltip content={<CustomSlaTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} />
                     <Legend
                       wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
                       iconType="square"
