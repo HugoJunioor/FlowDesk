@@ -195,6 +195,79 @@ const Dashboard = () => {
     }).filter((c) => c.abertas + c.concluidas + c.expiradas > 0);
   }, [filtered, clients, barStatusFilter]);
 
+  // === GRAFICOS MENSAIS (aparecem quando period === 'anual') ===
+  const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+  /** Demandas empilhadas por cliente, mes a mes (top 6 clientes + "Outros") */
+  const monthlyClientData = useMemo(() => {
+    if (period !== "anual") return [];
+    // Ranking de clientes pelo total no periodo
+    const clientTotals: Record<string, number> = {};
+    for (const d of filtered) {
+      const c = extractClientName(d.slackChannel);
+      if (c === d.slackChannel) continue;
+      clientTotals[c] = (clientTotals[c] ?? 0) + 1;
+    }
+    const topClients = Object.entries(clientTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([c]) => c);
+    // Se o user filtrou por cliente, usa so ele
+    const clientsToShow = client ? [client] : topClients;
+
+    return MONTH_NAMES.map((mName, idx) => {
+      const row: Record<string, string | number> = { month: mName };
+      const monthDemands = filtered.filter((d) => new Date(d.createdAt).getMonth() === idx);
+      for (const c of clientsToShow) {
+        row[c] = monthDemands.filter((d) => extractClientName(d.slackChannel) === c).length;
+      }
+      if (!client) {
+        // Todos os outros viram "Outros"
+        const topSet = new Set(clientsToShow);
+        row["Outros"] = monthDemands.filter((d) => {
+          const c = extractClientName(d.slackChannel);
+          return c !== d.slackChannel && !topSet.has(c);
+        }).length;
+      }
+      return row;
+    });
+  }, [filtered, period, client]);
+
+  /** Lista de chaves de cliente usadas no grafico acima */
+  const monthlyClientKeys = useMemo(() => {
+    if (monthlyClientData.length === 0) return [];
+    return Object.keys(monthlyClientData[0]).filter((k) => k !== "month");
+  }, [monthlyClientData]);
+
+  /** Demandas empilhadas por prioridade, mes a mes */
+  const monthlyPriorityData = useMemo(() => {
+    if (period !== "anual") return [];
+    return MONTH_NAMES.map((mName, idx) => {
+      const monthDemands = filtered.filter((d) => new Date(d.createdAt).getMonth() === idx);
+      return {
+        month: mName,
+        P1: monthDemands.filter((d) => d.priority === "p1").length,
+        P2: monthDemands.filter((d) => d.priority === "p2").length,
+        P3: monthDemands.filter((d) => d.priority === "p3").length,
+        "Sem classif.": monthDemands.filter((d) => d.priority === "sem_classificacao").length,
+      };
+    });
+  }, [filtered, period]);
+
+  /** Atingimento SLA por mes (%) */
+  const monthlySlaData = useMemo(() => {
+    if (period !== "anual") return [];
+    return MONTH_NAMES.map((mName, idx) => {
+      const monthDemands = filtered.filter(
+        (d) => new Date(d.createdAt).getMonth() === idx && d.priority !== "sem_classificacao"
+      );
+      const concluded = monthDemands.filter((d) => d.status === "concluida" || d.status === "expirada" || d.slaResolutionStatus);
+      const compliant = concluded.filter((d) => isSlaCompliant(d));
+      const rate = concluded.length > 0 ? Math.round((compliant.length / concluded.length) * 100) : 0;
+      return { month: mName, rate, total: concluded.length };
+    });
+  }, [filtered, period]);
+
   // SLA per client
   const clientSlaData = useMemo(() => {
     return clients.map((c) => {
@@ -511,6 +584,108 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Graficos mensais — aparecem apenas no filtro Anual */}
+        {period === "anual" && (
+          <div className="space-y-4 lg:space-y-6">
+            {/* Demandas por Cliente - mes a mes */}
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Building2 size={16} className="text-primary" />
+                  Demandas por Cliente — mês a mês
+                  {client && <span className="text-xs text-muted-foreground font-normal">({client})</span>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={monthlyClientData} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    {monthlyClientKeys.map((key, idx) => {
+                      const palette = ["#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#ef4444", "#06b6d4", "#94a3b8"];
+                      return (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          name={key}
+                          fill={palette[idx % palette.length]}
+                          stackId="clients"
+                          radius={idx === monthlyClientKeys.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                        />
+                      );
+                    })}
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Prioridade - mes a mes */}
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ShieldAlert size={16} className="text-warning" />
+                  Prioridade — mês a mês
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={monthlyPriorityData} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="P1" name="P1 Crítica" fill="#ef4444" stackId="prio" />
+                    <Bar dataKey="P2" name="P2 Alta" fill="#f59e0b" stackId="prio" />
+                    <Bar dataKey="P3" name="P3 Média" fill="#3b82f6" stackId="prio" />
+                    <Bar dataKey="Sem classif." name="Sem classif." fill="#94a3b8" stackId="prio" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* SLA de Resolucao - mes a mes */}
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp size={16} className="text-success" />
+                  Atingimento de SLA — mês a mês
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={monthlySlaData} barCategoryGap="25%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      style={{ fontSize: 11 }}
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value: number, _n, entry) => [
+                        `${value}% (${(entry as { payload?: { total: number } }).payload?.total ?? 0} demandas)`,
+                        "Atingimento",
+                      ]}
+                    />
+                    <Bar dataKey="rate" name="Atingimento" radius={[3, 3, 0, 0]}>
+                      {monthlySlaData.map((d, idx) => (
+                        <Cell
+                          key={idx}
+                          fill={d.rate >= 90 ? "#22c55e" : d.rate >= 75 ? "#f59e0b" : d.rate > 0 ? "#ef4444" : "#94a3b8"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Bottom row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
