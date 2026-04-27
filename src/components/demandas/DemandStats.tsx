@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap, MessageCir
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
+import { isStale } from "@/lib/staleInteraction";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -68,17 +69,10 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     return mins > slaMinutes;
   }).length;
 
-  // Sem interacao 24h: demandas nao concluidas sem nenhuma mensagem
-  // (equipe ou cliente) nas ultimas 24h.
-  const semInteracao = demands.filter((d) => {
-    if (d.status === "concluida" || d.status === "expirada") return false;
-    const replies = d.threadReplies || [];
-    const lastTs = replies.length > 0
-      ? Math.max(...replies.map(r => new Date(r.timestamp).getTime()))
-      : new Date(d.createdAt).getTime();
-    const hoursSinceLast = (now.getTime() - lastTs) / 3600000;
-    return hoursSinceLast > 24;
-  }).length;
+  // Sem interacao 24h UTEIS (Seg-Sex 8-18, sem feriados): demandas
+  // nao concluidas sem nenhuma mensagem (equipe ou cliente) ha mais
+  // de 24h uteis.
+  const semInteracao = demands.filter((d) => isStale(d, 24)).length;
 
   const stats = [
     { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
