@@ -33,7 +33,7 @@ const StaleBadge = ({
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/15 text-destructive border border-destructive/30 animate-pulse shrink-0 ${className}`}
-      title={`Sem interação há ${label}`}
+      title={`Sem interação há ${label} (horário comercial, exclui fds e feriados)`}
     >
       <AlertCircle size={10} />
       {compact ? label : `${label} sem interação`}
