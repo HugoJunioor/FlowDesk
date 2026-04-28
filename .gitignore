@@ -42,6 +42,10 @@ src/data/sqlDemands.ts
 /resposta-*.md
 /ticket-*.md
 
+# Documentos privados de contexto e operacao (uso interno)
+/CONTEXT.md
+/OPERATIONS.md
+
 # Local branding (company-specific)
 src/config/branding.local.ts
 public/just-logo.*
