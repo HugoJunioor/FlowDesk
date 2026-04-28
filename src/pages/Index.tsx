@@ -23,6 +23,7 @@ import {
   isSlaCompliant,
   computeDemandMetrics,
   parseResponseSla,
+  SLA_TARGET_PERCENT,
 } from "@/lib/slaCalculator";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
@@ -99,7 +100,7 @@ const CustomSlaTooltip = ({ active, payload, label }: any) => {
   const data = payload[0];
   const total = data.payload?.total ?? 0;
   const rate = data.value;
-  const color = rate >= 90 ? "#22c55e" : rate > 0 ? "#f59e0b" : "#94a3b8";
+  const color = rate >= SLA_TARGET_PERCENT ? "#22c55e" : rate > 0 ? "#f59e0b" : "#94a3b8";
   return (
     <div style={tooltipStyle}>
       <p style={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}>{label}</p>
@@ -716,7 +717,7 @@ const Dashboard = () => {
                   SLA de Resolução — % de atingimento mensal
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Percentual de SLA de resolução atingido em cada mês. Linha de meta em 90%.
+                  Percentual de SLA de resolução atingido em cada mês. Linha de meta em {SLA_TARGET_PERCENT}%.
                 </p>
               </CardHeader>
               <CardContent>
@@ -736,13 +737,13 @@ const Dashboard = () => {
                       iconType="square"
                       iconSize={10}
                       payload={[
-                        { value: "Atingiu meta (≥90%)", type: "square", color: "#22c55e" },
-                        { value: "Abaixo da meta (<90%)", type: "square", color: "#f59e0b" },
-                        { value: "Meta 90%", type: "line", color: "#ef4444" },
+                        { value: `Atingiu meta (≥${SLA_TARGET_PERCENT}%)`, type: "square", color: "#22c55e" },
+                        { value: `Abaixo da meta (<${SLA_TARGET_PERCENT}%)`, type: "square", color: "#f59e0b" },
+                        { value: `Meta ${SLA_TARGET_PERCENT}%`, type: "line", color: "#ef4444" },
                       ]}
                     />
                     <ReferenceLine
-                      y={90}
+                      y={SLA_TARGET_PERCENT}
                       stroke="#ef4444"
                       strokeDasharray="5 5"
                       strokeWidth={2}
@@ -752,7 +753,7 @@ const Dashboard = () => {
                       {monthlySlaData.map((d, idx) => (
                         <Cell
                           key={idx}
-                          fill={d.rate >= 90 ? "#22c55e" : d.rate > 0 ? "#f59e0b" : "#94a3b8"}
+                          fill={d.rate >= SLA_TARGET_PERCENT ? "#22c55e" : d.rate > 0 ? "#f59e0b" : "#94a3b8"}
                         />
                       ))}
                     </Bar>

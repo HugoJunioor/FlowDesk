@@ -15,6 +15,9 @@ import {
   isExcludedFromFirstResponseSla,
 } from "@/lib/businessHours";
 
+/** Meta de SLA (em %) usada nos paineis e graficos. */
+export const SLA_TARGET_PERCENT = 80;
+
 /** Converte "15 min" / "1 hora" / "4 horas" em minutos. */
 export function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
