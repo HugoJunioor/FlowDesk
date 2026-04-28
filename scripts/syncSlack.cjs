@@ -119,7 +119,7 @@ async function fetchAllReplies(channelId, threadTs) {
 // Demandas ja fechadas antes sao preservadas pela logica de preservacao.
 const CHECK_REACTIONS = ['large_green_circle'];
 
-async function fetchChannelMessages(channelId, channelName) {
+async function fetchChannelMessages(channelId, channelName, previousPriorities = new Map(), existingIds = new Set()) {
   const demands = [];
   let cursor;
 
@@ -221,12 +221,20 @@ async function fetchChannelMessages(channelId, channelName) {
                           fields['Descrição'] || fields['Descricao'] ||
                           resolvedText;
 
+      // Prioridade explicita no campo do Slack
+      const demandId = `slack_${channelId}_${msg.ts}`;
       const priority = (() => {
         const p = (fields['Prioridade'] || '').toLowerCase();
         if (p.includes('p1') || p.includes('crítico') || p.includes('critico')) return 'p1';
         if (p.includes('p2') || p.includes('alta')) return 'p2';
         if (p.includes('p3') || p.includes('média') || p.includes('media')) return 'p3';
-        return 'sem_classificacao';
+        // Sem prioridade explicita no Slack:
+        // - Se a demanda ja existia no sync anterior, preserva a classificacao antiga
+        // - Se e nova, atribui P3 (regra: conciliacao, remessa SITEF, etc viram P3)
+        if (existingIds.has(demandId)) {
+          return previousPriorities.get(demandId) || 'sem_classificacao';
+        }
+        return 'p3';
       })();
 
       const demandType = (() => {
@@ -284,7 +292,7 @@ async function fetchChannelMessages(channelId, channelName) {
       if (demandType !== 'Outro') tags.push(demandType.toLowerCase().replace('/', '-'));
 
       const demand = {
-        id: `slack_${channelId}_${msg.ts}`,
+        id: demandId,
         title: title.replace(/\*/g, '').trim(),
         description: description.replace(/\*/g, '').slice(0, 500),
         priority,
@@ -318,25 +326,31 @@ async function fetchChannelMessages(channelId, channelName) {
 
 // === PRESERVAR ESTADO CONCLUIDA DO SYNC ANTERIOR ===
 // Evita regressao quando heuristicas nao detectam conclusao em nova rodada.
+// Tambem preserva prioridade antiga (ex: sem_classificacao continua
+// sem_classificacao em demandas anteriores; novas viram P3).
 function loadPreviousState() {
   const previousFile = path.join(__dirname, '..', 'src', 'data', 'realDemands.ts');
-  if (!fs.existsSync(previousFile)) return new Map();
+  const empty = { concluded: new Map(), priorities: new Map(), existingIds: new Set() };
+  if (!fs.existsSync(previousFile)) return empty;
   try {
     const content = fs.readFileSync(previousFile, 'utf-8');
-    // Extrair o array JSON de dentro do arquivo .ts
     const match = content.match(/export const mockDemands[^=]*=\s*(\[[\s\S]*?\]);/);
-    if (!match) return new Map();
+    if (!match) return empty;
     const demands = JSON.parse(match[1]);
-    const map = new Map();
+    const concluded = new Map();
+    const priorities = new Map();
+    const existingIds = new Set();
     for (const d of demands) {
+      existingIds.add(d.id);
+      if (d.priority) priorities.set(d.id, d.priority);
       if (d.status === 'concluida' && d.completedAt) {
-        map.set(d.id, { status: d.status, completedAt: d.completedAt });
+        concluded.set(d.id, { status: d.status, completedAt: d.completedAt });
       }
     }
-    return map;
+    return { concluded, priorities, existingIds };
   } catch (e) {
     console.warn('  Aviso: nao foi possivel ler estado anterior:', e.message);
-    return new Map();
+    return empty;
   }
 }
 
@@ -349,9 +363,13 @@ async function main() {
   // PRE-FETCH todos os usuarios (elimina rate limiting)
   await prefetchUsers();
 
-  // Carregar estado anterior para preservar concluidas
-  const previousConcluded = loadPreviousState();
-  console.log(`${previousConcluded.size} demandas com status concluida no sync anterior (serao preservadas)\n`);
+  // Carregar estado anterior para preservar concluidas + prioridades
+  const previousState = loadPreviousState();
+  const previousConcluded = previousState.concluded;
+  const previousPriorities = previousState.priorities;
+  const existingIds = previousState.existingIds;
+  console.log(`${previousConcluded.size} demandas com status concluida no sync anterior (serao preservadas)`);
+  console.log(`${existingIds.size} demandas no arquivo anterior — novas demandas sem prioridade serao classificadas como P3.\n`);
 
   const channelsResult = await client.conversations.list({ types: 'public_channel', limit: 200 });
   const clientChannels = channelsResult.channels.filter(c => c.name.startsWith('cliente-'));
@@ -363,7 +381,7 @@ async function main() {
   for (const channel of clientChannels) {
     console.log(`Buscando #${channel.name}...`);
     try {
-      const demands = await fetchChannelMessages(channel.id, channel.name);
+      const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds);
       console.log(`  ${demands.length} demandas encontradas`);
       allDemands = allDemands.concat(demands);
     } catch (err) {
