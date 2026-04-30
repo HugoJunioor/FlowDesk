@@ -4,11 +4,13 @@ import {
   initializeAuth,
   getUserById,
   getUserByLogin,
-  hashPassword,
+  checkPasswordAndMigrate,
   setSession,
   getSession,
   clearSession,
   changeUserPassword,
+  getPasswordStrength,
+  isWeakPassword,
 } from "@/lib/authStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -57,17 +59,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!loginInput || !password) {
       return { success: false, error: "Preencha todos os campos" };
     }
+
+    // Rate limit: 5 tentativas / 5 min por login (anti brute-force)
+    const RL_KEY = `fd_login_rl_${loginInput.toLowerCase().trim()}`;
+    const RL_MAX = 5;
+    const RL_WINDOW = 5 * 60 * 1000;
+    try {
+      const raw = localStorage.getItem(RL_KEY);
+      if (raw) {
+        const rl = JSON.parse(raw) as { count: number; until: number };
+        if (rl.until && Date.now() < rl.until) {
+          const secs = Math.ceil((rl.until - Date.now()) / 1000);
+          return { success: false, error: `Muitas tentativas. Tente novamente em ${secs}s.` };
+        }
+      }
+    } catch { /* ignore */ }
+
     const user = getUserByLogin(loginInput);
+    const recordFail = () => {
+      try {
+        const raw = localStorage.getItem(RL_KEY);
+        const rl = raw ? (JSON.parse(raw) as { count: number; until: number }) : { count: 0, until: 0 };
+        rl.count = (rl.count || 0) + 1;
+        if (rl.count >= RL_MAX) {
+          rl.until = Date.now() + RL_WINDOW;
+          rl.count = 0;
+        }
+        localStorage.setItem(RL_KEY, JSON.stringify(rl));
+      } catch { /* ignore */ }
+    };
+
     if (!user) {
+      recordFail();
       return { success: false, error: "Usuário ou senha inválidos" };
     }
     if (user.status === "blocked") {
       return { success: false, error: "Conta bloqueada. Contate o administrador." };
     }
-    const hash = await hashPassword(password);
-    if (hash !== user.passwordHash) {
+    const valid = await checkPasswordAndMigrate(user, password);
+    if (!valid) {
+      recordFail();
       return { success: false, error: "Usuário ou senha inválidos" };
     }
+    try { localStorage.removeItem(RL_KEY); } catch { /* ignore */ }
     setSession(user);
     setCurrentUser(user);
     setMustChangePassword(user.isFirstAccess);
@@ -87,6 +121,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const changePassword = useCallback(
     async (newPassword: string) => {
       if (!currentUser) return { success: false, error: "Sessão expirada. Faça login novamente." };
+      if (isWeakPassword(newPassword)) {
+        return { success: false, error: "Senha muito comum. Escolha uma senha mais segura." };
+      }
+      const strength = getPasswordStrength(newPassword);
+      if (!strength.isStrong) {
+        return { success: false, error: "Senha fraca. Use ao menos 10 caracteres com maiúscula, minúscula, número e símbolo." };
+      }
       const saved = await changeUserPassword(currentUser.id, newPassword);
       if (!saved) return { success: false, error: "Não foi possível salvar a senha. Tente novamente." };
       const updated = getUserById(currentUser.id);

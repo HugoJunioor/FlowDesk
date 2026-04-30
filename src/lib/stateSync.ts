@@ -1,15 +1,10 @@
 /**
  * Sincroniza chaves do localStorage com um arquivo compartilhado no servidor.
  *
- * Problema que resolve: localStorage e por origem (localhost vs 192.x.x.x),
- * entao usuarios cadastrados, overrides, grupos e regras ficam isolados por
- * dispositivo. Este modulo centraliza esses dados em um arquivo servido pelo
- * Vite, permitindo que todos os acessos (VPN inclusa) convirjam no mesmo estado.
- *
- * Fluxo:
- *  - Ao iniciar, puxa estado do servidor e sobrescreve localStorage
- *  - Ao salvar (via setSyncedItem), salva em localStorage E envia pro servidor
- *  - Se o servidor estiver offline, continua funcionando so com localStorage
+ * Autenticacao: o servidor exige header X-FlowDesk-Token. No boot, tentamos
+ * pegar o token via GET /__token (so funciona em loopback do master). Em
+ * outros dispositivos (VPN), o token deve vir via cookie HttpOnly setado
+ * previamente, OU armazenado em sessionStorage manualmente.
  */
 
 const SYNCED_KEYS = [
@@ -25,24 +20,64 @@ const SYNCED_KEYS = [
 type SyncedKey = typeof SYNCED_KEYS[number];
 
 const ENDPOINT = "/__state";
+const TOKEN_KEY = "fd_state_token";
 
 let initialized = false;
+let authToken: string | null = null;
+
+function getStoredToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(t: string): void {
+  authToken = t;
+  try { sessionStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ }
+}
+
+async function fetchTokenFromServer(): Promise<string | null> {
+  try {
+    const res = await fetch("/__token", { method: "GET", credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.token || null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  return authToken ? { "X-FlowDesk-Token": authToken } : {};
+}
 
 /** Busca estado do servidor e sobrescreve chaves locais. Chamar no startup. */
 export async function initStateSync(): Promise<void> {
   if (initialized) return;
+
+  // 1) Tentar token armazenado, depois /__token (loopback do master)
+  authToken = getStoredToken();
+  if (!authToken) {
+    const t = await fetchTokenFromServer();
+    if (t) storeToken(t);
+  }
+
   try {
-    const res = await fetch(ENDPOINT, { method: "GET" });
+    const res = await fetch(ENDPOINT, {
+      method: "GET",
+      headers: authHeaders(),
+      credentials: "include",
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const serverState = (await res.json()) as Partial<Record<SyncedKey, unknown>>;
 
     for (const key of SYNCED_KEYS) {
       const value = serverState[key];
       if (value !== undefined && value !== null) {
-        // Servidor tem dados: sobrescreve localStorage
         localStorage.setItem(key, JSON.stringify(value));
       } else {
-        // Servidor nao tem dados: enviar o que esta no localStorage (primeira vez)
         const local = localStorage.getItem(key);
         if (local) {
           try {
@@ -62,12 +97,22 @@ async function pushToServer(key: SyncedKey, value: unknown): Promise<void> {
   try {
     await fetch(`${ENDPOINT}/${encodeURIComponent(key)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      credentials: "include",
       body: JSON.stringify(value),
     });
   } catch (err) {
     console.warn(`[stateSync] Falha ao enviar "${key}" ao servidor:`, err);
   }
+}
+
+/** Permite injetar token manualmente (admin compartilha via canal seguro). */
+export function setAuthToken(token: string): void {
+  storeToken(token);
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
 }
 
 /** Verifica se uma chave e sincronizada */
