@@ -1,47 +1,36 @@
-import { sha256 } from "js-sha256";
 import type { FlowDeskUser, UserRole } from "@/types/auth";
+import { hashPassword as cryptoHashPassword, verifyPassword, generateUUID } from "@/lib/crypto";
 
 const USERS_KEY = "fd_users_v2";
 const GROUPS_KEY = "fd_groups";
 const SESSION_KEY = "fd_session_v2";
 const SESSION_DURATION = 8 * 60 * 60 * 1000;
 
-// ── Crypto ────────────────────────────────────────────────────────────────────
+/** Hash de senha usando PBKDF2 com salt + 150k iteracoes. Reexporta da lib central. */
+export const hashPassword = cryptoHashPassword;
 
 /**
- * Gera SHA-256 em hex. Usa crypto.subtle (nativo) quando disponivel,
- * com fallback para js-sha256 em contextos nao-seguros (HTTP via IP de rede).
- * O output e identico em ambos os caminhos.
+ * Valida senha contra usuario armazenado, fazendo migracao transparente
+ * de hashes legados (SHA-256) para PBKDF2.
+ * Retorna true se a senha esta correta.
  */
-export async function hashPassword(str: string): Promise<string> {
-  if (typeof crypto !== "undefined" && crypto.subtle) {
+export async function checkPasswordAndMigrate(user: FlowDeskUser, password: string): Promise<boolean> {
+  const result = await verifyPassword(password, user.passwordHash);
+  if (!result.valid) return false;
+  if (result.needsRehash) {
+    // Re-hash com algoritmo atual e atualiza o registro silenciosamente.
     try {
-      const data = new TextEncoder().encode(str);
-      const buf = await crypto.subtle.digest("SHA-256", data);
-      return Array.from(new Uint8Array(buf))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-    } catch { /* fall through */ }
+      const users = getUsers();
+      const idx = users.findIndex((u) => u.id === user.id);
+      if (idx !== -1) {
+        users[idx] = { ...users[idx], passwordHash: await cryptoHashPassword(password) };
+        saveUsers(users);
+      }
+    } catch {
+      /* ignore — login continua valido mesmo se migracao falhar */
+    }
   }
-  return sha256(str);
-}
-
-/** Gera UUID v4. Usa crypto.randomUUID quando disponivel, com fallback puro JS. */
-function generateUUID(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try { return crypto.randomUUID(); } catch { /* fall through */ }
-  }
-  // Fallback RFC 4122 v4
-  const bytes = new Uint8Array(16);
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
+  return true;
 }
 
 // ── Password generation ───────────────────────────────────────────────────────
@@ -349,19 +338,32 @@ export function validateCPF(cpf: string): boolean {
 
 export type PasswordStrengthLevel = 0 | 1 | 2 | 3;
 
+/** Lista mínima de senhas obviamente fracas que NUNCA devem ser aceitas. */
+const WEAK_PASSWORDS = new Set([
+  "admin@1", "admin@123", "admin123", "admin1234", "password", "password1",
+  "password@1", "senha@1", "senha123", "123456", "12345678", "qwerty",
+  "qwerty123", "abc123", "111111", "000000", "master@1", "master123",
+  "flowdesk", "flowdesk@1", "just@1", "just123", "mudar@1", "trocar@1",
+]);
+
+export function isWeakPassword(password: string): boolean {
+  return WEAK_PASSWORDS.has(password.toLowerCase().trim());
+}
+
 export function getPasswordStrength(password: string): {
   level: PasswordStrengthLevel;
   label: string;
   isStrong: boolean;
 } {
   if (!password) return { level: 0, label: "", isStrong: false };
+  if (isWeakPassword(password)) return { level: 1, label: "Fraca (lista negra)", isStrong: false };
   const hasUpper = /[A-Z]/.test(password);
   const hasLower = /[a-z]/.test(password);
   const hasNum = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
   const classes = [hasUpper, hasLower, hasNum, hasSpecial].filter(Boolean).length;
 
-  if (password.length < 6 || classes <= 1) return { level: 1, label: "Fraca", isStrong: false };
-  if (classes >= 4) return { level: 3, label: "Forte", isStrong: true };
+  if (password.length < 8 || classes <= 1) return { level: 1, label: "Fraca", isStrong: false };
+  if (password.length >= 10 && classes >= 4) return { level: 3, label: "Forte", isStrong: true };
   return { level: 2, label: "Média", isStrong: false };
 }

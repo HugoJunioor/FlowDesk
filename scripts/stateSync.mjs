@@ -9,6 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
@@ -16,6 +17,47 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
+const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");
+
+// Gera/le token de autenticacao dos endpoints. Persiste em data/auth-token
+// (gitignored). Se nao existir, gera um novo de 32 bytes (256 bits).
+function getOrCreateAuthToken() {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) {
+      const t = fs.readFileSync(TOKEN_FILE, "utf-8").trim();
+      if (t.length >= 32) return t;
+    }
+  } catch {
+    /* fall through */
+  }
+  const dir = path.dirname(TOKEN_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const newToken = crypto.randomBytes(32).toString("hex");
+  fs.writeFileSync(TOKEN_FILE, newToken, { mode: 0o600 });
+  return newToken;
+}
+
+const AUTH_TOKEN = getOrCreateAuthToken();
+
+/** Compara strings em tempo constante para evitar timing attacks. */
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function isAuthenticated(req) {
+  const header = req.headers["x-flowdesk-token"];
+  // Permite cookie como fallback (usado por F5 do navegador apos login)
+  const cookie = (req.headers.cookie || "")
+    .split(";")
+    .map((s) => s.trim())
+    .find((s) => s.startsWith("fd_state_token="));
+  const cookieToken = cookie?.split("=")[1];
+  return timingSafeEqualStr(header, AUTH_TOKEN) || timingSafeEqualStr(cookieToken, AUTH_TOKEN);
+}
 
 // Chaves de localStorage que DEVEM ser compartilhadas entre origens
 export const SYNCED_KEYS = [
@@ -43,9 +85,37 @@ function readState() {
   }
 }
 
+// Backups rotativos: mantemos as ultimas N copias em data/backups/
+const BACKUP_DIR = path.join(__dirname, "..", "data", "backups");
+const MAX_BACKUPS = 20;
+
+function rotateBackup() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) return;
+    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const dest = path.join(BACKUP_DIR, `shared-state-${stamp}.json`);
+    fs.copyFileSync(STATE_FILE, dest);
+    // Poda backups antigos
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter((f) => f.startsWith("shared-state-") && f.endsWith(".json"))
+      .sort();
+    while (files.length > MAX_BACKUPS) {
+      const old = files.shift();
+      try { fs.unlinkSync(path.join(BACKUP_DIR, old)); } catch { /* ignore */ }
+    }
+  } catch {
+    /* backup falhou — nao interrompe a operacao */
+  }
+}
+
 function writeState(state) {
   ensureDir();
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  rotateBackup();
+  // Escrita atomica: tmp + rename evita corromper se processo morrer no meio
+  const tmp = STATE_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  fs.renameSync(tmp, STATE_FILE);
 }
 
 function readBody(req) {
@@ -105,10 +175,66 @@ async function runSqlSyncAndRebuild() {
   }
 }
 
+/** CORS: ECHO da Origin do request (so se for permitida) — evita expor "*" */
+function setCors(req, res) {
+  const origin = req.headers.origin;
+  // Aceita apenas origens locais/internas; rejeita qualquer site externo
+  const isLocalish =
+    !origin ||
+    /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.|172\.[1-3][0-9]\.|100\.[6-9][0-9]\.|100\.[1-9][0-9]{2}\.|\[::1\])/.test(origin);
+  if (origin && isLocalish) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-FlowDesk-Token");
+}
+
+function reject401(res, msg = "Unauthorized") {
+  res.statusCode = 401;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("WWW-Authenticate", 'Bearer realm="flowdesk-state"');
+  res.end(JSON.stringify({ error: msg }));
+}
+
 function handler(req, res, next) {
+  // Endpoint que devolve o token de auth (apenas para localhost/loopback)
+  // Permite o cliente pegar o token no boot e armazenar em sessionStorage.
+  if (req.url === "/__token") {
+    setCors(req, res);
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      return res.end();
+    }
+    const ip = req.socket?.remoteAddress || "";
+    const isLoopback =
+      ip === "127.0.0.1" ||
+      ip === "::1" ||
+      ip === "::ffff:127.0.0.1" ||
+      ip.startsWith("fe80::");
+    if (!isLoopback) {
+      // De fora do PC do master, o token NUNCA e exposto.
+      // Quem acessa via VPN tem que receber o token do admin manualmente.
+      return reject401(res, "Token endpoint restricted to localhost");
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader(
+      "Set-Cookie",
+      `fd_state_token=${AUTH_TOKEN}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
+    );
+    return res.end(JSON.stringify({ token: AUTH_TOKEN }));
+  }
+
+  // Healthcheck (publico — apenas confirma servidor de pe, sem dados)
+  if (req.url === "/__health") {
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({ ok: true, ts: Date.now() }));
+  }
+
   // Endpoint de sync sob demanda do canal SQL
   if (req.url === "/__sync-sql") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    setCors(req, res);
     if (req.method === "OPTIONS") {
       res.statusCode = 204;
       return res.end();
@@ -117,6 +243,7 @@ function handler(req, res, next) {
       res.statusCode = 405;
       return res.end(JSON.stringify({ error: "Use POST" }));
     }
+    if (!isAuthenticated(req)) return reject401(res);
     return runSqlSyncAndRebuild().then((result) => {
       res.setHeader("Content-Type", "application/json");
       res.statusCode = result.ok ? 200 : 500;
@@ -126,14 +253,14 @@ function handler(req, res, next) {
 
   if (!req.url?.startsWith("/__state")) return next();
 
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  setCors(req, res);
   if (req.method === "OPTIONS") {
     res.statusCode = 204;
     return res.end();
   }
+
+  // Auth obrigatorio para qualquer acesso a /__state
+  if (!isAuthenticated(req)) return reject401(res);
 
   // GET /__state → retorna todo estado
   if (req.method === "GET" && req.url === "/__state") {
