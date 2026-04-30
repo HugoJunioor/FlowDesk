@@ -1,18 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import path from "path";
 import stateSyncPlugin from "./scripts/stateSync.mjs";
 
-// https://vitejs.dev/config/
-export default defineConfig({
+// HTTPS auto-assinado em producao habilita Web Crypto (PBKDF2, clipboard, etc)
+// mesmo quando acessado via IP de rede/VPN. Em dev mantem HTTP para HMR rapido.
+// Pode ser desligado com VITE_DISABLE_HTTPS=1.
+const enableHttps = process.env.VITE_DISABLE_HTTPS !== "1";
+
+export default defineConfig(({ command }) => ({
   server: {
-    host: "0.0.0.0",           // bind em todas as interfaces (permite acesso remoto via VPN)
+    host: "0.0.0.0",
     port: 8080,
-    strictPort: true,          // falha em vez de escolher outra porta
-    allowedHosts: true,        // aceita qualquer hostname (necessario para acesso via VPN/IP)
+    strictPort: true,
+    allowedHosts: true,
     hmr: {
       overlay: false,
-      clientPort: 8080,   // garante que o HMR websocket usa a mesma porta que o cliente acessou
+      clientPort: 8080,
     },
   },
   preview: {
@@ -21,18 +26,36 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true,
     headers: {
-      // Forca o navegador a sempre buscar versao mais recente (sem cache)
-      // Essencial no modo share para que o F5 pegue novos builds imediatamente
       "Cache-Control": "no-cache, no-store, must-revalidate",
       "Pragma": "no-cache",
       "Expires": "0",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      // CSP restritivo: sem unsafe-eval em prod. 'unsafe-inline' fica em
+      // style-src porque shadcn/Tailwind usam estilos inline; script fica
+      // limitado a 'self'. Conexoes apenas para a propria origem.
+      "Content-Security-Policy": [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join("; "),
     },
   },
-  plugins: [react(), stateSyncPlugin()],
+  // basicSsl gera certificado self-signed na primeira execucao.
+  // Aplicado em dev e preview quando VITE_DISABLE_HTTPS != "1".
+  plugins: [react(), stateSyncPlugin(), ...(enableHttps && command !== "build" ? [basicSsl()] : [])],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
-});
+}));
