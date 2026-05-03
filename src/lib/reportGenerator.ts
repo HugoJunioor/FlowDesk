@@ -200,6 +200,8 @@ export function generateInteractiveReport(options: ReportOptions): string {
     expirado: monthlyResKeys.map((k) => monthlyResMap[k].expirado),
     avgHours: monthlyResKeys.map((k) => monthlyResMap[k].countRes > 0 ? Math.round((monthlyResMap[k].totalResHours / monthlyResMap[k].countRes) * 10) / 10 : 0),
   };
+  const slaResOk = metrics.slaResolutionOk;
+  const slaResBreach = metrics.slaResolutionBreach;
   const totalResAtendido = slaResOk;
   const totalResExpirado = slaResBreach;
 

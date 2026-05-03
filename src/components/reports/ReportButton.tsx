@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SlackDemand } from "@/types/demand";
 import { generateInteractiveReport } from "@/lib/reportGenerator";
-import { branding } from "@/config/brandingLoader";
 import { exportToExcel } from "@/lib/excelExporter";
 
 interface ReportButtonProps {
@@ -56,8 +56,12 @@ const ReportButton = ({ demands, filters, source, variant = "outline", size = "s
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast.success("Relatório BI gerado", { description: `relatorio-${source}-${dateStr}.html` });
     } catch (e) {
       console.error("Erro ao gerar relatório:", e);
+      toast.error("Erro ao gerar relatório BI", {
+        description: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -71,8 +75,12 @@ const ReportButton = ({ demands, filters, source, variant = "outline", size = "s
         ? "Relatório Analítico"
         : "Relatório de Demandas";
       exportToExcel(demands, title);
+      toast.success("Excel exportado");
     } catch (e) {
       console.error("Erro ao exportar Excel:", e);
+      toast.error("Erro ao exportar Excel", {
+        description: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setIsExportingExcel(false);
     }
