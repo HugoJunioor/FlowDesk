@@ -14,32 +14,32 @@ BI/Excel e controle granular de permissões.
 ### Dashboard executivo
 Métricas em tempo real, gráficos por cliente, prioridade e SLA.
 
-![Dashboard claro](docs/screenshots/02-dashboard-light.png)
-![Dashboard escuro](docs/screenshots/03-dashboard-dark.png)
+![Dashboard claro](docs/screenshots/dashboard-light.png)
+![Dashboard escuro](docs/screenshots/dashboard-dark.png)
 
 ### Gestão de demandas (Kanban)
 Cards com prioridade, SLA em horas úteis, classificação automática e ações rápidas.
 
-![Kanban](docs/screenshots/05-kanban.png)
+![Kanban](docs/screenshots/kanban.png)
 
 ### Classificação automática por IA
 Cada demanda recebe prioridade sugerida com nível de confiança e *reasoning* explícito — auditável.
 
-![Classificação automática](docs/screenshots/06-ai-classification.png)
+![Classificação automática](docs/screenshots/ai-classification.png)
 
 ### Relatório BI interativo
 Gera HTML autocontido com gráficos, timelines e análise por cliente, prioridade e canal.
 
-![Relatório BI](docs/screenshots/07-bi-report.png)
+![Relatório BI](docs/screenshots/bi-report.png)
 
 ### Grupos e permissões granulares
 Matriz de 8 módulos × 5 ações por grupo, união automática quando o usuário pertence a vários.
 
-![Grupos](docs/screenshots/08-permissions-overview.png)
-![Matriz](docs/screenshots/09-permissions-matrix.png)
+![Grupos](docs/screenshots/permissions-overview.png)
+![Matriz](docs/screenshots/permissions-matrix.png)
 
 ### Login
-![Login](docs/screenshots/01-login.png)
+![Login](docs/screenshots/login.png)
 
 ## 🌐 Demo ao vivo
 
