@@ -15,6 +15,7 @@ import GroupsManagement from "./pages/GroupsManagement.tsx";
 import Profile from "./pages/Profile.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { DemoBanner } from "./components/DemoBanner.tsx";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ const App = () => (
           <Sonner />
           <AuthProvider>
             <BrowserRouter>
+              <DemoBanner />
               <AppRoutes />
             </BrowserRouter>
           </AuthProvider>
