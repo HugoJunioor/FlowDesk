@@ -1,8 +1,26 @@
 # FlowDesk
 
+[![Demo](https://img.shields.io/badge/demo-online-success?style=flat&logo=vercel)](https://flow-desk-e2is.vercel.app)
+[![Stack](https://img.shields.io/badge/stack-React%2018%20%2B%20TypeScript%20%2B%20Vite-blue?style=flat)](#stack)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
+
 Sistema de gestão de demandas que chegam via Slack. Centraliza atendimentos
 dispersos em conversas num painel gerencial com SLA, métricas, relatórios
 BI/Excel e controle granular de permissões.
+
+## 🌐 Demo ao vivo
+
+**🔗 [flow-desk-e2is.vercel.app](https://flow-desk-e2is.vercel.app)**
+
+| Campo | Valor |
+|---|---|
+| Login | `master` |
+| Senha | `Admin@1` |
+
+A demo roda com dados fictícios (10 demandas com prioridades, SLAs e
+clientes variados). Cada visitante tem seu próprio estado isolado no
+navegador — pode criar usuários, mexer em overrides, exportar relatórios
+sem afetar outros visitantes.
 
 ## Funcionalidades
 
