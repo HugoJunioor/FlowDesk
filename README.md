@@ -1,5 +1,6 @@
 # FlowDesk
 
+[![CI](https://github.com/HugoJunioor/FlowDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/HugoJunioor/FlowDesk/actions/workflows/ci.yml)
 [![Demo](https://img.shields.io/badge/demo-online-success?style=flat&logo=vercel)](https://flow-desk-e2is.vercel.app)
 [![Stack](https://img.shields.io/badge/stack-React%2018%20%2B%20TypeScript%20%2B%20Vite-blue?style=flat)](#stack)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
