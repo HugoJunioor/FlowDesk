@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/HugoJunioor/FlowDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/HugoJunioor/FlowDesk/actions/workflows/ci.yml)
 [![Demo](https://img.shields.io/badge/demo-online-success?style=flat&logo=vercel)](https://flow-desk-e2is.vercel.app)
+[![API](https://img.shields.io/badge/API-flowdesk--api-orange?style=flat&logo=railway)](https://github.com/HugoJunioor/flowdesk-api)
 [![Stack](https://img.shields.io/badge/stack-React%2018%20%2B%20TypeScript%20%2B%20Vite-blue?style=flat)](#stack)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
 
@@ -54,6 +55,18 @@ A demo roda com dados fictícios (10 demandas com prioridades, SLAs e
 clientes variados). Cada visitante tem seu próprio estado isolado no
 navegador — pode criar usuários, mexer em overrides, exportar relatórios
 sem afetar outros visitantes.
+
+## ⚡ Backend separado
+
+O sistema funciona standalone (estado no `localStorage` ou arquivo JSON
+compartilhado), mas existe também uma **API REST completa** disponível em
+[**HugoJunioor/flowdesk-api**](https://github.com/HugoJunioor/flowdesk-api):
+
+- 🟢 **Rodando ao vivo** em [flowdesk-api-production-21cf.up.railway.app/docs](https://flowdesk-api-production-21cf.up.railway.app/docs)
+- 🛠 **Stack:** Node 20 + Fastify + Prisma + PostgreSQL
+- 🔐 **Auth:** PBKDF2 + JWT (cookie HttpOnly), rate limit, audit log
+- 📚 **Swagger UI** auto-gerado com 22 endpoints documentados
+- ✅ **Zero vulnerabilidades** (auditado em CI)
 
 ## 🏗 Arquitetura
 
