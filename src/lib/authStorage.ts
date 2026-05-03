@@ -103,13 +103,14 @@ function saveUsers(users: FlowDeskUser[]): void {
 
 export async function initializeAuth(): Promise<void> {
   const users = getUsers();
+  const isDemo = (typeof import.meta !== "undefined" && import.meta.env?.VITE_DEMO_MODE === "true");
   if (users.length === 0) {
     const passwordHash = await hashPassword("Admin@1");
     const master: FlowDeskUser = {
       id: "master-001",
       login: "master",
-      email: "admin@company.com",
-      name: "Administrador",
+      email: isDemo ? "demo@flowdesk.app" : "admin@company.com",
+      name: isDemo ? "Demo Master" : "Administrador",
       role: "master",
       status: "active",
       passwordHash,
