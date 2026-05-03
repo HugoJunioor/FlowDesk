@@ -22,6 +22,44 @@ clientes variados). Cada visitante tem seu próprio estado isolado no
 navegador — pode criar usuários, mexer em overrides, exportar relatórios
 sem afetar outros visitantes.
 
+## 🏗 Arquitetura
+
+```mermaid
+flowchart LR
+    A[Slack / Teams / Email] -->|Adapter| B[DemandAdapter]
+    B --> C[SlackDemand normalizado]
+    C --> D[Pipeline]
+    D --> E[Auto-classificação]
+    D --> F[Análise de status]
+    D --> G[SLA em horas úteis]
+    D --> H[Overrides do master]
+    E & F & G & H --> I[UI]
+    I --> J[Dashboard]
+    I --> K[Kanban]
+    I --> L[Relatórios BI/Excel]
+    H -.persiste.-> M[(Postgres / localStorage)]
+```
+
+Camadas desacopladas: **adapter** (fonte) → **pipeline** (lógica de
+negócio) → **UI** (apresentação) → **storage** (persistência). Trocar
+qualquer camada não afeta as outras.
+
+## 🔌 Multi-canal
+
+Sistema **não acoplado ao Slack**. A arquitetura suporta nativamente
+qualquer plataforma de chat — basta criar um adapter de ~80 linhas.
+
+| Canal              | Status     |
+|--------------------|------------|
+| Slack              | ✅ Produção |
+| Microsoft Teams    | 📋 Stub pronto |
+| Discord            | ⏳ Roadmap |
+| WhatsApp Business  | ⏳ Roadmap |
+| E-mail (IMAP)      | ⏳ Roadmap |
+| Telegram           | ⏳ Roadmap |
+
+Detalhes técnicos em [`src/adapters/README.md`](./src/adapters/README.md).
+
 ## Funcionalidades
 
 - 📊 **Dashboard executivo** com métricas, gráficos por prioridade/cliente e
