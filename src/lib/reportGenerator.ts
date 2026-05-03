@@ -228,6 +228,8 @@ export function generateInteractiveReport(options: ReportOptions): string {
     expirado: monthlyRespKeys.map((k) => monthlyRespMap[k].expirado),
     avgMins: monthlyRespKeys.map((k) => monthlyRespMap[k].countResp > 0 ? Math.round(monthlyRespMap[k].totalRespMins / monthlyRespMap[k].countResp) : 0),
   };
+  const slaRespOk = metrics.slaFirstResponseOk;
+  const slaRespBreach = metrics.slaFirstResponseBreach;
 
   // Section 3: Tipo de Demanda
   const demandTypeCategories: Record<string, "bug" | "tarefa"> = {};
