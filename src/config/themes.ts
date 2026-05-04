@@ -43,7 +43,7 @@ export const COLOR_THEMES: ColorTheme[] = [
   { id: "coral", label: "Coral", previewColor: "#fb7185", hasGradient: true },
   { id: "menta", label: "Menta", previewColor: "#34d399" },
   { id: "flamengo", label: "Flamengo", previewColor: "#E40521", hasGradient: true },
-  { id: "psicodelico", label: "Psicodélico", previewColor: "#ff00aa", hasGradient: true },
+  { id: "psicodelico", label: "Psicodélico", previewColor: "#00e0ff", hasGradient: true },
 ];
 
 export const DEFAULT_COLOR_THEME: ColorThemeId = "oceano";
