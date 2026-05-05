@@ -177,20 +177,90 @@ const DemandDetailSheet = ({
         <div className="flex-1 overflow-y-auto px-6 py-4 max-w-4xl w-full mx-auto">
 
         <div className="space-y-3">
-          {/* Countdown */}
-          {demand.priority !== "sem_classificacao" && demand.status !== "concluida" && (
-            <div className="p-3 rounded-lg bg-muted/50">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
-              <ExpirationCountdown
-                dueDate={demand.dueDate || ""}
-                createdAt={demand.createdAt}
-                status={demand.status}
-                priority={demand.priority}
-                completedAt={demand.completedAt}
-                expirationReason={demand.closure?.expirationReason}
-              />
-            </div>
-          )}
+          {/* Tempo restante + Status pareados em telas largas */}
+          {(() => {
+            const showCountdown = demand.priority !== "sem_classificacao" && demand.status !== "concluida";
+            const countdownBlock = showCountdown ? (
+              <div className="p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
+                <ExpirationCountdown
+                  dueDate={demand.dueDate || ""}
+                  createdAt={demand.createdAt}
+                  status={demand.status}
+                  priority={demand.priority}
+                  completedAt={demand.completedAt}
+                  expirationReason={demand.closure?.expirationReason}
+                />
+              </div>
+            ) : null;
+
+            const statusBlock = (
+              <div className="p-3 rounded-lg border border-border">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Clock size={14} className="text-primary" />
+                  <p className="text-xs text-muted-foreground font-medium">Status</p>
+                </div>
+                <Select value={showCompleteForm ? "concluida" : demand.status} onValueChange={handleStatusChange}>
+                  <SelectTrigger className={`w-full h-9 text-sm font-medium ${status.color}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aberta">Aberta</SelectItem>
+                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="concluida">Concluida</SelectItem>
+                    <SelectItem value="expirada">Expirada</SelectItem>
+                  </SelectContent>
+                </Select>
+                {showCompleteForm && (
+                  <div className="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                    <p className="text-xs font-medium text-success flex items-center gap-1">
+                      <Circle size={12} fill="currentColor" />
+                      Informe a data e horario da conclusao
+                    </p>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[11px] text-muted-foreground">Data</label>
+                        <Input type="date" className="h-9 mt-1" value={completeDate} onChange={(e) => setCompleteDate(e.target.value)} />
+                      </div>
+                      <div className="w-24 sm:w-28">
+                        <label className="text-[11px] text-muted-foreground">Horario</label>
+                        <Input type="time" className="h-9 mt-1" value={completeTime} onChange={(e) => setCompleteTime(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Observação</label>
+                      <textarea
+                        className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[48px]"
+                        rows={2}
+                        maxLength={2000}
+                        placeholder="Observação sobre a conclusão (opcional)..."
+                        value={completeObservation}
+                        onChange={(e) => setCompleteObservation(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="h-8 text-xs flex-1" onClick={handleConfirmComplete}>
+                        <Circle size={13} fill="currentColor" className="mr-1" />
+                        Confirmar Conclusao
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCompleteForm(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+
+            return showCountdown ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {countdownBlock}
+                {statusBlock}
+              </div>
+            ) : (
+              statusBlock
+            );
+          })()}
 
           {/* Responsavel + Prioridade lado a lado em telas largas */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -317,75 +387,6 @@ const DemandDetailSheet = ({
               </div>
             )}
           </div>
-          </div>
-
-          {/* Status */}
-          <div className="p-3 rounded-lg border border-border">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Clock size={14} className="text-primary" />
-              <p className="text-xs text-muted-foreground font-medium">Status</p>
-            </div>
-            <Select value={showCompleteForm ? "concluida" : demand.status} onValueChange={handleStatusChange}>
-              <SelectTrigger className={`w-full h-9 text-sm font-medium ${status.color}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="aberta">Aberta</SelectItem>
-                <SelectItem value="em_andamento">Em andamento</SelectItem>
-                <SelectItem value="concluida">Concluida</SelectItem>
-                <SelectItem value="expirada">Expirada</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Formulario de conclusao */}
-            {showCompleteForm && (
-              <div className="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 space-y-3">
-                <p className="text-xs font-medium text-success flex items-center gap-1">
-                  <Circle size={12} fill="currentColor" />
-                  Informe a data e horario da conclusao
-                </p>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="text-[11px] text-muted-foreground">Data</label>
-                    <Input
-                      type="date"
-                      className="h-9 mt-1"
-                      value={completeDate}
-                      onChange={(e) => setCompleteDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-24 sm:w-28">
-                    <label className="text-[11px] text-muted-foreground">Horario</label>
-                    <Input
-                      type="time"
-                      className="h-9 mt-1"
-                      value={completeTime}
-                      onChange={(e) => setCompleteTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] text-muted-foreground">Observação</label>
-                  <textarea
-                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[48px]"
-                    rows={2}
-                    maxLength={2000}
-                    placeholder="Observação sobre a conclusão (opcional)..."
-                    value={completeObservation}
-                    onChange={(e) => setCompleteObservation(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" className="h-8 text-xs flex-1" onClick={handleConfirmComplete}>
-                    <Circle size={13} fill="currentColor" className="mr-1" />
-                    Confirmar Conclusao
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowCompleteForm(false)}>
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Status analysis */}
