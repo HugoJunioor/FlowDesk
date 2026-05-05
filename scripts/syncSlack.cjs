@@ -65,6 +65,28 @@ function getUserName(userId) {
   return u ? u.name : userId;
 }
 
+/**
+ * Mapeia msg.files do Slack pra estrutura SlackFile do front.
+ * Pega so os campos uteis (id, name, mimetype, size, urlPrivate,
+ * thumb360, isPublic). Slack devolve dezenas de campos, mas a UI
+ * so precisa desses.
+ */
+function mapSlackFiles(rawFiles) {
+  if (!Array.isArray(rawFiles) || rawFiles.length === 0) return undefined;
+  return rawFiles
+    .filter((f) => f && f.id && f.name)
+    .map((f) => ({
+      id: f.id,
+      name: f.name,
+      mimetype: f.mimetype || 'application/octet-stream',
+      size: f.size || 0,
+      urlPrivate: f.url_private,
+      thumb360: f.thumb_360,
+      isPublic: !!f.is_public,
+      preview: typeof f.preview === 'string' ? f.preview.slice(0, 200) : undefined,
+    }));
+}
+
 function isTeamMemberSync(userId) {
   const u = USER_CACHE.get(userId);
   return u ? u.isTeam : false;
@@ -193,6 +215,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
               timestamp: new Date(parseFloat(reply.ts) * 1000).toISOString(),
               isTeamMember: info.isTeam,
               hasCheckReaction,
+              files: mapSlackFiles(reply.files),
             });
           }
         } catch (e) {
@@ -313,6 +336,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         slackPermalink: `https://${process.env.SLACK_WORKSPACE || 'workspace'}.slack.com/archives/${channelId}/p${msg.ts.replace('.', '')}`,
         replies: msg.reply_count || 0,
         threadReplies,
+        files: mapSlackFiles(msg.files),
       };
 
       demands.push(demand);
