@@ -9,11 +9,12 @@
  * - Optimistic update do thread (callback onReplied/onUploaded)
  */
 import { useRef, useState, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
-import { Bold, Italic, Code, Link2, Paperclip, Smile, Send, AtSign, X, FileText, Image as ImageIcon } from "lucide-react";
+import { Bold, Italic, Code, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { apiClient, ApiError } from "@/lib/apiClient";
+import EmojiPicker from "./EmojiPicker";
 import type { SlackDemand } from "@/types/demand";
 
 interface DemandReplyComposerProps {
@@ -54,6 +55,35 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [dragOver, setDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pessoas que ja apareceram nessa thread (pra autocomplete de @mention)
+  const mentionablePeople = (() => {
+    const set = new Set<string>();
+    if (demand.assignee?.name) set.add(demand.assignee.name);
+    demand.cc?.forEach((c) => set.add(c));
+    demand.threadReplies?.forEach((r) => r.author && set.add(r.author));
+    if (demand.requester?.name) set.add(demand.requester.name);
+    return Array.from(set).sort();
+  })();
+
+  // Estado do dropdown de mention
+  const [mentionFilter, setMentionFilter] = useState<string | null>(null);
+
+  const insertAtCursor = (snippet: string) => {
+    const ta = textareaRef.current;
+    if (!ta) {
+      setText((t) => t + snippet);
+      return;
+    }
+    const pos = ta.selectionStart;
+    const newText = text.slice(0, pos) + snippet + text.slice(pos);
+    setText(newText);
+    setTimeout(() => {
+      ta.focus();
+      const cursorPos = pos + snippet.length;
+      ta.setSelectionRange(cursorPos, cursorPos);
+    }, 0);
+  };
 
   const wrapSelection = (before: string, after = before) => {
     const ta = textareaRef.current;
@@ -201,8 +231,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         <ToolbarButton icon={Code} label="Código (Ctrl+E)" onClick={() => wrapSelection("`")} />
         <ToolbarButton icon={Link2} label="Link" onClick={() => wrapSelection("<", "|texto>")} />
         <div className="w-px h-4 bg-border mx-0.5" />
-        <ToolbarButton icon={AtSign} label="Mencionar" onClick={() => wrapSelection("<@", ">")} />
-        <ToolbarButton icon={Smile} label="Emoji" onClick={() => wrapSelection(":", ":")} />
+        <ToolbarButton icon={AtSign} label="Mencionar" onClick={() => insertAtCursor("@")} />
+        <EmojiPicker onSelect={(name) => insertAtCursor(`:${name}: `)} />
         <ToolbarButton
           icon={Paperclip}
           label="Anexar arquivo"
@@ -217,14 +247,68 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         />
       </div>
 
-      <Textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Digite sua resposta... use *negrito*, _italico_, `codigo`. Ctrl+Enter envia. Arraste arquivos aqui."
-        className="min-h-[80px] max-h-[200px] resize-y bg-background"
-      />
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => {
+            const v = e.target.value;
+            setText(v);
+            // Detecta @ pra abrir mention dropdown
+            const ta = e.target;
+            const cursor = ta.selectionStart;
+            const before = v.slice(0, cursor);
+            const m = before.match(/@(\w*)$/);
+            setMentionFilter(m ? m[1] : null);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Digite sua resposta... use *negrito*, _italico_, `codigo`. @ menciona. Ctrl+Enter envia."
+          className="min-h-[80px] max-h-[200px] resize-y bg-background"
+        />
+
+        {/* Mention dropdown */}
+        {mentionFilter !== null && (
+          (() => {
+            const filtered = mentionablePeople.filter((p) =>
+              p.toLowerCase().includes(mentionFilter.toLowerCase())
+            );
+            if (filtered.length === 0) return null;
+            return (
+              <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 border-b">
+                  Mencionar
+                </div>
+                {filtered.slice(0, 8).map((person) => (
+                  <button
+                    key={person}
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-1.5"
+                    onClick={() => {
+                      // Substitui @parcial por @nome completo
+                      const ta = textareaRef.current;
+                      if (!ta) return;
+                      const cursor = ta.selectionStart;
+                      const before = text.slice(0, cursor);
+                      const newBefore = before.replace(/@\w*$/, `@${person} `);
+                      const newText = newBefore + text.slice(cursor);
+                      setText(newText);
+                      setMentionFilter(null);
+                      setTimeout(() => {
+                        ta.focus();
+                        const newPos = newBefore.length;
+                        ta.setSelectionRange(newPos, newPos);
+                      }, 0);
+                    }}
+                  >
+                    <AtSign size={11} className="text-muted-foreground" />
+                    {person}
+                  </button>
+                ))}
+              </div>
+            );
+          })()
+        )}
+      </div>
 
       {/* Lista de anexos */}
       {files.length > 0 && (
