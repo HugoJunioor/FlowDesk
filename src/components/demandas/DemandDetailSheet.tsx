@@ -192,6 +192,8 @@ const DemandDetailSheet = ({
             </div>
           )}
 
+          {/* Responsavel + Prioridade lado a lado em telas largas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Responsavel */}
           <div className="p-3 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
@@ -314,6 +316,7 @@ const DemandDetailSheet = ({
                 )}
               </div>
             )}
+          </div>
           </div>
 
           {/* Status */}
