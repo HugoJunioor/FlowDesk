@@ -410,28 +410,36 @@ const DemandDetailSheet = ({
             );
           })()}
 
-          {/* Thread replies timeline */}
-          {demand.threadReplies.length > 0 && (
+          {/* Thread replies timeline + composer logo abaixo */}
+          {(demand.threadReplies.length > 0 || true) && (
             <div>
-              <p className="text-xs text-muted-foreground font-medium mb-2">Respostas da thread ({demand.threadReplies.length})</p>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {demand.threadReplies.map((reply, i) => (
-                  <div key={i} className={`p-2.5 rounded-lg text-[11px] ${reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"}`}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
-                        {reply.author}
-                        {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
-                      </span>
+              <p className="text-xs text-muted-foreground font-medium mb-2">
+                Respostas da thread ({demand.threadReplies.length})
+              </p>
+              {demand.threadReplies.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
+                  {demand.threadReplies.map((reply, i) => (
+                    <div key={i} className={`p-2.5 rounded-lg text-[11px] ${reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"}`}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
+                          {reply.author}
+                          {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed">{reply.text}</p>
+                      {reply.files && reply.files.length > 0 && (
+                        <SlackFilesList files={reply.files} compact />
+                      )}
                     </div>
-                    <p className="text-muted-foreground leading-relaxed">{reply.text}</p>
-                    {reply.files && reply.files.length > 0 && (
-                      <SlackFilesList files={reply.files} compact />
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+              {/* Composer inline — logo apos a thread (UX: leu, ja responde) */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <DemandReplyComposer demand={demand} />
               </div>
             </div>
           )}
@@ -974,8 +982,6 @@ const DemandDetailSheet = ({
           </div>
         </div>
         </div>
-        {/* Composer stub — Fase 1: layout pronto, send vem nas proximas fases */}
-        <DemandReplyComposer demand={demand} />
       </DialogContent>
     </Dialog>
   );
