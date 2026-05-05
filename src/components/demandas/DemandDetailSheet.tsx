@@ -18,6 +18,7 @@ import { addBusinessHours, getFirstResponseMinutes, getResolutionMinutes, format
 import ExpirationCountdown from "./ExpirationCountdown";
 import CopyLinkButton from "./CopyLinkButton";
 import DemandReplyComposer from "./DemandReplyComposer";
+import SlackFilesList from "./SlackFilesList";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -428,6 +429,9 @@ const DemandDetailSheet = ({
                       </span>
                     </div>
                     <p className="text-muted-foreground leading-relaxed">{reply.text}</p>
+                    {reply.files && reply.files.length > 0 && (
+                      <SlackFilesList files={reply.files} compact />
+                    )}
                   </div>
                 ))}
               </div>
@@ -440,6 +444,9 @@ const DemandDetailSheet = ({
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-1.5">Descricao</p>
             <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{demand.description}</p>
+            {demand.files && demand.files.length > 0 && (
+              <SlackFilesList files={demand.files} />
+            )}
           </div>
 
           <Separator />
