@@ -140,8 +140,8 @@ const DemandDetailSheet = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
-        {/* Header fixo */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+        {/* Header fixo (alinhado com a coluna de conteudo, nao stretches edge-to-edge) */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0 max-w-4xl w-full mx-auto">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className={`text-[10px] ${priority.bg} ${priority.color}`}>
               {priority.label}
@@ -171,8 +171,10 @@ const DemandDetailSheet = ({
             </span>
           </div>
         </DialogHeader>
-        {/* Conteudo scrollavel */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        {/* Conteudo scrollavel — limitado a ~720px centralizado pra harmonia
+            (campos curtos como prioridade, status, badges nao precisam de
+            largura total). Composer abaixo continua full width. */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 max-w-4xl w-full mx-auto">
 
         <div className="space-y-5">
           {/* Countdown */}
