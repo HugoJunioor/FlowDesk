@@ -325,7 +325,6 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           onChange={(e) => {
             const v = e.target.value;
             setText(v);
-            // Detecta @ pra abrir mention dropdown
             const ta = e.target;
             const cursor = ta.selectionStart;
             const before = v.slice(0, cursor);
@@ -333,9 +332,25 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             setMentionFilter(m ? m[1] : null);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Digite sua resposta... use *negrito*, _italico_, `codigo`. @ menciona. Ctrl+Enter envia."
-          className="min-h-[80px] max-h-[200px] resize-y bg-background"
+          placeholder=""
+          className="min-h-[120px] max-h-[260px] resize-y bg-background pr-14"
         />
+
+        {/* Botao enviar dentro do textarea, canto inferior direito */}
+        <Button
+          size="icon"
+          disabled={!canSend}
+          onClick={handleSend}
+          className="absolute bottom-2 right-2 h-9 w-9 rounded-full shadow-md"
+          title="Enviar (Ctrl+Enter)"
+          aria-label="Enviar"
+        >
+          {sending ? (
+            <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Send size={14} />
+          )}
+        </Button>
 
         {/* Mention dropdown */}
         {mentionFilter !== null && (
@@ -409,21 +424,11 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         </div>
       )}
 
-      <div className="flex items-center justify-end mt-2 gap-2">
-        {files.length > 0 && (
-          <span className="text-[10px] text-primary font-medium">
-            {files.length} anexo{files.length > 1 ? "s" : ""}
-          </span>
-        )}
-        <Button size="sm" disabled={!canSend} onClick={handleSend} className="gap-1.5 h-8">
-          {sending ? (
-            <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Send size={12} />
-          )}
-          {sending ? "Enviando..." : "Enviar"}
-        </Button>
-      </div>
+      {files.length > 0 && (
+        <p className="text-[10px] text-primary font-medium mt-1.5 text-right">
+          {files.length} anexo{files.length > 1 ? "s" : ""} pronto{files.length > 1 ? "s" : ""} pra envio
+        </p>
+      )}
     </div>
   );
 };
