@@ -32,16 +32,26 @@ export const SLA_RESOLUTION_EXCLUSION_REASONS = [
 ] as const;
 
 /**
+ * Cutoff a partir do qual a regra de exclusao se aplica.
+ * Demandas anteriores (jan-mar/2026) preservam o comportamento original
+ * — historico ja foi reportado com a logica antiga, nao reescrevemos.
+ */
+const SLA_EXCLUSION_EFFECTIVE_FROM = new Date("2026-04-01T00:00:00");
+
+/**
  * True se a demanda deve ser EXCLUIDA do calculo de SLA por culpa externa.
  *
- * IMPORTANTE: so exclui quando a demanda realmente atrasaria — ou seja,
- * quando o motivo de expiracao foi preenchido E ela esta de fato expirada
- * /quase expirada. Se a demanda foi concluida NO PRAZO mesmo tendo o
- * motivo preenchido (data dirty), continua contando como ok.
+ * Regras:
+ * 1. Demanda de marco/2026 ou anterior: NUNCA exclui (preserva historico)
+ * 2. Motivo precisa estar na lista SLA_RESOLUTION_EXCLUSION_REASONS
+ * 3. Demanda atendida no prazo: NAO exclui (continua como ok)
  *
- * Regra: exclui apenas se (motivo eh culpa externa) AND (status nao eh atendido).
+ * Caso contrario (expirada/atrasada por culpa externa em abril+): exclui.
  */
 export function isResolutionSlaExcluded(d: SlackDemand): boolean {
+  // Cutoff de data — historico Jan-Mar/26 mantem regra antiga
+  if (new Date(d.createdAt) < SLA_EXCLUSION_EFFECTIVE_FROM) return false;
+
   const reason =
     d.closure?.expirationReason ||
     (d.expirationReason as string | undefined);
