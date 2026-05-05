@@ -31,13 +31,37 @@ export const SLA_RESOLUTION_EXCLUSION_REASONS = [
   "Demora para validar a correcao",
 ] as const;
 
-/** True se o motivo de expiracao da demanda eh culpa externa (nao penaliza SLA). */
+/**
+ * True se a demanda deve ser EXCLUIDA do calculo de SLA por culpa externa.
+ *
+ * IMPORTANTE: so exclui quando a demanda realmente atrasaria — ou seja,
+ * quando o motivo de expiracao foi preenchido E ela esta de fato expirada
+ * /quase expirada. Se a demanda foi concluida NO PRAZO mesmo tendo o
+ * motivo preenchido (data dirty), continua contando como ok.
+ *
+ * Regra: exclui apenas se (motivo eh culpa externa) AND (status nao eh atendido).
+ */
 export function isResolutionSlaExcluded(d: SlackDemand): boolean {
   const reason =
     d.closure?.expirationReason ||
     (d.expirationReason as string | undefined);
   if (!reason) return false;
-  return (SLA_RESOLUTION_EXCLUSION_REASONS as readonly string[]).includes(reason);
+  if (!(SLA_RESOLUTION_EXCLUSION_REASONS as readonly string[]).includes(reason)) {
+    return false;
+  }
+  // Demanda atendida no prazo (planilha historico) — continua como ok
+  if (d.slaResolutionStatus === "atendido") return false;
+  // Concluida e dentro do prazo (calculo runtime) — continua como ok
+  if (d.status === "concluida" && d.completedAt && d.priority !== "sem_classificacao") {
+    const cfg = PRIORITY_CONFIG[d.priority];
+    if (cfg?.sla) {
+      const onTime =
+        new Date(d.completedAt) <=
+        addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+      if (onTime) return false;
+    }
+  }
+  return true;
 }
 
 /** Converte "15 min" / "1 hora" / "4 horas" em minutos. */
