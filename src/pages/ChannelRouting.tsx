@@ -17,12 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Hash, Plus, Trash2, Inbox, Database, Ban, Sparkles } from "lucide-react";
+import { ArrowLeft, Hash, Plus, Trash2, Inbox, Database, Ban, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   loadChannelRouting,
-  saveChannelRouting,
   upsertChannelRule,
   removeChannelRule,
   setDefaultRoute,
@@ -31,6 +30,7 @@ import {
   type ChannelRoutingConfig,
 } from "@/lib/channelRouting";
 import { getProcessedDemands } from "@/data/demandsLoader";
+import { getProcessedSqlDemands } from "@/data/sqlDemandsLoader";
 
 const ROUTE_LABELS: Record<ChannelRoute, { label: string; icon: typeof Inbox; color: string }> = {
   demandas: { label: "Demandas Geral", icon: Inbox, color: "text-info" },
@@ -45,6 +45,8 @@ const ChannelRouting = () => {
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelRoute, setNewChannelRoute] = useState<ChannelRoute>("demandas");
   const [filter, setFilter] = useState("");
+  const [scanCount, setScanCount] = useState(0); // forca re-scan de canais
+  const [lastScanAt, setLastScanAt] = useState(() => new Date());
 
   // Master only
   useEffect(() => {
@@ -54,16 +56,42 @@ const ChannelRouting = () => {
     }
   }, [currentUser, navigate]);
 
-  // Canais detectados nas demandas atuais (sugestao de cadastro)
+  // Canais detectados nas demandas atuais (sugestao de cadastro).
+  // Inclui AMBOS realDemands (geral) e sqlDemands (SQL) — assim novos
+  // canais sincronizados pra qualquer modulo aparecem aqui pra serem
+  // categorizados.
   const suggestedChannels = useMemo(() => {
     try {
-      const demands = getProcessedDemands();
-      const channels = Array.from(new Set(demands.map((d) => d.slackChannel)));
+      const general = getProcessedDemands();
+      let sql: typeof general = [];
+      try { sql = getProcessedSqlDemands(); } catch { /* sem dados sql */ }
+      const all = [...general, ...sql];
+      const channels = Array.from(new Set(all.map((d) => d.slackChannel)));
       return detectChannelsFromDemands(channels);
     } catch {
       return [];
     }
-  }, [config]);
+  }, [config, scanCount]);
+
+  const handleScanRefresh = () => {
+    setScanCount((n) => n + 1);
+    setLastScanAt(new Date());
+    toast.success("Canais re-escaneados", {
+      description: "Buscando novos canais nas demandas sincronizadas.",
+    });
+  };
+
+  const handleBulkAdd = (route: ChannelRoute) => {
+    if (suggestedChannels.length === 0) return;
+    let updated = config;
+    for (const ch of suggestedChannels) {
+      updated = upsertChannelRule(ch, route, { source: "slack" });
+    }
+    setConfig({ ...updated });
+    toast.success(
+      `${suggestedChannels.length} canais cadastrados como ${ROUTE_LABELS[route].label}`
+    );
+  };
 
   const handleAdd = () => {
     const name = newChannelName.trim().replace(/^#/, "");
@@ -180,20 +208,51 @@ const ChannelRouting = () => {
         </Card>
       </div>
 
-      {/* Canais detectados (sugestoes) */}
-      {suggestedChannels.length > 0 && (
-        <Card>
-          <CardHeader>
+      {/* Canais detectados (sugestoes) — sempre visivel pra clarificar
+          que detecta auto, mesmo se vazio agora. */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Sparkles size={16} className="text-primary" />
-              Canais detectados ({suggestedChannels.length})
+              Canais detectados {suggestedChannels.length > 0 && `(${suggestedChannels.length})`}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Estes canais aparecem nas demandas atuais mas ainda não foram cadastrados.
-              Clique em uma rota pra adicionar rapidamente.
-            </p>
-          </CardHeader>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">
+                escaneado {lastScanAt.toLocaleTimeString("pt-BR")}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={handleScanRefresh}
+                title="Re-escanear demandas pra detectar canais novos"
+              >
+                <RefreshCw size={12} /> Atualizar
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {suggestedChannels.length > 0
+              ? "Canais sincronizados que ainda não foram cadastrados aqui. Use os botões pra categorizar."
+              : "Tudo cadastrado! Quando você sincronizar canais novos via npm run sync, eles aparecem aqui automaticamente."}
+          </p>
+        </CardHeader>
+        {suggestedChannels.length > 0 && (
           <CardContent className="space-y-1.5">
+            {/* Bulk actions */}
+            <div className="flex items-center gap-2 pb-2 border-b border-border mb-1.5">
+              <span className="text-[11px] text-muted-foreground">Cadastrar todos como:</span>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleBulkAdd("demandas")}>
+                <Inbox size={11} className="mr-1" /> Geral ({suggestedChannels.length})
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleBulkAdd("sql")}>
+                <Database size={11} className="mr-1" /> SQL ({suggestedChannels.length})
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={() => handleBulkAdd("ignore")}>
+                <Ban size={11} className="mr-1" /> Ignorar todos
+              </Button>
+            </div>
             {suggestedChannels.map((channel) => (
               <div
                 key={channel}
@@ -217,8 +276,8 @@ const ChannelRouting = () => {
               </div>
             ))}
           </CardContent>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Adicionar canal manual */}
       <Card>
