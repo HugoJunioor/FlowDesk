@@ -12,9 +12,14 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Carrega .env do root do projeto pra dentro de process.env.
+// Vite so expoe VITE_* pro client; plugin Node precisa de dotenv explicito.
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
 const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");
