@@ -9,7 +9,7 @@
  * - Optimistic update do thread (callback onReplied/onUploaded)
  */
 import { useRef, useState, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
-import { Bold, Italic, Code, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon } from "lucide-react";
+import { Bold, Italic, Strikethrough, Code, Code2, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon, List, ListOrdered, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -81,6 +81,55 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     setTimeout(() => {
       ta.focus();
       const cursorPos = pos + snippet.length;
+      ta.setSelectionRange(cursorPos, cursorPos);
+    }, 0);
+  };
+
+  /**
+   * Aplica prefixo a cada linha da selecao (ou linha atual se sem selecao).
+   * Usado pra listas e quotes em mrkdwn Slack.
+   */
+  const prefixLines = (prefix: string | ((idx: number) => string)) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+
+    // Expande a selecao pra cobrir linhas inteiras
+    const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+    const lineEnd = text.indexOf("\n", end);
+    const realEnd = lineEnd === -1 ? text.length : lineEnd;
+
+    const segment = text.slice(lineStart, realEnd);
+    const lines = segment.split("\n");
+    const prefixed = lines
+      .map((line, i) => (typeof prefix === "function" ? prefix(i) : prefix) + line)
+      .join("\n");
+    const newText = text.slice(0, lineStart) + prefixed + text.slice(realEnd);
+    setText(newText);
+    setTimeout(() => {
+      ta.focus();
+      const cursorPos = lineStart + prefixed.length;
+      ta.setSelectionRange(cursorPos, cursorPos);
+    }, 0);
+  };
+
+  /** Wrap multi-linha pra code block (3 backticks). */
+  const wrapBlock = (delim: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = text.slice(start, end);
+    // Garante newlines antes/depois pra code block ficar bonito
+    const before = (start === 0 || text[start - 1] === "\n") ? "" : "\n";
+    const after = (end === text.length || text[end] === "\n") ? "" : "\n";
+    const wrapped = `${before}${delim}\n${selected || ""}\n${delim}${after}`;
+    const newText = text.slice(0, start) + wrapped + text.slice(end);
+    setText(newText);
+    setTimeout(() => {
+      ta.focus();
+      const cursorPos = start + before.length + delim.length + 1 + (selected.length || 0);
       ta.setSelectionRange(cursorPos, cursorPos);
     }, 0);
   };
@@ -224,13 +273,38 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         )}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 mb-1.5 px-1">
+      {/* Toolbar — paridade com Slack mrkdwn */}
+      <div className="flex items-center gap-0.5 mb-1.5 px-1 flex-wrap">
+        {/* Formatacao inline */}
         <ToolbarButton icon={Bold} label="Negrito (Ctrl+B)" onClick={() => wrapSelection("*")} />
         <ToolbarButton icon={Italic} label="Itálico (Ctrl+I)" onClick={() => wrapSelection("_")} />
-        <ToolbarButton icon={Code} label="Código (Ctrl+E)" onClick={() => wrapSelection("`")} />
+        <ToolbarButton icon={Strikethrough} label="Tachado" onClick={() => wrapSelection("~")} />
+        <ToolbarButton icon={Code} label="Código inline (Ctrl+E)" onClick={() => wrapSelection("`")} />
+        <div className="w-px h-4 bg-border mx-0.5" />
+        {/* Estrutura — listas, quote, code block */}
+        <ToolbarButton
+          icon={List}
+          label="Lista"
+          onClick={() => prefixLines("• ")}
+        />
+        <ToolbarButton
+          icon={ListOrdered}
+          label="Lista numerada"
+          onClick={() => prefixLines((i) => `${i + 1}. `)}
+        />
+        <ToolbarButton
+          icon={Quote}
+          label="Citação"
+          onClick={() => prefixLines("> ")}
+        />
+        <ToolbarButton
+          icon={Code2}
+          label="Bloco de código"
+          onClick={() => wrapBlock("```")}
+        />
         <ToolbarButton icon={Link2} label="Link" onClick={() => wrapSelection("<", "|texto>")} />
         <div className="w-px h-4 bg-border mx-0.5" />
+        {/* Inserts */}
         <ToolbarButton icon={AtSign} label="Mencionar" onClick={() => insertAtCursor("@")} />
         <EmojiPicker onSelect={(name) => insertAtCursor(`:${name}: `)} />
         <ToolbarButton
@@ -340,9 +414,11 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
 
       <div className="flex items-center justify-between mt-2">
         <p className="text-[10px] text-muted-foreground">
-          <span className="font-mono">*bold*</span>{" · "}
-          <span className="font-mono">_italic_</span>{" · "}
+          <span className="font-mono">*B*</span>{" · "}
+          <span className="font-mono">_I_</span>{" · "}
+          <span className="font-mono">~S~</span>{" · "}
           <span className="font-mono">`code`</span>{" · "}
+          <span className="font-mono">{"> quote"}</span>{" · "}
           <kbd className="px-1 rounded bg-background border text-[9px]">Ctrl+Enter</kbd>
           {files.length > 0 && (
             <span className="ml-2 text-primary font-medium">
