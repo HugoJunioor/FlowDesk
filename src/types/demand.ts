@@ -52,12 +52,34 @@ export interface SlackUser {
   avatar: string;
 }
 
+/** Arquivo anexado a uma mensagem Slack (msg.files[i] da API). */
+export interface SlackFile {
+  /** ID do file no Slack (ex: F12345ABC) */
+  id: string;
+  /** Nome original */
+  name: string;
+  /** MIME type (ex: image/png, application/pdf) */
+  mimetype: string;
+  /** Tamanho em bytes */
+  size: number;
+  /** URL privada (precisa de token Bot pra acessar) */
+  urlPrivate?: string;
+  /** Thumbnail 360px (imagens) — geralmente publica */
+  thumb360?: string;
+  /** Preview text (truncated) — pra docs/code snippets */
+  preview?: string;
+  /** Pode ser baixado direto sem auth (raro mas acontece) */
+  isPublic?: boolean;
+}
+
 export interface ThreadReply {
   author: string;
   text: string;
   timestamp: string;
   isTeamMember: boolean;
   hasCheckReaction?: boolean;
+  /** Arquivos anexados nessa reply */
+  files?: SlackFile[];
 }
 
 export interface ClosureAttachment {
@@ -105,6 +127,8 @@ export interface SlackDemand {
   slackPermalink: string;
   replies: number;
   threadReplies: ThreadReply[];
+  /** Arquivos anexados na mensagem original (raiz da thread) */
+  files?: SlackFile[];
   lastTeamReply?: {
     author: string;
     text: string;
