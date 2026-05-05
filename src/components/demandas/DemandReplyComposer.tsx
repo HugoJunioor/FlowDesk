@@ -264,14 +264,11 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-        <Send size={12} className="text-primary" />
-        Responder em <span className="font-medium text-foreground">{demand.slackChannel}</span>
-        <span className="text-muted-foreground/60">· thread</span>
-        {dragOver && (
-          <span className="ml-auto text-primary font-medium animate-pulse">Solte os arquivos aqui</span>
-        )}
-      </div>
+      {dragOver && (
+        <div className="text-xs text-primary font-medium animate-pulse mb-2 text-center">
+          Solte os arquivos aqui
+        </div>
+      )}
 
       {/* Toolbar — paridade com Slack mrkdwn */}
       <div className="flex items-center gap-0.5 mb-1.5 px-1 flex-wrap">
@@ -412,20 +409,12 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-2">
-        <p className="text-[10px] text-muted-foreground">
-          <span className="font-mono">*B*</span>{" · "}
-          <span className="font-mono">_I_</span>{" · "}
-          <span className="font-mono">~S~</span>{" · "}
-          <span className="font-mono">`code`</span>{" · "}
-          <span className="font-mono">{"> quote"}</span>{" · "}
-          <kbd className="px-1 rounded bg-background border text-[9px]">Ctrl+Enter</kbd>
-          {files.length > 0 && (
-            <span className="ml-2 text-primary font-medium">
-              {files.length} anexo{files.length > 1 ? "s" : ""}
-            </span>
-          )}
-        </p>
+      <div className="flex items-center justify-end mt-2 gap-2">
+        {files.length > 0 && (
+          <span className="text-[10px] text-primary font-medium">
+            {files.length} anexo{files.length > 1 ? "s" : ""}
+          </span>
+        )}
         <Button size="sm" disabled={!canSend} onClick={handleSend} className="gap-1.5 h-8">
           {sending ? (
             <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />

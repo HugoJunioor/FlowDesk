@@ -20,6 +20,8 @@ import CopyLinkButton from "./CopyLinkButton";
 import DemandReplyComposer from "./DemandReplyComposer";
 import SlackFilesList from "./SlackFilesList";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiClient, ApiError } from "@/lib/apiClient";
+import { toast } from "sonner";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -132,6 +134,39 @@ const DemandDetailSheet = ({
 
   const formatDate = (iso: string) =>
     format(new Date(iso), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
+
+  // Edit/delete handlers — backend (chat.update / chat.delete via flowdesk-api)
+  const handleEditReply = async (reply: { text: string; timestamp: string }) => {
+    const newText = window.prompt("Editar mensagem:", reply.text);
+    if (newText === null || newText.trim() === "" || newText === reply.text) return;
+    try {
+      // ts no Slack eh derivado do timestamp via permalink — em commit futuro
+      // passamos o ts direto. Por hora, busca via permalink.
+      await apiClient.slack.editReply({
+        permalink: demand.slackPermalink,
+        replyTimestamp: reply.timestamp,
+        newText,
+      });
+      toast.success("Mensagem atualizada no Slack");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : (err as Error).message;
+      toast.error("Falha ao editar", { description: msg });
+    }
+  };
+
+  const handleDeleteReply = async (reply: { text: string; timestamp: string }) => {
+    if (!window.confirm(`Excluir mensagem?\n\n"${reply.text.slice(0, 100)}${reply.text.length > 100 ? "..." : ""}"`)) return;
+    try {
+      await apiClient.slack.deleteReply({
+        permalink: demand.slackPermalink,
+        replyTimestamp: reply.timestamp,
+      });
+      toast.success("Mensagem excluída do Slack");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : (err as Error).message;
+      toast.error("Falha ao excluir", { description: msg });
+    }
+  };
 
   // Combina replies reais (do sync) + otimistas (enviadas localmente, ainda nao sincronizadas)
   // Se o sync proximo trouxer o ts da otimista, removemos auto-magicamente.
@@ -435,66 +470,6 @@ const DemandDetailSheet = ({
             );
           })()}
 
-          {/* Thread replies timeline + composer logo abaixo */}
-          <div>
-            <p className="text-xs text-muted-foreground font-medium mb-2">
-              Respostas da thread ({mergedReplies.length})
-              {optimisticReplies.length > 0 && (
-                <span className="ml-1.5 text-[10px] text-warning">
-                  · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""} de sync
-                </span>
-              )}
-            </p>
-            {mergedReplies.length > 0 && (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
-                {mergedReplies.map((reply, i) => {
-                  const isOptimistic = "pendingTs" in reply;
-                  return (
-                    <div
-                      key={i}
-                      className={`p-2.5 rounded-lg text-[11px] transition-opacity ${
-                        reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"
-                      } ${isOptimistic ? "opacity-70 ring-1 ring-warning/40" : ""}`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
-                          {reply.author}
-                          {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
-                          {isOptimistic && <span className="text-[9px] font-normal text-warning ml-1">(enviando...)</span>}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{reply.text}</p>
-                      {"files" in reply && reply.files && reply.files.length > 0 && (
-                        <SlackFilesList files={reply.files} compact />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {/* Composer inline — logo apos a thread (UX: leu, ja responde) */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <DemandReplyComposer
-                demand={demand}
-                onReplied={(text, ts) => {
-                  // Optimistic: adiciona na lista imediatamente
-                  setOptimisticReplies((prev) => [...prev, {
-                    author: currentUserName,
-                    text,
-                    timestamp: new Date().toISOString(),
-                    isTeamMember: true,
-                    pendingTs: ts,
-                  }]);
-                }}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
           {/* Descricao */}
           <div>
             <p className="text-xs text-muted-foreground font-medium mb-1.5">Descricao</p>
@@ -568,6 +543,88 @@ const DemandDetailSheet = ({
               )}
             </div>
           )}
+
+          <Separator />
+
+          {/* Thread replies + composer (apos descricao + detalhes pra contexto) */}
+          <div>
+            <p className="text-xs text-muted-foreground font-medium mb-2">
+              Respostas da thread ({mergedReplies.length})
+              {optimisticReplies.length > 0 && (
+                <span className="ml-1.5 text-[10px] text-warning">
+                  · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""} de sync
+                </span>
+              )}
+            </p>
+            {mergedReplies.length > 0 && (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
+                {mergedReplies.map((reply, i) => {
+                  const isOptimistic = "pendingTs" in reply;
+                  const isOwn = reply.isTeamMember && reply.author === currentUserName;
+                  return (
+                    <div
+                      key={i}
+                      className={`group p-2.5 rounded-lg text-[11px] transition-opacity ${
+                        reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"
+                      } ${isOptimistic ? "opacity-70 ring-1 ring-warning/40" : ""}`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
+                          {reply.author}
+                          {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
+                          {isOptimistic && <span className="text-[9px] font-normal text-warning ml-1">(enviando...)</span>}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Acoes em mensagens proprias enviadas pelo Slack */}
+                          {isOwn && !isOptimistic && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                className="text-[10px] text-muted-foreground hover:text-primary"
+                                onClick={() => handleEditReply(reply)}
+                                title="Editar mensagem"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="text-[10px] text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDeleteReply(reply)}
+                                title="Excluir mensagem"
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{reply.text}</p>
+                      {"files" in reply && reply.files && reply.files.length > 0 && (
+                        <SlackFilesList files={reply.files} compact />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <DemandReplyComposer
+                demand={demand}
+                onReplied={(text, ts) => {
+                  setOptimisticReplies((prev) => [...prev, {
+                    author: currentUserName,
+                    text,
+                    timestamp: new Date().toISOString(),
+                    isTeamMember: true,
+                    pendingTs: ts,
+                  }]);
+                }}
+              />
+            </div>
+          </div>
 
           <Separator />
 
