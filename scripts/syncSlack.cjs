@@ -414,6 +414,41 @@ async function main() {
     await new Promise(r => setTimeout(r, 500));
   }
 
+  // === FILTRO POR ROTEAMENTO DE CANAIS ===
+  // Le fd_channel_routing do shared-state.json (configurado via UI).
+  // Mantem so demandas de canais marcados como "demandas" (geral) ou
+  // sem cadastro com defaultRoute = demandas.
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const stateFile = path.join(__dirname, '..', 'data', 'shared-state.json');
+    if (fs.existsSync(stateFile)) {
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      const routing = state.fd_channel_routing;
+      if (routing && Array.isArray(routing.channels)) {
+        const ruleByName = new Map(
+          routing.channels.map((c) => [c.name.toLowerCase(), c.routeTo])
+        );
+        const defaultRoute = routing.defaultRoute || 'demandas';
+        const before = allDemands.length;
+        allDemands = allDemands.filter((d) => {
+          const ch = (d.slackChannel || '').replace(/^#/, '').toLowerCase();
+          const route = ruleByName.get(ch) ?? (
+            /^cliente-/i.test(ch) ? 'demandas' :
+            /^opera[çc][õo]es-sql$/i.test(ch) ? 'sql' :
+            defaultRoute
+          );
+          return route === 'demandas';
+        });
+        if (before !== allDemands.length) {
+          console.log(`Roteamento aplicado: ${before} -> ${allDemands.length} demandas (geral)`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Roteamento nao aplicado (shared-state nao acessivel):', err.message);
+  }
+
   allDemands.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // === ANALISE DE STATUS ===
