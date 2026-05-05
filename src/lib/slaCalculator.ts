@@ -18,6 +18,28 @@ import {
 /** Meta de SLA (em %) usada nos paineis e graficos. */
 export const SLA_TARGET_PERCENT = 80;
 
+/**
+ * Motivos de expiracao que NAO penalizam o SLA da Just.
+ * Quando o atraso eh culpa do cliente (nao respondeu, demora pra validar)
+ * ou de terceiros, a demanda nao deve aparecer na metrica de breach.
+ *
+ * Edite essa lista pra ajustar a regra de negocio.
+ */
+export const SLA_RESOLUTION_EXCLUSION_REASONS = [
+  "Falta de retorno do cliente",
+  "Demora no retorno do cliente",
+  "Demora para validar a correcao",
+] as const;
+
+/** True se o motivo de expiracao da demanda eh culpa externa (nao penaliza SLA). */
+export function isResolutionSlaExcluded(d: SlackDemand): boolean {
+  const reason =
+    d.closure?.expirationReason ||
+    (d.expirationReason as string | undefined);
+  if (!reason) return false;
+  return (SLA_RESOLUTION_EXCLUSION_REASONS as readonly string[]).includes(reason);
+}
+
 /** Converte "15 min" / "1 hora" / "4 horas" em minutos. */
 export function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -34,6 +56,9 @@ export function parseResponseSla(sla: string): number {
  * - Expirada: sempre false
  */
 export function isSlaCompliant(d: SlackDemand): boolean {
+  // Atrasos por culpa externa (cliente nao respondeu, demora p/ validar)
+  // nao contam contra a Just — tratamos como compliant.
+  if (isResolutionSlaExcluded(d)) return true;
   if (d.slaResolutionStatus === "atendido") return true;
   if (d.slaResolutionStatus === "expirado") return false;
   if (d.priority === "sem_classificacao") return true;
@@ -53,6 +78,8 @@ export function isSlaCompliant(d: SlackDemand): boolean {
 
 /** SLA foi ESTOURADO? (inverso logico de compliant, mas explicito pra clareza) */
 export function isSlaBreached(d: SlackDemand): boolean {
+  // Atrasos por culpa externa (cliente, validacao do cliente) nao contam.
+  if (isResolutionSlaExcluded(d)) return false;
   if (d.slaResolutionStatus) return d.slaResolutionStatus === "expirado";
   if (d.priority === "sem_classificacao") return false;
   const config = PRIORITY_CONFIG[d.priority];
@@ -86,6 +113,8 @@ export interface DemandMetrics {
   slaResolutionOk: number;
   slaResolutionBreach: number;
   slaResolutionTotal: number;
+  /** Demandas excluidas do calculo (motivo de expiracao por culpa externa) */
+  slaResolutionExcluded: number;
   /** SLA de 1a resposta */
   slaFirstResponseRate: number;
   slaFirstResponseOk: number;
@@ -116,9 +145,16 @@ export function computeDemandMetrics(demands: SlackDemand[]): DemandMetrics {
   );
 
   // === SLA Resolucao ===
+  // Demandas com motivo de expiracao por culpa externa (cliente) sao
+  // EXCLUIDAS do calculo — nao contam nem como ok nem como breach.
   let slaResOk = 0;
   let slaResBreach = 0;
+  let slaResExcluded = 0;
   for (const d of withSla) {
+    if (isResolutionSlaExcluded(d)) {
+      slaResExcluded++;
+      continue;
+    }
     if (d.slaResolutionStatus === "atendido") {
       slaResOk++;
     } else if (d.slaResolutionStatus === "expirado") {
@@ -184,6 +220,7 @@ export function computeDemandMetrics(demands: SlackDemand[]): DemandMetrics {
     slaResolutionOk: slaResOk,
     slaResolutionBreach: slaResBreach,
     slaResolutionTotal,
+    slaResolutionExcluded: slaResExcluded,
     slaFirstResponseRate,
     slaFirstResponseOk: slaRespOk,
     slaFirstResponseBreach: slaRespBreach,
