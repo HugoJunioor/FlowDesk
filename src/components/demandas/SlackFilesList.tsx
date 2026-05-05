@@ -1,15 +1,15 @@
 /**
  * Renderiza arquivos anexados a uma mensagem Slack.
  *
- * Formato visual:
- * - Imagens (mimetype image/*): thumb 360 inline + click pra abrir grande
- * - PDFs: chip com icone de arquivo + nome + tamanho + botao baixar
- * - Outros: chip generico + baixar
- *
- * Download de arquivo Slack precisa do token Bot (urlPrivate so abre com auth).
- * Em prod, o flowdesk-api proxia o download via GET /slack/file?id=X.
- * Em demo (sem flowdesk-api configurada), mostra o chip mas sem download real.
+ * Visual:
+ * - Imagens (mimetype image/*): thumb pequeno; click abre tamanho real.
+ *   Se thumb falha carregar (URL privada do Slack sem proxy backend
+ *   configurado), renderiza como chip generico, mantendo proporcao
+ *   visual com outros arquivos.
+ * - Outros (PDF, video, doc, zip): chip compacto com icone + nome
+ *   + tamanho + botao baixar.
  */
+import { useState } from "react";
 import { Download, FileText, Image as ImageIcon, FileVideo, FileArchive, File } from "lucide-react";
 import type { SlackFile } from "@/types/demand";
 
@@ -36,87 +36,78 @@ function iconForMime(mimetype: string) {
 /** URL pra baixar o arquivo. Usa flowdesk-api proxy em prod, ou direto se isPublic. */
 function downloadUrl(file: SlackFile): string {
   if (file.isPublic && file.urlPrivate) return file.urlPrivate;
-  // Backend proxy (precisa flowdesk-api configurada)
   const apiBase =
     import.meta.env.VITE_FLOWDESK_API_URL ??
     "https://flowdesk-api-production-21cf.up.railway.app";
   return `${apiBase}/slack/file/${encodeURIComponent(file.id)}`;
 }
 
+const FileChip = ({ file, compact }: { file: SlackFile; compact?: boolean }) => {
+  const Icon = iconForMime(file.mimetype);
+  return (
+    <a
+      href={downloadUrl(file)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-center gap-1.5 bg-muted/50 hover:bg-muted border border-border rounded-md transition-colors ${
+        compact ? "px-1.5 py-1 text-[11px]" : "px-2 py-1.5 text-xs"
+      }`}
+      title={`${file.name} (${formatBytes(file.size)})`}
+    >
+      <Icon size={compact ? 12 : 13} className="text-primary shrink-0" />
+      <span className={`truncate ${compact ? "max-w-[140px]" : "max-w-[200px]"}`}>{file.name}</span>
+      <span className="text-muted-foreground text-[10px]">{formatBytes(file.size)}</span>
+      <Download size={compact ? 10 : 11} className="opacity-50 shrink-0" />
+    </a>
+  );
+};
+
+const ImageThumb = ({ file, compact }: { file: SlackFile; compact?: boolean }) => {
+  const [errored, setErrored] = useState(false);
+  // Se a imagem falhar carregar (URL protegida sem proxy), cai no chip
+  if (errored || !file.thumb360) return <FileChip file={file} compact={compact} />;
+
+  return (
+    <a
+      href={downloadUrl(file)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative block overflow-hidden rounded-md border border-border hover:border-primary/50 transition-colors"
+      title={`${file.name} (${formatBytes(file.size)})`}
+    >
+      <img
+        src={file.thumb360}
+        alt={file.name}
+        onError={() => setErrored(true)}
+        className={
+          compact
+            ? "h-12 w-auto max-w-[80px] object-cover"
+            : "h-16 w-auto max-w-[120px] object-cover"
+        }
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+        <Download
+          size={compact ? 12 : 14}
+          className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
+        />
+      </div>
+    </a>
+  );
+};
+
 const SlackFilesList = ({ files, compact = false }: SlackFilesListProps) => {
   if (!files || files.length === 0) return null;
 
-  // Separa imagens (renderizadas grandes) das demais (chips compactos)
-  const images = files.filter((f) => f.mimetype.startsWith("image/"));
-  const others = files.filter((f) => !f.mimetype.startsWith("image/"));
-
+  // Tudo lado a lado — imagens e chips no mesmo flex wrap pra harmonizar tamanho
   return (
-    <div className={compact ? "space-y-1.5 mt-1.5" : "space-y-2 mt-2"}>
-      {/* Imagens — thumbs lado a lado */}
-      {images.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {images.map((f) => (
-            <a
-              key={f.id}
-              href={downloadUrl(f)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative block overflow-hidden rounded-md border border-border hover:border-primary/50 transition-colors"
-              title={`${f.name} (${formatBytes(f.size)})`}
-            >
-              {f.thumb360 ? (
-                <img
-                  src={f.thumb360}
-                  alt={f.name}
-                  className={
-                    compact
-                      ? "h-20 w-auto max-w-[160px] object-cover"
-                      : "h-32 w-auto max-w-[240px] object-cover"
-                  }
-                  loading="lazy"
-                />
-              ) : (
-                <div className={
-                  compact
-                    ? "h-20 w-32 bg-muted flex items-center justify-center"
-                    : "h-32 w-48 bg-muted flex items-center justify-center"
-                }>
-                  <ImageIcon size={compact ? 20 : 28} className="text-muted-foreground" />
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                <Download
-                  size={compact ? 14 : 18}
-                  className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow"
-                />
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
-
-      {/* Outros arquivos — chips */}
-      {others.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {others.map((f) => {
-            const Icon = iconForMime(f.mimetype);
-            return (
-              <a
-                key={f.id}
-                href={downloadUrl(f)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-muted/50 hover:bg-muted border border-border rounded-md px-2 py-1.5 text-xs transition-colors"
-                title={`${f.name} (${formatBytes(f.size)})`}
-              >
-                <Icon size={13} className="text-primary shrink-0" />
-                <span className="truncate max-w-[200px]">{f.name}</span>
-                <span className="text-muted-foreground text-[10px]">{formatBytes(f.size)}</span>
-                <Download size={11} className="opacity-50 shrink-0" />
-              </a>
-            );
-          })}
-        </div>
+    <div className={`flex flex-wrap gap-1.5 ${compact ? "mt-1.5" : "mt-2"}`}>
+      {files.map((f) =>
+        f.mimetype.startsWith("image/") ? (
+          <ImageThumb key={f.id} file={f} compact={compact} />
+        ) : (
+          <FileChip key={f.id} file={f} compact={compact} />
+        )
       )}
     </div>
   );

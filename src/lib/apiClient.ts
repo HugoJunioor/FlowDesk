@@ -120,6 +120,18 @@ export const apiClient = {
         files: params.files.map(() => ({ ok: true })),
       });
     },
+    editReply: (body: { permalink: string; replyTimestamp: string; newText: string }) =>
+      request<{ ok: boolean }>("/slack/edit", {
+        method: "POST",
+        body: JSON.stringify(body),
+        demoFallback: { ok: true },
+      }),
+    deleteReply: (body: { permalink: string; replyTimestamp: string }) =>
+      request<{ ok: boolean }>("/slack/delete", {
+        method: "POST",
+        body: JSON.stringify(body),
+        demoFallback: { ok: true },
+      }),
     status: () =>
       request<{ enabled: boolean; team?: string; user?: string; error?: string }>(
         "/slack/status",
