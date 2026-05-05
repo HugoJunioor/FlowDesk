@@ -286,29 +286,31 @@ async function handleSlack(req, res) {
         channel = parsed.channel; thread_ts = parsed.thread_ts;
       }
 
-      // Busca user no Slack pelo email pra postar com identidade real
-      let postAs = {};
+      // Atribuicao do remetente: bot posta MAS prefixa a mensagem com
+      // <@SLACK_USER_ID> (mention real do remetente). Visualmente indica
+      // quem originou a mensagem via FlowDesk. Funciona sem o scope
+      // chat:write.customize (que o Slack restringiu).
+      let finalText = body.text;
+      let postedAs;
       if (body.senderEmail) {
         try {
           const lookup = await slackApi("users.lookupByEmail", { email: body.senderEmail }, true);
-          if (lookup.user) {
-            postAs = {
-              username: lookup.user.real_name || lookup.user.profile?.display_name || lookup.user.name,
-              icon_url: lookup.user.profile?.image_72 || lookup.user.profile?.image_48,
-            };
+          if (lookup.user?.id) {
+            finalText = `<@${lookup.user.id}>\n${body.text}`;
+            postedAs = lookup.user.real_name || lookup.user.profile?.display_name || lookup.user.name;
           }
-        } catch { /* fallback: posta como bot mesmo */ }
+        } catch { /* email nao bate com nenhum user — posta sem atribuicao */ }
       }
 
       const r = await slackApi("chat.postMessage", {
-        channel, thread_ts, text: body.text, ...postAs,
+        channel, thread_ts, text: finalText,
       });
       let permalink;
       try {
         const link = await slackApi("chat.getPermalink", { channel, message_ts: r.ts }, true);
         permalink = link.permalink;
       } catch { /* ignore */ }
-      return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink, postedAs: postAs.username }));
+      return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink, postedAs }));
     }
 
     // GET /slack/channel-members?channel=C123 — lista membros pra mention autocomplete
