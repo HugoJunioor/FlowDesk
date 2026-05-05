@@ -19,6 +19,7 @@ import ExpirationCountdown from "./ExpirationCountdown";
 import CopyLinkButton from "./CopyLinkButton";
 import DemandReplyComposer from "./DemandReplyComposer";
 import SlackFilesList from "./SlackFilesList";
+import { useAuth } from "@/contexts/AuthContext";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -63,6 +64,8 @@ const DemandDetailSheet = ({
   onAddExpirationReason,
   onTaskLinkChange,
 }: DemandDetailSheetProps) => {
+  const { currentUser } = useAuth();
+  const currentUserName = currentUser?.name || currentUser?.login || "Equipe";
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
@@ -79,6 +82,16 @@ const DemandDetailSheet = ({
   const [showTaskEdit, setShowTaskEdit] = useState(false);
   const [taskLinkDraft, setTaskLinkDraft] = useState("");
 
+  // Replies otimistas — enviadas via composer, aparecem na thread imediatamente
+  // antes do proximo sync. Limpa quando troca de demanda ou re-sync traz a real.
+  const [optimisticReplies, setOptimisticReplies] = useState<Array<{
+    author: string;
+    text: string;
+    timestamp: string;
+    isTeamMember: boolean;
+    pendingTs: string;
+  }>>([]);
+
   // Reset forms when demand changes
   useEffect(() => {
     setShowCompleteForm(false);
@@ -91,6 +104,7 @@ const DemandDetailSheet = ({
     setShowTaskEdit(false);
     setTaskLinkDraft(demand?.taskLink || "");
     setCompleteObservation("");
+    setOptimisticReplies([]); // limpa otimistas ao trocar demanda
     if (demand) {
       const now = new Date();
       setCompleteDate(format(now, "yyyy-MM-dd"));
@@ -118,6 +132,17 @@ const DemandDetailSheet = ({
 
   const formatDate = (iso: string) =>
     format(new Date(iso), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
+
+  // Combina replies reais (do sync) + otimistas (enviadas localmente, ainda nao sincronizadas)
+  // Se o sync proximo trouxer o ts da otimista, removemos auto-magicamente.
+  const mergedReplies = (() => {
+    const real = demand.threadReplies || [];
+    const realTexts = new Set(real.map((r) => `${r.author}|${r.text}`));
+    const stillPending = optimisticReplies.filter(
+      (o) => !realTexts.has(`${o.author}|${o.text}`)
+    );
+    return [...real, ...stillPending];
+  })();
 
   const handleStatusChange = (newStatus: string) => {
     if (newStatus === "concluida") {
@@ -411,38 +436,62 @@ const DemandDetailSheet = ({
           })()}
 
           {/* Thread replies timeline + composer logo abaixo */}
-          {(demand.threadReplies.length > 0 || true) && (
-            <div>
-              <p className="text-xs text-muted-foreground font-medium mb-2">
-                Respostas da thread ({demand.threadReplies.length})
-              </p>
-              {demand.threadReplies.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
-                  {demand.threadReplies.map((reply, i) => (
-                    <div key={i} className={`p-2.5 rounded-lg text-[11px] ${reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"}`}>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium mb-2">
+              Respostas da thread ({mergedReplies.length})
+              {optimisticReplies.length > 0 && (
+                <span className="ml-1.5 text-[10px] text-warning">
+                  · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""} de sync
+                </span>
+              )}
+            </p>
+            {mergedReplies.length > 0 && (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
+                {mergedReplies.map((reply, i) => {
+                  const isOptimistic = "pendingTs" in reply;
+                  return (
+                    <div
+                      key={i}
+                      className={`p-2.5 rounded-lg text-[11px] transition-opacity ${
+                        reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"
+                      } ${isOptimistic ? "opacity-70 ring-1 ring-warning/40" : ""}`}
+                    >
                       <div className="flex items-center justify-between mb-0.5">
                         <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
                           {reply.author}
                           {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
+                          {isOptimistic && <span className="text-[9px] font-normal text-warning ml-1">(enviando...)</span>}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
                           {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
                         </span>
                       </div>
-                      <p className="text-muted-foreground leading-relaxed">{reply.text}</p>
-                      {reply.files && reply.files.length > 0 && (
+                      <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{reply.text}</p>
+                      {"files" in reply && reply.files && reply.files.length > 0 && (
                         <SlackFilesList files={reply.files} compact />
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-              {/* Composer inline — logo apos a thread (UX: leu, ja responde) */}
-              <div className="rounded-lg border border-border overflow-hidden">
-                <DemandReplyComposer demand={demand} />
+                  );
+                })}
               </div>
+            )}
+            {/* Composer inline — logo apos a thread (UX: leu, ja responde) */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <DemandReplyComposer
+                demand={demand}
+                onReplied={(text, ts) => {
+                  // Optimistic: adiciona na lista imediatamente
+                  setOptimisticReplies((prev) => [...prev, {
+                    author: currentUserName,
+                    text,
+                    timestamp: new Date().toISOString(),
+                    isTeamMember: true,
+                    pendingTs: ts,
+                  }]);
+                }}
+              />
             </div>
-          )}
+          </div>
 
           <Separator />
 
