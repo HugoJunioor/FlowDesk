@@ -178,9 +178,10 @@ const DemandDetailSheet = ({
         <div className="flex-1 overflow-y-auto px-6 py-4 max-w-4xl w-full mx-auto">
 
         <div className="space-y-3">
-          {/* Tempo restante + Status pareados em telas largas */}
+          {/* Layout 2-col: esq = Tempo + Responsavel + Status; dir = Prioridade + Deteccao */}
           {(() => {
             const showCountdown = demand.priority !== "sem_classificacao" && demand.status !== "concluida";
+
             const countdownBlock = showCountdown ? (
               <div className="p-3 rounded-lg bg-muted/50">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
@@ -194,6 +195,80 @@ const DemandDetailSheet = ({
                 />
               </div>
             ) : null;
+
+            const responsavelBlock = (
+              <div className="p-3 rounded-lg border border-border">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <UserCog size={14} className="text-primary" />
+                  <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
+                </div>
+                <Select
+                  value={demand.assignee?.name || "_none_"}
+                  onValueChange={(v) => {
+                    if (v === "__add_new__") {
+                      setShowAddAssignee(true);
+                      setTimeout(() => newAssigneeRef.current?.focus(), 100);
+                    } else {
+                      onAssigneeChange(demand.id, v === "_none_" ? null : v);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full h-9 text-sm">
+                    <SelectValue placeholder="Sem responsavel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none_">Sem responsavel</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                    <SelectItem value="__add_new__">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        <Plus size={12} /> Adicionar responsavel...
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {showAddAssignee && (
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      ref={newAssigneeRef}
+                      placeholder="Nome do responsavel"
+                      className="h-9 flex-1"
+                      value={newAssigneeName}
+                      onChange={(e) => setNewAssigneeName(e.target.value)}
+                      maxLength={50}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newAssigneeName.trim()) {
+                          onAddAssignee(newAssigneeName.trim());
+                          onAssigneeChange(demand.id, newAssigneeName.trim());
+                          setNewAssigneeName("");
+                          setShowAddAssignee(false);
+                        }
+                        if (e.key === "Escape") setShowAddAssignee(false);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-9 text-xs"
+                      disabled={!newAssigneeName.trim()}
+                      onClick={() => {
+                        if (newAssigneeName.trim()) {
+                          onAddAssignee(newAssigneeName.trim());
+                          onAssigneeChange(demand.id, newAssigneeName.trim());
+                          setNewAssigneeName("");
+                          setShowAddAssignee(false);
+                        }
+                      }}
+                    >
+                      Adicionar
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setShowAddAssignee(false)}>
+                      <X size={14} />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
 
             const statusBlock = (
               <div className="p-3 rounded-lg border border-border">
@@ -253,164 +328,87 @@ const DemandDetailSheet = ({
               </div>
             );
 
-            return showCountdown ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {countdownBlock}
-                {statusBlock}
-              </div>
-            ) : (
-              statusBlock
-            );
-          })()}
-
-          {/* Responsavel + Prioridade lado a lado em telas largas */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* Responsavel */}
-          <div className="p-3 rounded-lg border border-border">
-            <div className="flex items-center gap-1.5 mb-2">
-              <UserCog size={14} className="text-primary" />
-              <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
-            </div>
-            <Select
-              value={demand.assignee?.name || "_none_"}
-              onValueChange={(v) => {
-                if (v === "__add_new__") {
-                  setShowAddAssignee(true);
-                  setTimeout(() => newAssigneeRef.current?.focus(), 100);
-                } else {
-                  onAssigneeChange(demand.id, v === "_none_" ? null : v);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full h-9 text-sm">
-                <SelectValue placeholder="Sem responsavel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none_">Sem responsavel</SelectItem>
-                {assignees.map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
-                ))}
-                <SelectItem value="__add_new__">
-                  <span className="flex items-center gap-1.5 text-primary">
-                    <Plus size={12} /> Adicionar responsavel...
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            {showAddAssignee && (
-              <div className="mt-2 flex gap-2">
-                <Input
-                  ref={newAssigneeRef}
-                  placeholder="Nome do responsavel"
-                  className="h-9 flex-1"
-                  value={newAssigneeName}
-                  onChange={(e) => setNewAssigneeName(e.target.value)}
-                  maxLength={50}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newAssigneeName.trim()) {
-                      onAddAssignee(newAssigneeName.trim());
-                      onAssigneeChange(demand.id, newAssigneeName.trim());
-                      setNewAssigneeName("");
-                      setShowAddAssignee(false);
-                    }
-                    if (e.key === "Escape") setShowAddAssignee(false);
-                  }}
-                />
-                <Button
-                  size="sm"
-                  className="h-9 text-xs"
-                  disabled={!newAssigneeName.trim()}
-                  onClick={() => {
-                    if (newAssigneeName.trim()) {
-                      onAddAssignee(newAssigneeName.trim());
-                      onAssigneeChange(demand.id, newAssigneeName.trim());
-                      setNewAssigneeName("");
-                      setShowAddAssignee(false);
-                    }
-                  }}
-                >
-                  Adicionar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 text-xs"
-                  onClick={() => setShowAddAssignee(false)}
-                >
-                  <X size={14} />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Prioridade - editavel */}
-          <div className="p-3 rounded-lg border border-border">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Signal size={14} className="text-primary" />
-              <p className="text-xs text-muted-foreground font-medium">Prioridade</p>
-            </div>
-            <Select value={demand.priority} onValueChange={(v) => onPriorityChange(demand.id, v as DemandPriority)}>
-              <SelectTrigger className={`w-full h-9 text-sm font-medium ${priority.color}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="p1">P1 - Critico</SelectItem>
-                <SelectItem value="p2">P2 - Alta</SelectItem>
-                <SelectItem value="p3">P3 - Media</SelectItem>
-                <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Auto classification info */}
-            {demand.autoClassification && (
-              <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Sparkles size={12} className="text-primary" />
-                  <span className="text-[11px] font-semibold text-primary">Classificacao automatica</span>
-                  <Badge variant="secondary" className="text-[9px] ml-auto">
-                    {demand.autoClassification.confidence === "alta" ? "Alta confianca" :
-                     demand.autoClassification.confidence === "media" ? "Media confianca" : "Baixa confianca"}
-                  </Badge>
+            const prioridadeBlock = (
+              <div className="p-3 rounded-lg border border-border">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Signal size={14} className="text-primary" />
+                  <p className="text-xs text-muted-foreground font-medium">Prioridade</p>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {demand.autoClassification.reason}
-                </p>
-                {demand.autoClassification.matchedKeywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {demand.autoClassification.matchedKeywords.slice(0, 5).map((kw) => (
-                      <span key={kw} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                        {kw}
-                      </span>
-                    ))}
+                <Select value={demand.priority} onValueChange={(v) => onPriorityChange(demand.id, v as DemandPriority)}>
+                  <SelectTrigger className={`w-full h-9 text-sm font-medium ${priority.color}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="p1">P1 - Critico</SelectItem>
+                    <SelectItem value="p2">P2 - Alta</SelectItem>
+                    <SelectItem value="p3">P3 - Media</SelectItem>
+                    <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
+                  </SelectContent>
+                </Select>
+                {demand.autoClassification && (
+                  <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Sparkles size={12} className="text-primary" />
+                      <span className="text-[11px] font-semibold text-primary">Classificacao automatica</span>
+                      <Badge variant="secondary" className="text-[9px] ml-auto">
+                        {demand.autoClassification.confidence === "alta" ? "Alta confianca" :
+                         demand.autoClassification.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {demand.autoClassification.reason}
+                    </p>
+                    {demand.autoClassification.matchedKeywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {demand.autoClassification.matchedKeywords.slice(0, 5).map((kw) => (
+                          <span key={kw} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-          </div>
+            );
 
-          {/* Status analysis */}
-          {demand.statusAnalysis && (
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Sparkles size={12} className="text-primary" />
-                <span className="text-[11px] font-semibold text-primary">Deteccao automatica de status</span>
-                <Badge variant="secondary" className="text-[9px] ml-auto">
-                  {demand.statusAnalysis.confidence === "alta" ? "Alta confianca" :
-                   demand.statusAnalysis.confidence === "media" ? "Media confianca" : "Baixa confianca"}
-                </Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {demand.statusAnalysis.reason}
-              </p>
-              {demand.manualStatusOverride && (
-                <p className="text-[10px] text-warning mt-1 flex items-center gap-1">
-                  <Info size={10} /> Status foi alterado manualmente (override)
+            const deteccaoBlock = demand.statusAnalysis ? (
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Sparkles size={12} className="text-primary" />
+                  <span className="text-[11px] font-semibold text-primary">Deteccao automatica de status</span>
+                  <Badge variant="secondary" className="text-[9px] ml-auto">
+                    {demand.statusAnalysis.confidence === "alta" ? "Alta confianca" :
+                     demand.statusAnalysis.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {demand.statusAnalysis.reason}
                 </p>
-              )}
-            </div>
-          )}
+                {demand.manualStatusOverride && (
+                  <p className="text-[10px] text-warning mt-1 flex items-center gap-1">
+                    <Info size={10} /> Status foi alterado manualmente (override)
+                  </p>
+                )}
+              </div>
+            ) : null;
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Coluna esquerda: Tempo, Responsavel, Status (vertical) */}
+                <div className="space-y-3">
+                  {countdownBlock}
+                  {responsavelBlock}
+                  {statusBlock}
+                </div>
+                {/* Coluna direita: Prioridade, Deteccao (vertical) */}
+                <div className="space-y-3">
+                  {prioridadeBlock}
+                  {deteccaoBlock}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Thread replies timeline */}
           {demand.threadReplies.length > 0 && (
