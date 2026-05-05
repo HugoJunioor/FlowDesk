@@ -176,10 +176,10 @@ const DemandDetailSheet = ({
             largura total). Composer abaixo continua full width. */}
         <div className="flex-1 overflow-y-auto px-6 py-4 max-w-4xl w-full mx-auto">
 
-        <div className="space-y-5">
+        <div className="space-y-3">
           {/* Countdown */}
           {demand.priority !== "sem_classificacao" && demand.status !== "concluida" && (
-            <div className="p-4 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
               <ExpirationCountdown
                 dueDate={demand.dueDate || ""}
@@ -193,7 +193,7 @@ const DemandDetailSheet = ({
           )}
 
           {/* Responsavel */}
-          <div className="p-4 rounded-lg border border-border">
+          <div className="p-3 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <UserCog size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
@@ -272,7 +272,7 @@ const DemandDetailSheet = ({
           </div>
 
           {/* Prioridade - editavel */}
-          <div className="p-4 rounded-lg border border-border">
+          <div className="p-3 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <Signal size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Prioridade</p>
@@ -317,7 +317,7 @@ const DemandDetailSheet = ({
           </div>
 
           {/* Status */}
-          <div className="p-4 rounded-lg border border-border">
+          <div className="p-3 rounded-lg border border-border">
             <div className="flex items-center gap-1.5 mb-2">
               <Clock size={14} className="text-primary" />
               <p className="text-xs text-muted-foreground font-medium">Status</p>
@@ -520,7 +520,7 @@ const DemandDetailSheet = ({
 
             return (
               <>
-                <div className="p-4 rounded-lg border border-border space-y-4">
+                <div className="p-3 rounded-lg border border-border space-y-4">
                   <p className="text-xs text-muted-foreground font-medium">SLA - {priority.label}</p>
                   <div className="grid grid-cols-3 gap-3 text-center">
                     <div>
@@ -577,7 +577,7 @@ const DemandDetailSheet = ({
 
           {/* Closure fields */}
           {(demand.status === "concluida" || demand.status === "expirada" || demand.status === "em_andamento") && (
-            <div className="p-4 rounded-lg border border-border space-y-3">
+            <div className="p-3 rounded-lg border border-border space-y-3">
               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Layers size={14} className="text-primary" />
                 Campos de fechamento
