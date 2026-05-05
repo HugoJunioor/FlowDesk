@@ -12,6 +12,7 @@ import DemandasSql from "./pages/DemandasSql.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import UserManagement from "./pages/UserManagement.tsx";
 import GroupsManagement from "./pages/GroupsManagement.tsx";
+import ChannelRouting from "./pages/ChannelRouting.tsx";
 import Profile from "./pages/Profile.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -48,6 +49,9 @@ const AppRoutes = () => {
       )}
       {currentUser?.role === "master" && (
         <Route path="/grupos" element={<GroupsManagement />} />
+      )}
+      {currentUser?.role === "master" && (
+        <Route path="/grupos-demandas" element={<ChannelRouting />} />
       )}
       <Route path="*" element={<NotFound />} />
     </Routes>

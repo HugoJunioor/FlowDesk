@@ -11,6 +11,7 @@ import {
   Users,
   ShieldCheck,
   UserCircle,
+  Hash,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -165,6 +166,25 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               )}
               <ShieldCheck size={20} className={location.pathname === "/grupos" ? "text-sidebar-primary" : ""} />
               {!collapsed && <span>{t("nav.groups")}</span>}
+            </NavLink>
+          )}
+
+          {/* Master-only: Grupos de Demandas (roteamento de canais) */}
+          {isMaster && (
+            <NavLink
+              to="/grupos-demandas"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                location.pathname === "/grupos-demandas"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              {location.pathname === "/grupos-demandas" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
+              )}
+              <Hash size={20} className={location.pathname === "/grupos-demandas" ? "text-sidebar-primary" : ""} />
+              {!collapsed && <span>Grupos de Demandas</span>}
             </NavLink>
           )}
         </nav>

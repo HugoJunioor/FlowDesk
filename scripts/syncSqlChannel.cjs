@@ -20,17 +20,34 @@ const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 // Aceita tanto com quanto sem acento ('operacoes-sql' ou 'operações-sql')
 // Canais de operacoes que vao pro modulo SQL/Operacoes do FlowDesk.
-// 1) Sempre inclui operacoes-sql (oficial)
-// 2) Soma quaisquer canais listados em SLACK_OPS_EXTRA_CHANNELS (CSV)
-//    Use isso pra rotear novos canais que NAO sejam de cliente direto
-//    (ex: 'time-dev', 'incidentes', 'integracoes-prod').
-const CHANNEL_NAME_CANDIDATES = [
-  'operações-sql', 'operacoes-sql',
-  ...(process.env.SLACK_OPS_EXTRA_CHANNELS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
-];
+//
+// 3 fontes (juntas):
+// 1) Sempre inclui operacoes-sql (default historico)
+// 2) Soma SLACK_OPS_EXTRA_CHANNELS do .env (CSV) — fallback simples
+// 3) Soma canais com routeTo='sql' do shared-state.json (UI master)
+//    -> permite gerenciar via /grupos-demandas sem editar arquivo
+function loadCandidates() {
+  const fromEnv = (process.env.SLACK_OPS_EXTRA_CHANNELS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const fromUi = [];
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const stateFile = path.join(__dirname, '..', 'data', 'shared-state.json');
+    if (fs.existsSync(stateFile)) {
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      const routing = state.fd_channel_routing;
+      if (routing && Array.isArray(routing.channels)) {
+        for (const c of routing.channels) {
+          if (c.routeTo === 'sql') fromUi.push(c.name);
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return [...new Set(['operações-sql', 'operacoes-sql', ...fromEnv, ...fromUi])];
+}
+
+const CHANNEL_NAME_CANDIDATES = loadCandidates();
 
 function normalize(s) {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
