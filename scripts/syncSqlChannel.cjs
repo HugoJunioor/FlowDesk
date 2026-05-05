@@ -19,7 +19,18 @@ const path = require('path');
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 // Aceita tanto com quanto sem acento ('operacoes-sql' ou 'operações-sql')
-const CHANNEL_NAME_CANDIDATES = ['operações-sql', 'operacoes-sql'];
+// Canais de operacoes que vao pro modulo SQL/Operacoes do FlowDesk.
+// 1) Sempre inclui operacoes-sql (oficial)
+// 2) Soma quaisquer canais listados em SLACK_OPS_EXTRA_CHANNELS (CSV)
+//    Use isso pra rotear novos canais que NAO sejam de cliente direto
+//    (ex: 'time-dev', 'incidentes', 'integracoes-prod').
+const CHANNEL_NAME_CANDIDATES = [
+  'operações-sql', 'operacoes-sql',
+  ...(process.env.SLACK_OPS_EXTRA_CHANNELS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+];
 
 function normalize(s) {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
