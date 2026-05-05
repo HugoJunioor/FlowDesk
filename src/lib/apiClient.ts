@@ -70,6 +70,15 @@ export interface SlackReplyRequest {
   channel?: string;
   thread_ts?: string;
   text: string;
+  /** Email do user FlowDesk — usado pra postar com identidade real no Slack */
+  senderEmail?: string;
+}
+
+export interface SlackChannelMember {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
 }
 
 export interface SlackReplyResponse {
@@ -146,6 +155,11 @@ export const apiClient = {
         body: JSON.stringify(body),
         demoFallback: { ok: true },
       }),
+    channelMembers: (channel: string) =>
+      request<{ channel: string; members: SlackChannelMember[] }>(
+        `/slack/channel-members?channel=${encodeURIComponent(channel)}`,
+        { demoFallback: { channel, members: [] } }
+      ),
     status: () =>
       request<{ enabled: boolean; team?: string; user?: string; error?: string }>(
         "/slack/status",

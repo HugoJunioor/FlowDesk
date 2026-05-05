@@ -270,7 +270,9 @@ async function handleSlack(req, res) {
       }));
     }
 
-    // POST /slack/reply { permalink, text }
+    // POST /slack/reply { permalink, text, senderEmail? }
+    // Se senderEmail vier, busca user no Slack por email e posta com
+    // username + icon_url da pessoa real (chat:write.customize scope).
     if (req.method === "POST" && url === "/slack/reply") {
       const body = await readJsonBody(req);
       if (!body.text || (!body.permalink && (!body.channel || !body.thread_ts))) {
@@ -283,15 +285,81 @@ async function handleSlack(req, res) {
         if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
         channel = parsed.channel; thread_ts = parsed.thread_ts;
       }
+
+      // Busca user no Slack pelo email pra postar com identidade real
+      let postAs = {};
+      if (body.senderEmail) {
+        try {
+          const lookup = await slackApi("users.lookupByEmail", { email: body.senderEmail }, true);
+          if (lookup.user) {
+            postAs = {
+              username: lookup.user.real_name || lookup.user.profile?.display_name || lookup.user.name,
+              icon_url: lookup.user.profile?.image_72 || lookup.user.profile?.image_48,
+            };
+          }
+        } catch { /* fallback: posta como bot mesmo */ }
+      }
+
       const r = await slackApi("chat.postMessage", {
-        channel, thread_ts, text: body.text,
+        channel, thread_ts, text: body.text, ...postAs,
       });
       let permalink;
       try {
         const link = await slackApi("chat.getPermalink", { channel, message_ts: r.ts }, true);
         permalink = link.permalink;
       } catch { /* ignore */ }
-      return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink }));
+      return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink, postedAs: postAs.username }));
+    }
+
+    // GET /slack/channel-members?channel=C123 — lista membros pra mention autocomplete
+    if (req.method === "GET" && url.startsWith("/slack/channel-members")) {
+      const u = new URL(url, "http://localhost");
+      const channel = u.searchParams.get("channel");
+      if (!channel) { res.statusCode = 400; return res.end(JSON.stringify({ error: "channel obrigatorio" })); }
+      const cleanCh = channel.replace(/^#/, "");
+
+      // 1) Resolve channel name -> ID se necessario
+      let channelId = cleanCh;
+      if (!cleanCh.match(/^[A-Z0-9]{8,}$/)) {
+        // Nao parece ID, busca pelo nome
+        const list = await slackApi("conversations.list", { types: "public_channel,private_channel", limit: 1000 }, true);
+        const found = list.channels?.find((c) => c.name === cleanCh);
+        if (!found) { res.statusCode = 404; return res.end(JSON.stringify({ error: `Canal #${cleanCh} nao encontrado` })); }
+        channelId = found.id;
+      }
+
+      // 2) Busca membros (paginado)
+      const memberIds = [];
+      let cursor;
+      do {
+        const r = await slackApi("conversations.members",
+          { channel: channelId, limit: 200, ...(cursor ? { cursor } : {}) },
+          true);
+        memberIds.push(...(r.members || []));
+        cursor = r.response_metadata?.next_cursor;
+      } while (cursor);
+
+      // 3) Busca info de cada user (paralelo, mas batch limitado pra nao 429)
+      const users = [];
+      const batchSize = 10;
+      for (let i = 0; i < memberIds.length; i += batchSize) {
+        const batch = memberIds.slice(i, i + batchSize);
+        const infos = await Promise.all(batch.map((id) =>
+          slackApi("users.info", { user: id }, true).catch(() => null)
+        ));
+        for (const u of infos) {
+          if (u?.user && !u.user.deleted && !u.user.is_bot) {
+            users.push({
+              id: u.user.id,
+              name: u.user.real_name || u.user.profile?.display_name || u.user.name,
+              email: u.user.profile?.email,
+              avatar: u.user.profile?.image_24,
+            });
+          }
+        }
+      }
+      users.sort((a, b) => a.name.localeCompare(b.name));
+      return res.end(JSON.stringify({ channel: channelId, members: users }));
     }
 
     // POST /slack/edit { permalink, replyTimestamp, newText }

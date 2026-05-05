@@ -8,13 +8,14 @@
  * - Drag-and-drop de arquivos sobre o composer
  * - Optimistic update do thread (callback onReplied/onUploaded)
  */
-import { useRef, useState, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
+import { useRef, useState, useEffect, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
 import { Bold, Italic, Strikethrough, Code, Code2, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon, List, ListOrdered, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { apiClient, ApiError } from "@/lib/apiClient";
+import { apiClient, ApiError, type SlackChannelMember } from "@/lib/apiClient";
 import EmojiPicker from "./EmojiPicker";
+import { useAuth } from "@/contexts/AuthContext";
 import type { SlackDemand } from "@/types/demand";
 
 interface DemandReplyComposerProps {
@@ -49,21 +50,42 @@ function formatBytes(b: number): string {
 }
 
 const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) => {
+  const { currentUser } = useAuth();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<SlackChannelMember[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Pessoas que ja apareceram nessa thread (pra autocomplete de @mention)
-  const mentionablePeople = (() => {
+  // Busca membros reais do canal Slack pra autocomplete de @mention
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.slack.channelMembers(demand.slackChannel)
+      .then((res) => { if (!cancelled) setChannelMembers(res.members); })
+      .catch(() => { /* silencioso — fallback usa thread participants */ });
+    return () => { cancelled = true; };
+  }, [demand.slackChannel]);
+
+  // Pessoas mencionaveis: prioriza membros REAIS do canal Slack
+  // (com slack_id pra mention real), fallback pra participantes da thread.
+  const mentionablePeople: Array<{ name: string; slackId?: string; email?: string; avatar?: string }> = (() => {
+    if (channelMembers.length > 0) {
+      return channelMembers.map((m) => ({
+        name: m.name,
+        slackId: m.id,
+        email: m.email,
+        avatar: m.avatar,
+      }));
+    }
+    // Fallback: thread participants (sem slackId, vai inserir como texto)
     const set = new Set<string>();
     if (demand.assignee?.name) set.add(demand.assignee.name);
     demand.cc?.forEach((c) => set.add(c));
     demand.threadReplies?.forEach((r) => r.author && set.add(r.author));
     if (demand.requester?.name) set.add(demand.requester.name);
-    return Array.from(set).sort();
+    return Array.from(set).sort().map((name) => ({ name }));
   })();
 
   // Estado do dropdown de mention
@@ -216,6 +238,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         const reply = await apiClient.slack.reply({
           permalink: demand.slackPermalink,
           text,
+          senderEmail: currentUser?.email,
         });
         resultTs = reply.ts;
         toast.success("Resposta enviada", {
@@ -356,26 +379,32 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         {mentionFilter !== null && (
           (() => {
             const filtered = mentionablePeople.filter((p) =>
-              p.toLowerCase().includes(mentionFilter.toLowerCase())
+              p.name.toLowerCase().includes(mentionFilter.toLowerCase())
             );
             if (filtered.length === 0) return null;
             return (
-              <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 border-b">
-                  Mencionar
+              <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border rounded-md shadow-lg max-h-56 overflow-y-auto min-w-[240px]">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 border-b flex items-center gap-1">
+                  <AtSign size={10} /> Mencionar
+                  {channelMembers.length > 0 && (
+                    <span className="ml-auto opacity-70">membros do canal</span>
+                  )}
                 </div>
-                {filtered.slice(0, 8).map((person) => (
+                {filtered.slice(0, 10).map((person) => (
                   <button
-                    key={person}
+                    key={person.slackId || person.name}
                     type="button"
-                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-1.5"
+                    className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted transition-colors flex items-center gap-2"
                     onClick={() => {
-                      // Substitui @parcial por @nome completo
                       const ta = textareaRef.current;
                       if (!ta) return;
                       const cursor = ta.selectionStart;
                       const before = text.slice(0, cursor);
-                      const newBefore = before.replace(/@\w*$/, `@${person} `);
+                      // Mention real (<@U123>) se temos slackId, senao texto
+                      const replacement = person.slackId
+                        ? `<@${person.slackId}> `
+                        : `@${person.name} `;
+                      const newBefore = before.replace(/@\w*$/, replacement);
                       const newText = newBefore + text.slice(cursor);
                       setText(newText);
                       setMentionFilter(null);
@@ -386,8 +415,22 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                       }, 0);
                     }}
                   >
-                    <AtSign size={11} className="text-muted-foreground" />
-                    {person}
+                    {person.avatar ? (
+                      <img src={person.avatar} alt="" className="w-5 h-5 rounded-full" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-semibold text-primary">
+                        {person.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{person.name}</div>
+                      {person.email && (
+                        <div className="text-[9px] text-muted-foreground truncate">{person.email}</div>
+                      )}
+                    </div>
+                    {person.slackId && (
+                      <span className="text-[9px] text-success">●</span>
+                    )}
                   </button>
                 ))}
               </div>
