@@ -49,3 +49,4 @@ src/data/sqlDemands.ts
 # Local branding (company-specific)
 src/config/branding.local.ts
 public/just-logo.*
+.env.bak*
