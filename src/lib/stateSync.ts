@@ -15,6 +15,7 @@ const SYNCED_KEYS = [
   "fd_group_permissions",
   "fd_auto_assign_rules",
   "fd_support_members",
+  "fd_channel_routing",
 ] as const;
 
 type SyncedKey = typeof SYNCED_KEYS[number];

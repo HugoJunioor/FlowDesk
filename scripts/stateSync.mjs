@@ -68,6 +68,7 @@ export const SYNCED_KEYS = [
   "fd_group_permissions",      // permissoes por grupo (modulos x acoes)
   "fd_auto_assign_rules",
   "fd_support_members",
+  "fd_channel_routing",        // roteamento de canais Slack -> modulos
 ];
 
 function ensureDir() {
