@@ -257,7 +257,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
 
   return (
     <div
-      className={`border-t bg-muted/30 px-4 py-3 shrink-0 transition-colors ${
+      className={`bg-muted/30 px-4 py-3 transition-colors ${
         dragOver ? "bg-primary/10 ring-2 ring-primary/40 ring-inset" : ""
       }`}
       onDragOver={handleDragOver}
