@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { extractClientName } from "@/data/demandsLoader";
 import { addBusinessHours, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, getBusinessMinutesBetween } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
 import CopyLinkButton from "./CopyLinkButton";
+import DemandReplyComposer from "./DemandReplyComposer";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -137,9 +138,10 @@ const DemandDetailSheet = ({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader className="pb-4">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+        {/* Header fixo */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className={`text-[10px] ${priority.bg} ${priority.color}`}>
               {priority.label}
@@ -157,9 +159,9 @@ const DemandDetailSheet = ({
               </Badge>
             )}
           </div>
-          <SheetTitle className="text-lg leading-snug mt-2">
+          <DialogTitle className="text-lg leading-snug mt-2">
             {demand.title}
-          </SheetTitle>
+          </DialogTitle>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1 text-primary/80 font-medium">
               <Building2 size={12} /> {client}
@@ -168,7 +170,9 @@ const DemandDetailSheet = ({
               <Layers size={12} /> {demand.workflow}
             </span>
           </div>
-        </SheetHeader>
+        </DialogHeader>
+        {/* Conteudo scrollavel */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
 
         <div className="space-y-5">
           {/* Countdown */}
@@ -958,8 +962,11 @@ const DemandDetailSheet = ({
             </div>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+        </div>
+        {/* Composer stub — Fase 1: layout pronto, send vem nas proximas fases */}
+        <DemandReplyComposer demand={demand} />
+      </DialogContent>
+    </Dialog>
   );
 };
 
