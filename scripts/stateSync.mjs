@@ -199,24 +199,36 @@ function reject401(res, msg = "Unauthorized") {
 }
 
 function handler(req, res, next) {
-  // Endpoint que devolve o token de auth (apenas para localhost/loopback)
-  // Permite o cliente pegar o token no boot e armazenar em sessionStorage.
+  // Endpoint que devolve o token de auth.
+  //
+  // Permite que dispositivos da rede privada (LAN, VPN, mesh) peguem o
+  // token automaticamente no boot. Externos (qualquer IP publico) sao
+  // rejeitados — token NUNCA viaja pra fora da rede confiavel.
+  //
+  // Ranges aceitos:
+  //   - Loopback (127.0.0.1, ::1)
+  //   - LAN privada (RFC1918): 10.x, 172.16-31.x, 192.168.x
+  //   - Tailscale (CGNAT): 100.64.0.0/10
+  //   - link-local IPv6: fe80::
   if (req.url === "/__token") {
     setCors(req, res);
     if (req.method === "OPTIONS") {
       res.statusCode = 204;
       return res.end();
     }
-    const ip = req.socket?.remoteAddress || "";
-    const isLoopback =
+    const ip = (req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+    const isPrivate =
       ip === "127.0.0.1" ||
       ip === "::1" ||
-      ip === "::ffff:127.0.0.1" ||
-      ip.startsWith("fe80::");
-    if (!isLoopback) {
-      // De fora do PC do master, o token NUNCA e exposto.
-      // Quem acessa via VPN tem que receber o token do admin manualmente.
-      return reject401(res, "Token endpoint restricted to localhost");
+      ip.startsWith("fe80::") ||
+      /^10\./.test(ip) ||
+      /^192\.168\./.test(ip) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+      // Tailscale CGNAT: 100.64.0.0 - 100.127.255.255
+      /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip);
+    if (!isPrivate) {
+      // IP publico — token NUNCA e exposto.
+      return reject401(res, "Token endpoint restricted to private networks");
     }
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
