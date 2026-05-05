@@ -65,6 +65,35 @@ export interface SlackReplyResponse {
   permalink?: string;
 }
 
+export interface SlackUploadResponse {
+  ok: boolean;
+  count: number;
+  files: Array<{ ok?: boolean; files?: unknown[] }>;
+}
+
+async function uploadMultipart(
+  path: string,
+  formData: FormData,
+  demoFallback?: SlackUploadResponse
+): Promise<SlackUploadResponse> {
+  if (isDemoMode && demoFallback) {
+    await new Promise((r) => setTimeout(r, 800));
+    return demoFallback;
+  }
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    let body: unknown;
+    try { body = await res.json(); } catch { /* ignore */ }
+    const msg = (body as { error?: string })?.error || `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status, body);
+  }
+  return res.json() as Promise<SlackUploadResponse>;
+}
+
 export const apiClient = {
   slack: {
     reply: (body: SlackReplyRequest) =>
@@ -78,6 +107,19 @@ export const apiClient = {
           permalink: "https://demo.slack.com/archives/X/p123",
         },
       }),
+    upload: (params: { permalink?: string; channel?: string; thread_ts?: string; comment?: string; files: File[] }) => {
+      const fd = new FormData();
+      if (params.permalink) fd.append("permalink", params.permalink);
+      if (params.channel) fd.append("channel", params.channel);
+      if (params.thread_ts) fd.append("thread_ts", params.thread_ts);
+      if (params.comment) fd.append("comment", params.comment);
+      for (const f of params.files) fd.append("file", f);
+      return uploadMultipart("/slack/upload", fd, {
+        ok: true,
+        count: params.files.length,
+        files: params.files.map(() => ({ ok: true })),
+      });
+    },
     status: () =>
       request<{ enabled: boolean; team?: string; user?: string; error?: string }>(
         "/slack/status",
