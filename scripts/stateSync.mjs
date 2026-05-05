@@ -199,7 +199,156 @@ function reject401(res, msg = "Unauthorized") {
   res.end(JSON.stringify({ error: msg }));
 }
 
+// ===================================================================
+// Slack endpoints — versao LOCAL.
+// Antes ficavam em flowdesk-api/Railway, mas Railway eh infra publica
+// e nao pode ter token Slack. Aqui tudo roda no Vite dev server da
+// maquina do master, lendo SLACK_BOT_TOKEN do .env local (gitignored).
+// ===================================================================
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk));
+    req.on("end", () => {
+      try { resolve(data ? JSON.parse(data) : {}); }
+      catch (e) { reject(e); }
+    });
+    req.on("error", reject);
+  });
+}
+
+async function slackApi(method, body, asForm = false) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) throw new Error("SLACK_BOT_TOKEN nao configurado no .env");
+  const url = `https://slack.com/api/${method}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  let payload;
+  if (asForm) {
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    payload = new URLSearchParams(body).toString();
+  } else {
+    headers["Content-Type"] = "application/json; charset=utf-8";
+    payload = JSON.stringify(body);
+  }
+  const res = await fetch(url, { method: "POST", headers, body: payload });
+  const json = await res.json();
+  if (!json.ok) throw new Error(`Slack API: ${json.error || "unknown"}`);
+  return json;
+}
+
+function parseSlackPermalink(permalink) {
+  const m = String(permalink || "").match(/\/archives\/([A-Z0-9]+)\/p(\d+)/);
+  if (!m) return null;
+  const channel = m[1];
+  const pTs = m[2];
+  const ts = `${pTs.slice(0, -6)}.${pTs.slice(-6)}`;
+  return { channel, thread_ts: ts };
+}
+
+function isoToSlackTs(iso) {
+  return (new Date(iso).getTime() / 1000).toFixed(6);
+}
+
+async function handleSlack(req, res) {
+  const url = req.url || "";
+
+  try {
+    // GET /slack/status — auth.test
+    if (req.method === "GET" && url === "/slack/status") {
+      if (!process.env.SLACK_BOT_TOKEN) {
+        return res.end(JSON.stringify({ enabled: false }));
+      }
+      const r = await slackApi("auth.test", {});
+      return res.end(JSON.stringify({
+        enabled: true, team: r.team, user: r.user, botId: r.bot_id,
+      }));
+    }
+
+    // POST /slack/reply { permalink, text }
+    if (req.method === "POST" && url === "/slack/reply") {
+      const body = await readJsonBody(req);
+      if (!body.text || (!body.permalink && (!body.channel || !body.thread_ts))) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "permalink+text OU channel+thread_ts+text" }));
+      }
+      let { channel, thread_ts } = body;
+      if (body.permalink) {
+        const parsed = parseSlackPermalink(body.permalink);
+        if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
+        channel = parsed.channel; thread_ts = parsed.thread_ts;
+      }
+      const r = await slackApi("chat.postMessage", {
+        channel, thread_ts, text: body.text,
+      });
+      let permalink;
+      try {
+        const link = await slackApi("chat.getPermalink", { channel, message_ts: r.ts }, true);
+        permalink = link.permalink;
+      } catch { /* ignore */ }
+      return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink }));
+    }
+
+    // POST /slack/edit { permalink, replyTimestamp, newText }
+    if (req.method === "POST" && url === "/slack/edit") {
+      const body = await readJsonBody(req);
+      const parsed = parseSlackPermalink(body.permalink);
+      if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
+      const ts = isoToSlackTs(body.replyTimestamp);
+      await slackApi("chat.update", { channel: parsed.channel, ts, text: body.newText });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+
+    // POST /slack/delete { permalink, replyTimestamp }
+    if (req.method === "POST" && url === "/slack/delete") {
+      const body = await readJsonBody(req);
+      const parsed = parseSlackPermalink(body.permalink);
+      if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
+      const ts = isoToSlackTs(body.replyTimestamp);
+      await slackApi("chat.delete", { channel: parsed.channel, ts }, true);
+      return res.end(JSON.stringify({ ok: true }));
+    }
+
+    // GET /slack/file/:fileId — proxy de download
+    const fileMatch = url.match(/^\/slack\/file\/([^/?]+)/);
+    if (req.method === "GET" && fileMatch) {
+      const fileId = decodeURIComponent(fileMatch[1]);
+      const info = await slackApi("files.info", { file: fileId }, true);
+      const file = info.file;
+      if (!file?.url_private) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "Arquivo nao encontrado" }));
+      }
+      const r = await fetch(file.url_private, {
+        headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` },
+      });
+      if (!r.ok) {
+        res.statusCode = 502;
+        return res.end(JSON.stringify({ error: "Download falhou" }));
+      }
+      res.setHeader("Content-Type", file.mimetype || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.name)}"`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      return res.end(buf);
+    }
+
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: "Endpoint Slack nao encontrado" }));
+  } catch (err) {
+    res.statusCode = 502;
+    return res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
 function handler(req, res, next) {
+  // Slack endpoints (locais, leem SLACK_BOT_TOKEN do .env)
+  if (req.url?.startsWith("/slack/")) {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    res.setHeader("Content-Type", "application/json");
+    return handleSlack(req, res);
+  }
+
   // Endpoint que devolve o token de auth.
   //
   // Permite que dispositivos da rede privada (LAN, VPN, mesh) peguem o

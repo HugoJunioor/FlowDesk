@@ -7,9 +7,23 @@
  */
 import { isDemoMode } from "@/components/DemoBanner";
 
-const BASE_URL =
-  import.meta.env.VITE_FLOWDESK_API_URL ??
-  "https://flowdesk-api-production-21cf.up.railway.app";
+/**
+ * BASE_URL resolution:
+ * - Em DEV (npm run dev): vazio → URL relativa, vai pro Vite dev server
+ *   que tem os endpoints /slack/* locais (lendo SLACK_BOT_TOKEN do .env)
+ * - Em PROD remoto (Vercel): VITE_FLOWDESK_API_URL aponta pra Railway
+ * - Override manual: define VITE_FLOWDESK_API_URL no .env
+ *
+ * Esquema garante que a maquina do master rode tudo localmente sem
+ * depender de Railway (que nao pode ter token Slack real, infra publica).
+ */
+const isDev = import.meta.env.DEV;
+const explicit = import.meta.env.VITE_FLOWDESK_API_URL;
+const BASE_URL = explicit
+  ? explicit
+  : isDev
+  ? ""
+  : "https://flowdesk-api-production-21cf.up.railway.app";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public body?: unknown) {
