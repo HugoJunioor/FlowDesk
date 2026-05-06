@@ -50,3 +50,4 @@ src/data/sqlDemands.ts
 src/config/branding.local.ts
 public/just-logo.*
 .env.bak*
+coverage

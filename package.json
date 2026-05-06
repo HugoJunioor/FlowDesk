@@ -16,11 +16,19 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run lint && npm run typecheck && npm test",
     "share": "npm run sync && npm run build && concurrently -n \"serve,sync,ips\" -c \"cyan,yellow,green\" \"vite preview\" \"node scripts/shareWatch.cjs\" \"npm:ips\"",
     "sync": "node scripts/syncSlack.cjs",
     "sync:sql": "node scripts/syncSqlChannel.cjs",
     "sync:watch": "node scripts/syncWatch.cjs",
-    "share:watch": "node scripts/shareWatch.cjs"
+    "share:watch": "node scripts/shareWatch.cjs",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,cjs,mjs}": [
+      "eslint --fix --max-warnings=999"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -62,8 +70,11 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@total-typescript/ts-reset": "^0.6.1",
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
@@ -76,6 +87,8 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",

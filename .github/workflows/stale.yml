@@ -1,0 +1,47 @@
+name: Stale
+
+on:
+  schedule:
+    # Roda toda terca as 9h BRT (12h UTC)
+    - cron: "0 12 * * 2"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Issues abandonadas
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          stale-issue-label: "stale"
+          stale-issue-message: |
+            Essa issue ficou 60 dias sem atividade. Marcando como stale —
+            sera fechada automaticamente em 14 dias se nao houver retorno.
+            Comente pra manter aberta se ainda for relevante.
+          close-issue-message: |
+            Fechando por inatividade. Reabra se ainda for relevante.
+          exempt-issue-labels: "pinned,security,roadmap"
+
+          # PRs abandonados
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
+          stale-pr-label: "stale"
+          stale-pr-message: |
+            Esse PR ficou 30 dias sem atividade. Marcando como stale —
+            sera fechado em 14 dias se nao houver retorno. Faca push pra
+            manter aberto.
+          close-pr-message: |
+            Fechando por inatividade. Reabra quando estiver pronto pra continuar.
+          exempt-pr-labels: "pinned,security,wip,blocked"
+
+          # Nao bloqueia o ciclo: limita pra 30 operacoes/run pra nao
+          # estourar rate limit em repos grandes
+          operations-per-run: 30

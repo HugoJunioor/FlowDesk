@@ -34,3 +34,8 @@ updates:
       - "ci"
     commit-message:
       prefix: "chore(ci)"
+    ignore:
+      # Major bumps de actions tem breaking changes (ex: setup-node v4->v6
+      # mudou node default). Revisao manual antes de subir.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
