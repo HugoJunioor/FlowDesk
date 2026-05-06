@@ -240,7 +240,22 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
                     resolvedText.split('\n').find(l => l.length > 10 && !l.startsWith('*'))?.slice(0, 100) ||
                     resolvedText.slice(0, 80);
 
-      const description = fields['Descrição da demanda'] || fields['Descricao da demanda'] ||
+      // Extrai SO o conteudo apos "Descrição da demanda" ate o proximo campo
+      // (ex: *Prioridade*, *Solicitante*, etc). Captura multi-linha completo.
+      // Os outros campos ja sao mostrados em outras partes do UI — aqui so o corpo.
+      const extractDescriptionBody = (raw) => {
+        const headerRe = /\*\s*Descri[cç][aã]o(?:\s+da\s+demanda)?\s*\*:?\s*\n?/i;
+        const m = raw.match(headerRe);
+        if (!m) return null;
+        const after = raw.slice(m.index + m[0].length);
+        // Para no proximo header em negrito (*Campo*) — esses sao os outros campos
+        const nextHeaderRe = /\n\s*\*[^*\n]+\*\s*:?\s*(?:\n|$)/;
+        const stop = after.match(nextHeaderRe);
+        const body = stop ? after.slice(0, stop.index) : after;
+        return body.trim();
+      };
+      const description = extractDescriptionBody(resolvedText) ||
+                          fields['Descrição da demanda'] || fields['Descricao da demanda'] ||
                           fields['Descrição'] || fields['Descricao'] ||
                           resolvedText;
 
@@ -317,7 +332,9 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const demand = {
         id: demandId,
         title: title.replace(/\*/g, '').trim(),
-        description: description.replace(/\*/g, '').slice(0, 500),
+        // So o corpo apos "Descrição da demanda" — outros campos ja aparecem
+        // em locais proprios do UI (titulo, prioridade, solicitante, etc).
+        description: description.replace(/\*/g, '').trim(),
         priority,
         status: 'aberta',
         demandType,
