@@ -205,6 +205,148 @@ function reject401(res, msg = "Unauthorized") {
 }
 
 // ===================================================================
+// Slack User OAuth — armazena token pessoal de cada usuario (xoxp-)
+// permitindo postar AS o usuario (Slack registra como sendo dele).
+// ===================================================================
+
+const SLACK_TOKENS_FILE = path.join(__dirname, "..", "data", "slack-user-tokens.json");
+
+function readSlackTokens() {
+  try {
+    if (!fs.existsSync(SLACK_TOKENS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(SLACK_TOKENS_FILE, "utf-8"));
+  } catch { return {}; }
+}
+
+function writeSlackTokens(data) {
+  ensureDir();
+  const tmp = SLACK_TOKENS_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, SLACK_TOKENS_FILE);
+}
+
+function saveUserSlackToken(email, payload) {
+  const all = readSlackTokens();
+  all[email.toLowerCase()] = payload;
+  writeSlackTokens(all);
+}
+
+function getUserSlackToken(email) {
+  if (!email) return null;
+  const all = readSlackTokens();
+  return all[email.toLowerCase()] || null;
+}
+
+async function handleSlackOAuth(req, res) {
+  const url = req.url || "";
+
+  // GET /auth/slack/start?email=user@... — redireciona pra Slack OAuth
+  if (req.method === "GET" && url.startsWith("/auth/slack/start")) {
+    const u = new URL(url, "http://localhost");
+    const email = u.searchParams.get("email") || "";
+    const clientId = process.env.SLACK_CLIENT_ID;
+    const redirectUri = process.env.SLACK_REDIRECT_URI || "http://localhost:8080/auth/slack/callback";
+    if (!clientId) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ error: "SLACK_CLIENT_ID nao configurado no .env" }));
+    }
+    // User scopes pra postar como usuario
+    const userScopes = ["chat:write", "files:write", "users.profile:read"].join(",");
+    const state = encodeURIComponent(email);
+    const authUrl =
+      `https://slack.com/oauth/v2/authorize?client_id=${clientId}` +
+      `&user_scope=${encodeURIComponent(userScopes)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${state}`;
+    res.statusCode = 302;
+    res.setHeader("Location", authUrl);
+    return res.end();
+  }
+
+  // GET /auth/slack/callback?code=...&state=email — troca code por token
+  if (req.method === "GET" && url.startsWith("/auth/slack/callback")) {
+    const u = new URL(url, "http://localhost");
+    const code = u.searchParams.get("code");
+    const email = decodeURIComponent(u.searchParams.get("state") || "");
+    if (!code) {
+      res.statusCode = 400;
+      return res.end("<h1>Erro</h1><p>code ausente</p>");
+    }
+
+    try {
+      const params = new URLSearchParams({
+        client_id: process.env.SLACK_CLIENT_ID,
+        client_secret: process.env.SLACK_CLIENT_SECRET,
+        code,
+        redirect_uri: process.env.SLACK_REDIRECT_URI || "http://localhost:8080/auth/slack/callback",
+      });
+      const r = await fetch("https://slack.com/api/oauth.v2.access", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      const json = await r.json();
+      if (!json.ok) throw new Error(`Slack OAuth: ${json.error}`);
+
+      // Salva o user token (xoxp-) com info da pessoa
+      const userToken = json.authed_user?.access_token;
+      const slackUserId = json.authed_user?.id;
+      if (!userToken || !slackUserId) throw new Error("Resposta OAuth sem user token");
+
+      saveUserSlackToken(email, {
+        accessToken: userToken,
+        slackUserId,
+        teamId: json.team?.id,
+        teamName: json.team?.name,
+        scope: json.authed_user?.scope,
+        connectedAt: new Date().toISOString(),
+      });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(`
+        <html><body style="font-family:system-ui;padding:40px;background:#0f172a;color:#e2e8f0">
+          <h1 style="color:#10b981">✓ Slack conectado</h1>
+          <p>Conta <strong>${email}</strong> ligada ao Slack como <strong>&lt;@${slackUserId}&gt;</strong>.</p>
+          <p>Agora suas mensagens via FlowDesk vão postar como você no Slack.</p>
+          <p><a href="/" style="color:#3b82f6">Voltar ao FlowDesk</a></p>
+        </body></html>
+      `);
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(`<h1 style="color:#ef4444">Erro OAuth</h1><pre>${err.message}</pre>`);
+    }
+  }
+
+  // GET /auth/slack/status?email=... — verifica se user tem token
+  if (req.method === "GET" && url.startsWith("/auth/slack/status")) {
+    const u = new URL(url, "http://localhost");
+    const email = u.searchParams.get("email") || "";
+    const token = getUserSlackToken(email);
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({
+      connected: !!token,
+      slackUserId: token?.slackUserId,
+      teamName: token?.teamName,
+      connectedAt: token?.connectedAt,
+    }));
+  }
+
+  // POST /auth/slack/disconnect { email } — remove token
+  if (req.method === "POST" && url === "/auth/slack/disconnect") {
+    const body = await readJsonBody(req);
+    const all = readSlackTokens();
+    delete all[(body.email || "").toLowerCase()];
+    writeSlackTokens(all);
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  res.statusCode = 404;
+  return res.end(JSON.stringify({ error: "OAuth endpoint nao encontrado" }));
+}
+
+// ===================================================================
 // Slack endpoints — versao LOCAL.
 // Antes ficavam em flowdesk-api/Railway, mas Railway eh infra publica
 // e nao pode ter token Slack. Aqui tudo roda no Vite dev server da
@@ -223,9 +365,9 @@ function readJsonBody(req) {
   });
 }
 
-async function slackApi(method, body, asForm = false) {
-  const token = process.env.SLACK_BOT_TOKEN;
-  if (!token) throw new Error("SLACK_BOT_TOKEN nao configurado no .env");
+async function slackApi(method, body, asForm = false, customToken) {
+  const token = customToken || process.env.SLACK_BOT_TOKEN;
+  if (!token) throw new Error("Token Slack nao disponivel");
   const url = `https://slack.com/api/${method}`;
   const headers = { Authorization: `Bearer ${token}` };
   let payload;
@@ -286,25 +428,33 @@ async function handleSlack(req, res) {
         channel = parsed.channel; thread_ts = parsed.thread_ts;
       }
 
-      // Atribuicao do remetente: bot posta MAS prefixa a mensagem com
-      // <@SLACK_USER_ID> (mention real do remetente). Visualmente indica
-      // quem originou a mensagem via FlowDesk. Funciona sem o scope
-      // chat:write.customize (que o Slack restringiu).
+      // Identidade do remetente: se o user FlowDesk tem token Slack pessoal
+      // (xoxp-) via OAuth, posta como ELE de verdade. Senao, fallback pro
+      // bot com mention <@user_id> no topo.
+      let postedAs = "FlowDesk Bot";
+      let useUserToken;
       let finalText = body.text;
-      let postedAs;
       if (body.senderEmail) {
-        try {
-          const lookup = await slackApi("users.lookupByEmail", { email: body.senderEmail }, true);
-          if (lookup.user?.id) {
-            finalText = `<@${lookup.user.id}>\n${body.text}`;
-            postedAs = lookup.user.real_name || lookup.user.profile?.display_name || lookup.user.name;
-          }
-        } catch { /* email nao bate com nenhum user — posta sem atribuicao */ }
+        const userToken = getUserSlackToken(body.senderEmail);
+        if (userToken?.accessToken) {
+          // Modo ideal: posta como o usuario
+          useUserToken = userToken.accessToken;
+          postedAs = userToken.teamName ? `${body.senderEmail} (via OAuth)` : body.senderEmail;
+        } else {
+          // Fallback: bot + mention atribuindo
+          try {
+            const lookup = await slackApi("users.lookupByEmail", { email: body.senderEmail }, true);
+            if (lookup.user?.id) {
+              finalText = `<@${lookup.user.id}>\n${body.text}`;
+              postedAs = `${lookup.user.real_name || body.senderEmail} (via bot)`;
+            }
+          } catch { /* sem user_id */ }
+        }
       }
 
       const r = await slackApi("chat.postMessage", {
         channel, thread_ts, text: finalText,
-      });
+      }, false, useUserToken);
       let permalink;
       try {
         const link = await slackApi("chat.getPermalink", { channel, message_ts: r.ts }, true);
@@ -364,23 +514,26 @@ async function handleSlack(req, res) {
       return res.end(JSON.stringify({ channel: channelId, members: users }));
     }
 
-    // POST /slack/edit { permalink, replyTimestamp, newText }
+    // POST /slack/edit { permalink, replyTimestamp, newText, senderEmail? }
+    // Usa user token se disponivel (so user pode editar mensagem dele)
     if (req.method === "POST" && url === "/slack/edit") {
       const body = await readJsonBody(req);
       const parsed = parseSlackPermalink(body.permalink);
       if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
       const ts = isoToSlackTs(body.replyTimestamp);
-      await slackApi("chat.update", { channel: parsed.channel, ts, text: body.newText });
+      const userTok = body.senderEmail ? getUserSlackToken(body.senderEmail)?.accessToken : null;
+      await slackApi("chat.update", { channel: parsed.channel, ts, text: body.newText }, false, userTok);
       return res.end(JSON.stringify({ ok: true }));
     }
 
-    // POST /slack/delete { permalink, replyTimestamp }
+    // POST /slack/delete { permalink, replyTimestamp, senderEmail? }
     if (req.method === "POST" && url === "/slack/delete") {
       const body = await readJsonBody(req);
       const parsed = parseSlackPermalink(body.permalink);
       if (!parsed) { res.statusCode = 400; return res.end(JSON.stringify({ error: "Permalink invalido" })); }
       const ts = isoToSlackTs(body.replyTimestamp);
-      await slackApi("chat.delete", { channel: parsed.channel, ts }, true);
+      const userTok = body.senderEmail ? getUserSlackToken(body.senderEmail)?.accessToken : null;
+      await slackApi("chat.delete", { channel: parsed.channel, ts }, true, userTok);
       return res.end(JSON.stringify({ ok: true }));
     }
 
