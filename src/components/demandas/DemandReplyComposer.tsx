@@ -59,6 +59,25 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [channelMembers, setChannelMembers] = useState<SlackChannelMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [mentionAnchor, setMentionAnchor] = useState<{ top: number; left: number } | null>(null);
+  // Captura cursor pos quando dropdown abre, pra usar no click (evita race com blur)
+  const mentionCursorRef = useRef<number>(0);
+
+  // Atualiza posicao do dropdown quando rola/redimensiona (mantem ancorado ao textarea)
+  useEffect(() => {
+    if (!mentionAnchor) return;
+    const updatePos = () => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const rect = ta.getBoundingClientRect();
+      setMentionAnchor({ top: rect.bottom + 4, left: rect.left });
+    };
+    window.addEventListener("scroll", updatePos, true); // capture: pega scroll de qualquer ancestral
+    window.addEventListener("resize", updatePos);
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
+  }, [mentionAnchor !== null]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,7 +284,15 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           ? err.message
           : "Erro desconhecido";
       toast.error("Falha ao enviar", { description: msg });
-      console.error("[composer] send failed:", err);
+      console.group("[composer] send falhou — info de debug");
+      console.error("Error:", err);
+      console.log("Demand ID:", demand.id);
+      console.log("Slack channel:", demand.slackChannel);
+      console.log("Slack permalink:", demand.slackPermalink);
+      console.log("Sender email:", currentUser?.email);
+      console.log("Files:", files.length);
+      console.log("Text length:", text.length);
+      console.groupEnd();
     } finally {
       setSending(false);
     }
@@ -362,7 +389,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             const m = before.match(/@(\w*)$/);
             if (m) {
               setMentionFilter(m[1]);
-              // Calcula posicao da janela flutuante (abaixo do textarea)
+              mentionCursorRef.current = cursor; // captura pos pra usar no click
               const rect = ta.getBoundingClientRect();
               setMentionAnchor({
                 top: rect.bottom + 4,
@@ -407,14 +434,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             <div
               className="fixed z-[9999] bg-popover border rounded-lg shadow-2xl max-h-72 overflow-y-auto min-w-[280px] max-w-[400px]"
               style={{ top: mentionAnchor.top, left: mentionAnchor.left }}
-              // Previne dialog Radix de tratar como "click fora" e fechar a modal
+              // Previne Radix Dialog de tratar como "click fora" (fecharia o modal)
               onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => {
-                // Previne textarea de perder foco (que fecharia o dropdown)
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onClick={(e) => e.stopPropagation()}
             >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 py-1.5 border-b flex items-center gap-1.5 sticky top-0 bg-popover">
                 <AtSign size={10} /> Mencionar
@@ -435,10 +456,14 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                   key={person.slackId || person.name}
                   type="button"
                   className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
-                  onClick={() => {
+                  // mousedown.preventDefault impede textarea de perder foco
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     const ta = textareaRef.current;
                     if (!ta) return;
-                    const cursor = ta.selectionStart;
+                    // Usa cursor capturado quando dropdown abriu (mais confiavel que selectionStart)
+                    const cursor = mentionCursorRef.current;
                     const before = text.slice(0, cursor);
                     const replacement = person.slackId
                       ? `<@${person.slackId}> `
