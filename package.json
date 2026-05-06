@@ -16,6 +16,8 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run lint && npm run typecheck && npm test",
     "share": "npm run sync && npm run build && concurrently -n \"serve,sync,ips\" -c \"cyan,yellow,green\" \"vite preview\" \"node scripts/shareWatch.cjs\" \"npm:ips\"",
     "sync": "node scripts/syncSlack.cjs",
     "sync:sql": "node scripts/syncSqlChannel.cjs",
