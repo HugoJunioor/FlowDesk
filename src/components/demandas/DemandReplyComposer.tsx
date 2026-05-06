@@ -62,6 +62,9 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
   // Captura cursor pos quando dropdown abre, pra usar no click (evita race com blur)
   const mentionCursorRef = useRef<number>(0);
+  // Map nome -> slackId pra converter @Nome visual em <@ID> Slack na hora do envio.
+  // Mantido como ref pra nao causar re-render. Persiste enquanto o composer estiver montado.
+  const mentionMapRef = useRef<Map<string, string>>(new Map());
 
   // Atualiza posicao do dropdown quando rola/redimensiona (mantem ancorado ao textarea)
   useEffect(() => {
@@ -245,16 +248,34 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     e.target.value = ""; // permite selecionar o mesmo arquivo de novo
   };
 
+  // Converte @Nome (visual) em <@SLACK_ID> (formato Slack) usando o mentionMap.
+  // Ordena por tamanho desc pra evitar match parcial (ex: "Ana" antes de "Ana Maria").
+  const expandMentions = (raw: string): string => {
+    const entries = Array.from(mentionMapRef.current.entries())
+      .sort((a, b) => b[0].length - a[0].length);
+    let out = raw;
+    for (const [name, id] of entries) {
+      // Escapa metacaracteres regex no nome
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // \B@ pra permitir mention no inicio de uma palavra precedida por espaco/inicio,
+      // e (?!\w) pra nao casar @AnaMaria quando o map so tem "Ana"
+      const re = new RegExp(`@${escaped}(?!\\w)`, "g");
+      out = out.replace(re, `<@${id}>`);
+    }
+    return out;
+  };
+
   const handleSend = async () => {
     if ((!text.trim() && files.length === 0) || sending) return;
     setSending(true);
     try {
       let resultTs = "";
+      const textToSend = expandMentions(text);
 
       if (files.length > 0) {
         const uploadResult = await apiClient.slack.upload({
           permalink: demand.slackPermalink,
-          comment: text.trim() || undefined,
+          comment: textToSend.trim() || undefined,
           files,
         });
         resultTs = `upload-${Date.now()}`;
@@ -265,7 +286,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
       } else {
         const reply = await apiClient.slack.reply({
           permalink: demand.slackPermalink,
-          text,
+          text: textToSend,
           senderEmail: currentUser?.email,
         });
         resultTs = reply.ts;
@@ -305,7 +326,12 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     if (!ta) return;
     const cursor = mentionCursorRef.current;
     const before = text.slice(0, cursor);
-    const replacement = person.slackId ? `<@${person.slackId}> ` : `@${person.name} `;
+    // Sempre insere @Nome visualmente. Se tiver slackId, registra no map
+    // pra converter pra <@ID> na hora de enviar pro Slack.
+    if (person.slackId) {
+      mentionMapRef.current.set(person.name, person.slackId);
+    }
+    const replacement = `@${person.name} `;
     const newBefore = before.replace(/@\w*$/, replacement);
     const newText = newBefore + text.slice(cursor);
     setText(newText);
