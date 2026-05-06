@@ -1,0 +1,13 @@
+# Auto-atribui revisores quando arquivos sao tocados.
+# Sintaxe: <pattern> <owner1> <owner2> ...
+# Owners podem ser usuarios (@username) ou times (@org/team).
+
+# Default: tudo precisa do Hugo
+* @HugoJunioor
+
+# Areas criticas: enfatizar na review
+/.github/                  @HugoJunioor
+/scripts/                  @HugoJunioor
+/src/lib/slaCalculator.ts  @HugoJunioor
+/src/lib/businessHours.ts  @HugoJunioor
+/src/contexts/AuthContext.tsx @HugoJunioor
