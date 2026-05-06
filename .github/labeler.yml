@@ -1,0 +1,69 @@
+# Auto-labels em PRs baseado nos arquivos alterados.
+# Usado por .github/workflows/labeler.yml.
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/workflows/**
+          - .github/dependabot.yml
+          - .github/CODEOWNERS
+
+deps:
+  - changed-files:
+      - any-glob-to-any-file:
+          - package.json
+          - package-lock.json
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - docs/**
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/components/**
+          - src/pages/**
+          - src/hooks/**
+          - src/contexts/**
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - scripts/**
+          - src/lib/apiClient.ts
+          - src/lib/stateSync.ts
+
+slack:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/slack*"
+          - "**/Slack*"
+          - scripts/syncSlack.cjs
+          - scripts/stateSync.mjs
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.test.ts"
+          - "**/*.test.tsx"
+          - "**/*.spec.ts"
+          - vitest.config.ts
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.config.*"
+          - tsconfig*.json
+          - .eslintrc*
+          - .prettierrc*
+          - .editorconfig
+          - .nvmrc
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - SECURITY.md
+          - .gitleaks.toml
+          - .github/workflows/secrets-scan.yml
