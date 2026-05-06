@@ -107,6 +107,7 @@ const DemandDetailSheet = ({
     setTaskLinkDraft(demand?.taskLink || "");
     setCompleteObservation("");
     setOptimisticReplies([]); // limpa otimistas ao trocar demanda
+    setExtraReplies([]);      // limpa replies do refresh manual
     if (demand) {
       const now = new Date();
       setCompleteDate(format(now, "yyyy-MM-dd"));
@@ -134,6 +135,47 @@ const DemandDetailSheet = ({
 
   const formatDate = (iso: string) =>
     format(new Date(iso), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
+
+  // Refresh thread — busca replies frescas do Slack
+  const [refreshingThread, setRefreshingThread] = useState(false);
+  const [extraReplies, setExtraReplies] = useState<Array<{ author: string; text: string; timestamp: string; isTeamMember: boolean; files?: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }> }>>([]);
+
+  const refreshThread = async () => {
+    if (refreshingThread) return;
+    setRefreshingThread(true);
+    try {
+      const res = await apiClient.slack.threadReplies(demand.slackPermalink);
+      // Marca team members pelos nomes ja conhecidos
+      const teamNames = new Set(
+        demand.threadReplies.filter((r) => r.isTeamMember).map((r) => r.author.toLowerCase())
+      );
+      if (currentUser?.name) teamNames.add(currentUser.name.toLowerCase());
+      // Mapeia replies do slack pra formato local + filtra repetidas (ja em threadReplies)
+      const existingTexts = new Set(demand.threadReplies.map((r) => `${r.author}|${r.text}`));
+      const fresh = res.replies
+        .map((r) => ({
+          author: r.author,
+          text: r.text,
+          timestamp: r.timestamp,
+          isTeamMember: teamNames.has(r.author.toLowerCase()) || r.isBot,
+          files: r.files,
+        }))
+        .filter((r) => !existingTexts.has(`${r.author}|${r.text}`));
+      setExtraReplies(fresh);
+      // Tira otimistas que ja vieram
+      setOptimisticReplies((prev) =>
+        prev.filter((o) => !res.replies.some((r) => r.text === o.text))
+      );
+      toast.success(`${fresh.length} novas mensagens` , {
+        description: `Total na thread: ${res.count}`,
+      });
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : (err as Error).message;
+      toast.error("Falha ao atualizar thread", { description: msg });
+    } finally {
+      setRefreshingThread(false);
+    }
+  };
 
   // Edit/delete handlers — backend (chat.update / chat.delete via flowdesk-api)
   const handleEditReply = async (reply: { text: string; timestamp: string }) => {
@@ -168,15 +210,23 @@ const DemandDetailSheet = ({
     }
   };
 
-  // Combina replies reais (do sync) + otimistas (enviadas localmente, ainda nao sincronizadas)
-  // Se o sync proximo trouxer o ts da otimista, removemos auto-magicamente.
+  // Combina: replies do sync + extra (refresh manual) + otimistas (em voo).
+  // Dedup por author+text. Otimisticas/extras sumem quando sync proximo trouxer.
   const mergedReplies = (() => {
     const real = demand.threadReplies || [];
-    const realTexts = new Set(real.map((r) => `${r.author}|${r.text}`));
+    const seen = new Set(real.map((r) => `${r.author}|${r.text}`));
+    const fromExtra = extraReplies.filter((e) => {
+      const k = `${e.author}|${e.text}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
     const stillPending = optimisticReplies.filter(
-      (o) => !realTexts.has(`${o.author}|${o.text}`)
+      (o) => !seen.has(`${o.author}|${o.text}`)
     );
-    return [...real, ...stillPending];
+    return [...real, ...fromExtra, ...stillPending].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
   })();
 
   const handleStatusChange = (newStatus: string) => {
@@ -548,14 +598,31 @@ const DemandDetailSheet = ({
 
           {/* Thread replies + composer (apos descricao + detalhes pra contexto) */}
           <div>
-            <p className="text-xs text-muted-foreground font-medium mb-2">
-              Respostas da thread ({mergedReplies.length})
-              {optimisticReplies.length > 0 && (
-                <span className="ml-1.5 text-[10px] text-warning">
-                  · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""} de sync
-                </span>
-              )}
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-muted-foreground font-medium">
+                Respostas da thread ({mergedReplies.length})
+                {optimisticReplies.length > 0 && (
+                  <span className="ml-1.5 text-[10px] text-warning">
+                    · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""}
+                  </span>
+                )}
+                {extraReplies.length > 0 && (
+                  <span className="ml-1.5 text-[10px] text-success">
+                    · {extraReplies.length} novas
+                  </span>
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={refreshThread}
+                disabled={refreshingThread}
+                className="text-[10px] flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                title="Buscar mensagens novas direto do Slack"
+              >
+                <span className={refreshingThread ? "inline-block animate-spin" : ""}>↻</span>
+                {refreshingThread ? "Atualizando..." : "Atualizar"}
+              </button>
+            </div>
             {mergedReplies.length > 0 && (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
                 {mergedReplies.map((reply, i) => {
@@ -621,6 +688,8 @@ const DemandDetailSheet = ({
                     isTeamMember: true,
                     pendingTs: ts,
                   }]);
+                  // Auto-refresh apos envio pra confirmar do Slack (~2s)
+                  setTimeout(() => { void refreshThread(); }, 2000);
                 }}
               />
             </div>

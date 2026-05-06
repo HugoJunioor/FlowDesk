@@ -451,33 +451,38 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                 <div className="px-3 py-3 text-xs text-muted-foreground text-center">
                   {membersLoading ? "Carregando membros..." : `Nenhum match com "${mentionFilter}"`}
                 </div>
-              ) : filtered.slice(0, 12).map((person) => (
-                <button
+              ) : filtered.slice(0, 12).map((person) => {
+                const selectPerson = () => {
+                  console.log("[mention] selecionando:", person.name);
+                  const ta = textareaRef.current;
+                  if (!ta) return;
+                  const cursor = mentionCursorRef.current;
+                  const before = text.slice(0, cursor);
+                  const replacement = person.slackId
+                    ? `<@${person.slackId}> `
+                    : `@${person.name} `;
+                  const newBefore = before.replace(/@\w*$/, replacement);
+                  const newText = newBefore + text.slice(cursor);
+                  setText(newText);
+                  setMentionFilter(null);
+                  setMentionAnchor(null);
+                  setTimeout(() => {
+                    ta.focus();
+                    const newPos = newBefore.length;
+                    ta.setSelectionRange(newPos, newPos);
+                  }, 0);
+                };
+
+                return (
+                <div
                   key={person.slackId || person.name}
-                  type="button"
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
-                  // mousedown.preventDefault impede textarea de perder foco
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(e) => {
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer select-none"
+                  // Usa onMouseDown — fires ANTES do textarea perder foco.
+                  // preventDefault impede focus shift; depois selectPerson re-foca.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
-                    const ta = textareaRef.current;
-                    if (!ta) return;
-                    // Usa cursor capturado quando dropdown abriu (mais confiavel que selectionStart)
-                    const cursor = mentionCursorRef.current;
-                    const before = text.slice(0, cursor);
-                    const replacement = person.slackId
-                      ? `<@${person.slackId}> `
-                      : `@${person.name} `;
-                    const newBefore = before.replace(/@\w*$/, replacement);
-                    const newText = newBefore + text.slice(cursor);
-                    setText(newText);
-                    setMentionFilter(null);
-                    setMentionAnchor(null);
-                    setTimeout(() => {
-                      ta.focus();
-                      const newPos = newBefore.length;
-                      ta.setSelectionRange(newPos, newPos);
-                    }, 0);
+                    selectPerson();
                   }}
                 >
                   {person.avatar ? (
@@ -496,8 +501,9 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                   {person.slackId && (
                     <span className="text-[10px] text-success" title="Mention real (notifica)">●</span>
                   )}
-                </button>
-              ))}
+                </div>
+                );
+              })}
             </div>
           );
         })(),

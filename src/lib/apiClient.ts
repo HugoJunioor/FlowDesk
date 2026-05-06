@@ -160,6 +160,16 @@ export const apiClient = {
         `/slack/channel-members?channel=${encodeURIComponent(channel)}`,
         { demoFallback: { channel, members: [] } }
       ),
+    threadReplies: (permalink: string) =>
+      request<{
+        replies: Array<{
+          ts: string; text: string; userId?: string; timestamp: string;
+          author: string; isBot: boolean;
+          files: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }>;
+        }>;
+        count: number;
+      }>(`/slack/thread-replies?permalink=${encodeURIComponent(permalink)}`,
+        { demoFallback: { replies: [], count: 0 } }),
     status: () =>
       request<{ enabled: boolean; team?: string; user?: string; error?: string }>(
         "/slack/status",
