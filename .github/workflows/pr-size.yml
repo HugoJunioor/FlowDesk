@@ -1,0 +1,38 @@
+name: PR Size
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # Aplica label baseado no numero de linhas alteradas (excluindo gerados).
+      # Util pra reviewer saber rapidamente o tamanho antes de abrir.
+      - uses: codelytv/pr-size-labeler@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          xs_label: "size/XS"
+          xs_max_size: "10"
+          s_label: "size/S"
+          s_max_size: "100"
+          m_label: "size/M"
+          m_max_size: "500"
+          l_label: "size/L"
+          l_max_size: "1000"
+          xl_label: "size/XL"
+          fail_if_xl: "false"
+          message_if_xl: |
+            Esse PR tem mais de 1000 linhas alteradas. Considere quebrar em
+            PRs menores pra facilitar a review — uma feature por vez.
+          # Ignora gerados/locks pra nao inflar artificialmente
+          files_to_ignore: |
+            "package-lock.json"
+            "yarn.lock"
+            "*.svg"
+            "dist/**"
+            "coverage/**"

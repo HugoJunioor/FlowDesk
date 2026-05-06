@@ -1,0 +1,35 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # Mantem CHANGELOG.md atualizado e abre PR de release a cada commit em main.
+      # Quando esse PR de release for mergeado, cria tag + GitHub Release automatico.
+      # Bumps de versao seguem Conventional Commits:
+      #   feat: -> minor
+      #   fix:  -> patch
+      #   feat!:/BREAKING CHANGE -> major
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: node
+          package-name: flowdesk
+          changelog-types: |
+            [
+              {"type":"feat","section":"Features","hidden":false},
+              {"type":"fix","section":"Bug Fixes","hidden":false},
+              {"type":"perf","section":"Performance","hidden":false},
+              {"type":"refactor","section":"Refactoring","hidden":false},
+              {"type":"docs","section":"Docs","hidden":false},
+              {"type":"chore","section":"Chores","hidden":true},
+              {"type":"test","section":"Tests","hidden":true},
+              {"type":"ci","section":"CI","hidden":true}
+            ]
