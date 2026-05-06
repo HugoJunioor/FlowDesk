@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "EditorConfig.EditorConfig",
+    "bradlc.vscode-tailwindcss",
+    "vitest.explorer",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens"
+  ]
+}
