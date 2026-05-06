@@ -59,6 +59,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [channelMembers, setChannelMembers] = useState<SlackChannelMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [mentionAnchor, setMentionAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
   // Captura cursor pos quando dropdown abre, pra usar no click (evita race com blur)
   const mentionCursorRef = useRef<number>(0);
 
@@ -298,7 +299,56 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     }
   };
 
+  // Funcao pra selecionar pessoa no mention dropdown (compartilhada click + teclado)
+  const selectMentionPerson = (person: { name: string; slackId?: string }) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const cursor = mentionCursorRef.current;
+    const before = text.slice(0, cursor);
+    const replacement = person.slackId ? `<@${person.slackId}> ` : `@${person.name} `;
+    const newBefore = before.replace(/@\w*$/, replacement);
+    const newText = newBefore + text.slice(cursor);
+    setText(newText);
+    setMentionFilter(null);
+    setMentionAnchor(null);
+    setMentionSelectedIdx(0);
+    setTimeout(() => {
+      ta.focus();
+      const newPos = newBefore.length;
+      ta.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Navegacao no mention dropdown se aberto
+    if (mentionFilter !== null) {
+      const filtered = mentionablePeople.filter((p) =>
+        p.name.toLowerCase().includes(mentionFilter.toLowerCase())
+      );
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionSelectedIdx((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionSelectedIdx((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" && filtered.length > 0) {
+        e.preventDefault();
+        const chosen = filtered[Math.min(mentionSelectedIdx, filtered.length - 1)];
+        selectMentionPerson(chosen);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionFilter(null);
+        setMentionAnchor(null);
+        return;
+      }
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       void handleSend();
@@ -389,7 +439,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             const m = before.match(/@(\w*)$/);
             if (m) {
               setMentionFilter(m[1]);
-              mentionCursorRef.current = cursor; // captura pos pra usar no click
+              setMentionSelectedIdx(0); // reset selecao a cada novo filtro
+              mentionCursorRef.current = cursor;
               const rect = ta.getBoundingClientRect();
               setMentionAnchor({
                 top: rect.bottom + 4,
@@ -451,38 +502,20 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                 <div className="px-3 py-3 text-xs text-muted-foreground text-center">
                   {membersLoading ? "Carregando membros..." : `Nenhum match com "${mentionFilter}"`}
                 </div>
-              ) : filtered.slice(0, 12).map((person) => {
-                const selectPerson = () => {
-                  console.log("[mention] selecionando:", person.name);
-                  const ta = textareaRef.current;
-                  if (!ta) return;
-                  const cursor = mentionCursorRef.current;
-                  const before = text.slice(0, cursor);
-                  const replacement = person.slackId
-                    ? `<@${person.slackId}> `
-                    : `@${person.name} `;
-                  const newBefore = before.replace(/@\w*$/, replacement);
-                  const newText = newBefore + text.slice(cursor);
-                  setText(newText);
-                  setMentionFilter(null);
-                  setMentionAnchor(null);
-                  setTimeout(() => {
-                    ta.focus();
-                    const newPos = newBefore.length;
-                    ta.setSelectionRange(newPos, newPos);
-                  }, 0);
-                };
-
+              ) : filtered.slice(0, 12).map((person, idx) => {
+                const isSelected = idx === Math.min(mentionSelectedIdx, filtered.length - 1);
                 return (
-                <div
+                <button
                   key={person.slackId || person.name}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer select-none"
-                  // Usa onMouseDown — fires ANTES do textarea perder foco.
-                  // preventDefault impede focus shift; depois selectPerson re-foca.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    selectPerson();
+                  type="button"
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 cursor-pointer ${
+                    isSelected ? "bg-primary/10 text-primary-foreground" : "hover:bg-muted"
+                  }`}
+                  onMouseEnter={() => setMentionSelectedIdx(idx)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    console.log("[mention] click:", person.name);
+                    selectMentionPerson(person);
                   }}
                 >
                   {person.avatar ? (
@@ -501,7 +534,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                   {person.slackId && (
                     <span className="text-[10px] text-success" title="Mention real (notifica)">●</span>
                   )}
-                </div>
+                </button>
                 );
               })}
             </div>
