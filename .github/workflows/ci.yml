@@ -6,29 +6,59 @@ on:
   pull_request:
     branches: [main]
 
+# Cancela runs antigos quando push novo chega no mesmo PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-test:
-    name: Build, Lint & Test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      - run: npm run lint
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
 
-      - name: Lint
-        run: npm run lint
-        continue-on-error: true
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      # Build em modo demo: garante que o repo rode sem realDemands.ts (dados privados)
+      - run: npm run build
+        env:
+          VITE_DEMO_MODE: "true"
 
-      - name: Build
-        run: npm run build
-
-      - name: Test
-        run: npm test --if-present
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      - run: npm test
