@@ -1,0 +1,38 @@
+# Configuracao do Gitleaks (rodado no CI via .github/workflows/secrets-scan.yml)
+# Estende as regras default + adiciona regras especificas do projeto.
+
+title = "FlowDesk gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "slack-bot-token"
+description = "Slack Bot Token"
+regex = '''xoxb-[0-9]{10,}-[0-9]{10,}-[A-Za-z0-9]{20,}'''
+keywords = ["xoxb"]
+
+[[rules]]
+id = "slack-user-token"
+description = "Slack User Token"
+regex = '''xoxp-[0-9]{10,}-[0-9]{10,}-[0-9]{10,}-[a-f0-9]{32}'''
+keywords = ["xoxp"]
+
+[[rules]]
+id = "slack-app-token"
+description = "Slack App Token"
+regex = '''xapp-[0-9]+-[A-Z0-9]+-[0-9]+-[a-f0-9]+'''
+keywords = ["xapp"]
+
+[allowlist]
+description = "Falsos positivos conhecidos"
+paths = [
+  '''\.env\.example$''',
+  '''(^|/)dist/''',
+  '''(^|/)node_modules/''',
+  '''package-lock\.json$''',
+]
+# Permite literalmente o placeholder do .env.example
+regexes = [
+  '''xoxb-your-token-here''',
+]
