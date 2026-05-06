@@ -407,6 +407,14 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             <div
               className="fixed z-[9999] bg-popover border rounded-lg shadow-2xl max-h-72 overflow-y-auto min-w-[280px] max-w-[400px]"
               style={{ top: mentionAnchor.top, left: mentionAnchor.left }}
+              // Previne dialog Radix de tratar como "click fora" e fechar a modal
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                // Previne textarea de perder foco (que fecharia o dropdown)
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 py-1.5 border-b flex items-center gap-1.5 sticky top-0 bg-popover">
                 <AtSign size={10} /> Mencionar
