@@ -1,0 +1,27 @@
+# https://docs.codecov.com/docs/codecov-yaml
+coverage:
+  status:
+    project:
+      default:
+        # Permite ate 1% de queda na cobertura geral antes de marcar fail
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        # Codigo NOVO em PRs deve ter pelo menos 50% de cobertura
+        target: 50%
+        threshold: 5%
+
+comment:
+  layout: "header, diff, flags, files"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "src/components/**"
+  - "src/pages/**"
+  - "src/hooks/**"
+  - "src/contexts/**"
+  - "**/*.test.ts"
+  - "scripts/**"
+  - "dist/**"
