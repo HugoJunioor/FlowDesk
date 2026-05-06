@@ -86,6 +86,8 @@ const DemandDetailSheet = ({
 
   // Replies otimistas — enviadas via composer, aparecem na thread imediatamente
   // antes do proximo sync. Limpa quando troca de demanda ou re-sync traz a real.
+  const [refreshingThread, setRefreshingThread] = useState(false);
+  const [extraReplies, setExtraReplies] = useState<Array<{ author: string; text: string; timestamp: string; isTeamMember: boolean; files?: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }> }>>([]);
   const [optimisticReplies, setOptimisticReplies] = useState<Array<{
     author: string;
     text: string;
@@ -137,9 +139,6 @@ const DemandDetailSheet = ({
     format(new Date(iso), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
 
   // Refresh thread — busca replies frescas do Slack
-  const [refreshingThread, setRefreshingThread] = useState(false);
-  const [extraReplies, setExtraReplies] = useState<Array<{ author: string; text: string; timestamp: string; isTeamMember: boolean; files?: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }> }>>([]);
-
   const refreshThread = async () => {
     if (refreshingThread) return;
     setRefreshingThread(true);
