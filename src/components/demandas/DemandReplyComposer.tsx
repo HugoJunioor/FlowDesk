@@ -383,7 +383,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
             );
             if (filtered.length === 0) return null;
             return (
-              <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border rounded-md shadow-lg max-h-56 overflow-y-auto min-w-[240px]">
+              <div className="absolute top-full left-0 mt-1 z-50 bg-popover border rounded-md shadow-lg max-h-72 overflow-y-auto min-w-[280px]">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-2 py-1 border-b flex items-center gap-1">
                   <AtSign size={10} /> Mencionar
                   {channelMembers.length > 0 && (
