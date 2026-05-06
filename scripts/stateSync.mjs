@@ -569,6 +569,13 @@ async function handleSlack(req, res) {
 }
 
 function handler(req, res, next) {
+  // Slack OAuth endpoints (login do user, redirect, callback)
+  if (req.url?.startsWith("/auth/slack/")) {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    return handleSlackOAuth(req, res);
+  }
+
   // Slack endpoints (locais, leem SLACK_BOT_TOKEN do .env)
   if (req.url?.startsWith("/slack/")) {
     setCors(req, res);
