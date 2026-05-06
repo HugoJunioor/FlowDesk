@@ -463,6 +463,56 @@ async function handleSlack(req, res) {
       return res.end(JSON.stringify({ ok: true, ts: r.ts, channel, permalink, postedAs }));
     }
 
+    // GET /slack/thread-replies?permalink=... — busca replies FRESCAS de uma thread
+    // pra refresh manual (sem rodar sync completo). Util pra mostrar mensagem
+    // recem-postada (no Slack ou via FlowDesk) imediatamente.
+    if (req.method === "GET" && url.startsWith("/slack/thread-replies")) {
+      const u = new URL(url, "http://localhost");
+      const permalink = u.searchParams.get("permalink");
+      if (!permalink) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "permalink obrigatorio" }));
+      }
+      const parsed = parseSlackPermalink(permalink);
+      if (!parsed) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "Permalink invalido" }));
+      }
+      const r = await slackApi("conversations.replies",
+        { channel: parsed.channel, ts: parsed.thread_ts, limit: 200 },
+        true);
+      // Pula a primeira (eh a mensagem original, nao reply)
+      const replies = (r.messages || []).slice(1).map((msg) => ({
+        ts: msg.ts,
+        text: msg.text || "",
+        userId: msg.user,
+        timestamp: new Date(parseFloat(msg.ts) * 1000).toISOString(),
+        files: (msg.files || []).map((f) => ({
+          id: f.id, name: f.name, mimetype: f.mimetype, size: f.size,
+          urlPrivate: f.url_private, thumb360: f.thumb_360,
+          isPublic: !!f.is_public,
+        })),
+      }));
+      // Resolve nome dos users em batch
+      const uniqueUsers = [...new Set(replies.map((r) => r.userId).filter(Boolean))];
+      const userMap = {};
+      for (const uid of uniqueUsers) {
+        try {
+          const info = await slackApi("users.info", { user: uid }, true);
+          userMap[uid] = {
+            name: info.user.real_name || info.user.profile?.display_name || info.user.name,
+            isBot: info.user.is_bot,
+          };
+        } catch { userMap[uid] = { name: uid, isBot: false }; }
+      }
+      const enriched = replies.map((r) => ({
+        ...r,
+        author: userMap[r.userId]?.name || "?",
+        isBot: userMap[r.userId]?.isBot || false,
+      }));
+      return res.end(JSON.stringify({ replies: enriched, count: enriched.length }));
+    }
+
     // GET /slack/channel-members?channel=C123 — lista membros pra mention autocomplete
     if (req.method === "GET" && url.startsWith("/slack/channel-members")) {
       const u = new URL(url, "http://localhost");
