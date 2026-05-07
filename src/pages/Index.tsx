@@ -235,6 +235,27 @@ const Dashboard = () => {
     })).filter((d) => d.value > 0);
   }, [filtered, pieFilter]);
 
+  // === REPORT DEMANDS ===
+  // Aplica os filtros locais dos graficos (pieFilter de prioridade e
+  // barStatusFilter de status) por cima do filtered global. Sem isso os
+  // relatorios BI/Excel ignoravam esses filtros — divergiam da tela.
+  const reportDemands = useMemo(() => {
+    return filtered.filter((d) => {
+      if (pieFilter !== "all" && d.priority !== pieFilter) return false;
+      if (barStatusFilter !== "all") {
+        // barStatusFilter: "abertas" inclui aberta+em_andamento; outros sao 1:1
+        if (barStatusFilter === "abertas") {
+          if (d.status !== "aberta" && d.status !== "em_andamento") return false;
+        } else if (barStatusFilter === "concluidas" && d.status !== "concluida") {
+          return false;
+        } else if (barStatusFilter === "expiradas" && d.status !== "expirada") {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [filtered, pieFilter, barStatusFilter]);
+
   // === BAR CHART DATA (apply local status filter) ===
   const clientChartData = useMemo(() => {
     return clients.map((c) => {
@@ -363,7 +384,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center gap-2">
               <ReportButton
-                demands={filtered}
+                demands={reportDemands}
                 source="dashboard"
                 filters={{
                   Período: period === "personalizado"
@@ -371,6 +392,8 @@ const Dashboard = () => {
                     : period === "anual" ? `${selectedYear}` : period,
                   ...(client ? { Cliente: client } : {}),
                   ...(assignee ? { Responsável: assignee } : {}),
+                  ...(pieFilter !== "all" ? { Prioridade: pieFilter.toUpperCase() } : {}),
+                  ...(barStatusFilter !== "all" ? { Status: barStatusFilter } : {}),
                 }}
               />
               <SyncStatusIndicator />
