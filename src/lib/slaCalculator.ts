@@ -20,15 +20,21 @@ export const SLA_TARGET_PERCENT = 80;
 
 /**
  * Motivos de expiracao que NAO penalizam o SLA da Just.
- * Quando o atraso eh culpa do cliente (nao respondeu, demora pra validar)
- * ou de terceiros, a demanda nao deve aparecer na metrica de breach.
+ *
+ * Sao apenas casos onde o atraso e EXTERNO ao time:
+ * - Cliente nao respondeu (bloqueia continuidade)
+ * - Dependencia de terceiros (provedor, integrador, fornecedor)
+ *
+ * Outros motivos — incluindo "Demora para validar a correcao", "Demanda
+ * complexa", "Muitas demandas juntas" — continuam impactando SLA porque
+ * sao gerenciaveis pelo time.
  *
  * Edite essa lista pra ajustar a regra de negocio.
  */
 export const SLA_RESOLUTION_EXCLUSION_REASONS = [
   "Falta de retorno do cliente",
   "Demora no retorno do cliente",
-  "Demora para validar a correcao",
+  "Dependencia de terceiros",
 ] as const;
 
 /**
