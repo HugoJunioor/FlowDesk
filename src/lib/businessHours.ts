@@ -227,18 +227,34 @@ export function formatBusinessTime(minutes: number): string {
 }
 
 /**
+ * Reply sintetico = gerado pelo sync quando a demanda foi fechada via
+ * reaction ✅/🟢 direto na mensagem principal, sem resposta real no thread.
+ * Texto comeca com "[✅" e nao representa atendimento humano. Esses replies
+ * NAO contam como primeira resposta da equipe (distorceriam a metrica de SLA
+ * pra perto de 0 — a reaction acontece ~1s apos createdAt).
+ */
+function isSyntheticReply(r: { text?: string }): boolean {
+  return typeof r.text === "string" && r.text.startsWith("[✅");
+}
+
+/**
  * SLA de primeira resposta: minutos uteis entre criacao e primeira resposta da equipe.
  * Se slaFirstResponseOverride for fornecido (dados historicos da planilha), usa diretamente.
- * Retorna null se nao ha resposta da equipe.
+ * Retorna null se nao ha resposta real da equipe (replies sinteticos de reaction
+ * sao ignorados — ver isSyntheticReply).
  */
-export function getFirstResponseMinutes(createdAt: string, threadReplies: { timestamp: string; isTeamMember: boolean }[], slaFirstResponseOverride?: number | null): number | null {
+export function getFirstResponseMinutes(
+  createdAt: string,
+  threadReplies: { timestamp: string; isTeamMember: boolean; text?: string }[],
+  slaFirstResponseOverride?: number | null,
+): number | null {
   // Dados historicos com SLA pre-calculado da planilha
   if (slaFirstResponseOverride !== undefined && slaFirstResponseOverride !== null) {
     return slaFirstResponseOverride;
   }
 
   const teamReplies = threadReplies
-    .filter((r) => r.isTeamMember)
+    .filter((r) => r.isTeamMember && !isSyntheticReply(r))
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   if (teamReplies.length === 0) return null;
@@ -249,10 +265,32 @@ export function getFirstResponseMinutes(createdAt: string, threadReplies: { time
 /**
  * SLA de resolucao: minutos uteis entre criacao e conclusao.
  * Retorna null se nao foi concluida.
+ *
+ * Heuristica anti-zerado: quando a demanda foi fechada via reaction ✅/🟢
+ * direto na mensagem principal SEM resposta real da equipe, o sync gera
+ * completedAt = createdAt + 1s (timestamp aproximado, nao real). Resultado
+ * eh ~0min, distorcendo metricas. Pra evitar, se o tempo for < 1 minuto E
+ * nao houver resposta real da equipe no thread, retorna null (tempo real
+ * desconhecido — melhor "sem dado" do que "0min" enganoso).
  */
-export function getResolutionMinutes(createdAt: string, completedAt: string | null): number | null {
+export function getResolutionMinutes(
+  createdAt: string,
+  completedAt: string | null,
+  threadReplies?: { isTeamMember: boolean; text?: string }[],
+): number | null {
   if (!completedAt) return null;
-  return getBusinessMinutesBetween(new Date(createdAt), new Date(completedAt));
+  const minutes = getBusinessMinutesBetween(new Date(createdAt), new Date(completedAt));
+
+  // Heuristica: se < 1 min E nao ha resposta real da equipe -> reply sintetico,
+  // tempo real desconhecido. Retorna null pra metrica nao usar valor enganoso.
+  if (minutes < 1 && threadReplies) {
+    const realTeamReplies = threadReplies.filter(
+      (r) => r.isTeamMember && !(typeof r.text === "string" && r.text.startsWith("[✅")),
+    );
+    if (realTeamReplies.length === 0) return null;
+  }
+
+  return minutes;
 }
 
 export function getBusinessTimeInfo(createdAt: string, dueDate: string) {

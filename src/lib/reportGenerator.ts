@@ -147,7 +147,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
       if (d.slaResolutionStatus === "atendido") slaPriorityData[d.priority].ok++;
       else if (d.slaResolutionStatus === "expirado") slaPriorityData[d.priority].breach++;
     } else {
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+      const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       if (resMins !== null) {
         if (resMins <= cfg.sla.resolutionHours * 60) slaPriorityData[d.priority].ok++;
         else slaPriorityData[d.priority].breach++;
@@ -180,14 +180,14 @@ export function generateInteractiveReport(options: ReportOptions): string {
     if (d.slaResolutionStatus === "atendido") resStatus = "atendido";
     else if (d.slaResolutionStatus === "expirado") resStatus = "expirado";
     else {
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+      const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       if (resMins !== null) resStatus = resMins <= cfg.sla.resolutionHours * 60 ? "atendido" : "expirado";
       else if (d.status === "expirada") resStatus = "expirado";
     }
     if (resStatus === "atendido") monthlyResMap[key].atendido++;
     else if (resStatus === "expirado") monthlyResMap[key].expirado++;
     // Avg resolution hours
-    const rh = d.resolutionHours ?? (getResolutionMinutes(d.createdAt, d.completedAt) !== null ? (getResolutionMinutes(d.createdAt, d.completedAt) as number) / 60 : null);
+    const rh = d.resolutionHours ?? (getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies) !== null ? (getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies) as number) / 60 : null);
     if (rh !== null) {
       monthlyResMap[key].totalResHours += rh;
       monthlyResMap[key].countRes++;
@@ -359,7 +359,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
       const resHoursArr = pDemands
         .map(d => {
           if (d.resolutionHours != null && d.resolutionHours > 0) return d.resolutionHours;
-          const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+          const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
           return resMins != null && resMins > 0 ? resMins / 60 : null;
         })
         .filter((h): h is number => h !== null);
@@ -456,7 +456,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
     .map((d) => {
       const client = extractClientName(d.slackChannel);
       const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+      const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       const cfg = PRIORITY_CONFIG[d.priority];
       const slaRespLimit = cfg?.sla ? parseResponseSla(cfg.sla.response) : null;
       const slaResLimit = cfg?.sla ? cfg.sla.resolutionHours * 60 : null;

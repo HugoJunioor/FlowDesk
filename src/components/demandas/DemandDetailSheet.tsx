@@ -176,7 +176,7 @@ const DemandDetailSheet = ({
     }
   };
 
-  // Edit/delete handlers — backend (chat.update / chat.delete via flowdesk-api)
+  // Edit/delete handlers — backend (chat.update / chat.delete via stateSync plugin)
   const handleEditReply = async (reply: { text: string; timestamp: string }) => {
     const newText = window.prompt("Editar mensagem:", reply.text);
     if (newText === null || newText.trim() === "" || newText === reply.text) return;
@@ -720,7 +720,7 @@ const DemandDetailSheet = ({
             const slaRespMinutes = parseResponseSla(priority.sla.response);
             const firstRespOk = firstRespMinutes !== null ? firstRespMinutes <= slaRespMinutes : null;
 
-            const resolutionMinutes = getResolutionMinutes(demand.createdAt, demand.completedAt);
+            const resolutionMinutes = getResolutionMinutes(demand.createdAt, demand.completedAt, demand.threadReplies);
             const slaResMinutes = priority.sla.resolutionHours * 60;
             // Usa slaResolutionStatus da planilha (historico) ou calcula em runtime (abril+)
             const resolutionOk = demand.slaResolutionStatus

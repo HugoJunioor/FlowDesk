@@ -179,30 +179,17 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const resolvedText = resolveUserMentions(msg.text || '');
       const fields = parseWorkflowMessage(resolvedText);
 
-      const parentCheckReaction = (msg.reactions || []).some(r => CHECK_REACTIONS.includes(r.name));
-
-      // Get thread replies (TODAS, paginadas)
+      // Get thread replies (TODAS, paginadas).
+      //
+      // REGRA DE FECHAMENTO: o sinal de "concluida" eh APENAS reaction ✅/🟢
+      // numa RESPOSTA do thread, nao na mensagem principal. Reaction na main
+      // message eh ambigua (pode ser "li", "ack", "ciente") e nao representa
+      // resolucao real — alem de gerar timestamps falsos (sync n/d quando
+      // a reaction foi feita). Por isso nao geramos reply sintetico aqui.
       const threadReplies = [];
       if (msg.reply_count > 0) {
         try {
           const replies = await fetchAllReplies(channelId, msg.ts);
-
-          const parentFull = replies[0];
-          const parentHasCheck = parentCheckReaction || (parentFull?.reactions || []).some(r => CHECK_REACTIONS.includes(r.name));
-
-          if (parentHasCheck) {
-            const checkReaction = (parentFull?.reactions || msg.reactions || []).find(r => CHECK_REACTIONS.includes(r.name));
-            const reactorId = checkReaction?.users?.[0];
-            const reactorInfo = reactorId ? await getUserInfo(reactorId) : { name: 'Equipe', isTeam: true };
-
-            threadReplies.push({
-              author: reactorInfo.name,
-              text: '[✅ Reacao de conclusao na mensagem principal]',
-              timestamp: new Date(parseFloat(parentFull?.ts || msg.ts) * 1000 + 1000).toISOString(),
-              isTeamMember: reactorInfo.isTeam,
-              hasCheckReaction: true,
-            });
-          }
 
           for (const reply of replies.slice(1)) {
             const info = reply.user ? await getUserInfo(reply.user) : { name: reply.username || 'Bot', isTeam: false };
@@ -221,18 +208,6 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         } catch (e) {
           console.error(`  Erro ao buscar replies de ${msg.ts}:`, e.message);
         }
-      } else if (parentCheckReaction) {
-        const checkReaction = (msg.reactions || []).find(r => CHECK_REACTIONS.includes(r.name));
-        const reactorId = checkReaction?.users?.[0];
-        const reactorInfo = reactorId ? await getUserInfo(reactorId) : { name: 'Equipe', isTeam: true };
-
-        threadReplies.push({
-          author: reactorInfo.name,
-          text: '[✅ Reacao de conclusao na mensagem principal]',
-          timestamp: new Date(parseFloat(msg.ts) * 1000 + 1000).toISOString(),
-          isTeamMember: reactorInfo.isTeam,
-          hasCheckReaction: true,
-        });
       }
 
       const title = fields['Título da demanda'] || fields['Titulo da demanda'] ||
