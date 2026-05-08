@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { updateUser, validateCPF, hashPassword, getUserById, changeUserPassword, getPasswordStrength } from "@/lib/authStorage";
 import PasswordStrength from "@/components/auth/PasswordStrength";
+import SlackConnection from "@/components/profile/SlackConnection";
 
 function formatCPF(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -307,6 +308,9 @@ const Profile = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Integracoes (Slack OAuth pra postar com identidade real) */}
+        {currentUser.email && <SlackConnection email={currentUser.email} />}
       </div>
     </AppLayout>
   );
