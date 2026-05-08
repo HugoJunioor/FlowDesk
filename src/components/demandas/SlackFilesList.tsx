@@ -33,12 +33,11 @@ function iconForMime(mimetype: string) {
   return File;
 }
 
-/** URL pra baixar o arquivo. Usa flowdesk-api proxy em prod, ou direto se isPublic. */
+/** URL pra baixar o arquivo. Usa proxy local /slack/file/:id; arquivos
+ *  publicos podem ser baixados direto do Slack. */
 function downloadUrl(file: SlackFile): string {
   if (file.isPublic && file.urlPrivate) return file.urlPrivate;
-  const apiBase =
-    import.meta.env.VITE_FLOWDESK_API_URL ??
-    "https://flowdesk-api-production-21cf.up.railway.app";
+  const apiBase = import.meta.env.VITE_FLOWDESK_API_URL ?? "";
   return `${apiBase}/slack/file/${encodeURIComponent(file.id)}`;
 }
 

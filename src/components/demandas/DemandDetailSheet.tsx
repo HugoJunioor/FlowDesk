@@ -176,7 +176,7 @@ const DemandDetailSheet = ({
     }
   };
 
-  // Edit/delete handlers — backend (chat.update / chat.delete via flowdesk-api)
+  // Edit/delete handlers — backend (chat.update / chat.delete via stateSync plugin)
   const handleEditReply = async (reply: { text: string; timestamp: string }) => {
     const newText = window.prompt("Editar mensagem:", reply.text);
     if (newText === null || newText.trim() === "" || newText === reply.text) return;

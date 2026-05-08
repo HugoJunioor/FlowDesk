@@ -1,0 +1,38 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      # Compara tamanho do bundle (build) entre PR e main, comenta no PR.
+      # Falha so se aumentar muito sem ajuste no threshold (ver action docs).
+      - uses: preactjs/compressed-size-action@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          install-script: "npm ci --legacy-peer-deps"
+          build-script: "build"
+          # Glob dos arquivos finais (Vite gera com hash em dist/assets/)
+          pattern: "dist/**/*.{js,css,html}"
+          # Ignora source maps e arquivos de manifest pra nao poluir
+          exclude: "{**/*.map,**/manifest.json}"
+          # Limite de aumento sem comentar (1KB)
+          minimum-change-threshold: 1024

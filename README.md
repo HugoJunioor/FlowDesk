@@ -57,17 +57,16 @@ clientes variados). Cada visitante tem seu próprio estado isolado no
 navegador — pode criar usuários, mexer em overrides, exportar relatórios
 sem afetar outros visitantes.
 
-## ⚡ Backend separado
+## ⚡ Backend integrado
 
-O sistema funciona standalone (estado no `localStorage` ou arquivo JSON
-compartilhado), mas existe também uma **API REST completa** disponível em
-[**HugoJunioor/flowdesk-api**](https://github.com/HugoJunioor/flowdesk-api):
+Os endpoints `/slack/*` e `/auth/slack/*` rodam direto no Vite dev server
+via plugin (`scripts/stateSync.mjs`) — sem dependência de servidor externo.
 
-- 🟢 **Rodando ao vivo** em [flowdesk-api-production-21cf.up.railway.app/docs](https://flowdesk-api-production-21cf.up.railway.app/docs)
-- 🛠 **Stack:** Node 20 + Fastify + Prisma + PostgreSQL
-- 🔐 **Auth:** PBKDF2 + JWT (cookie HttpOnly), rate limit, audit log
-- 📚 **Swagger UI** auto-gerado com 22 endpoints documentados
-- ✅ **Zero vulnerabilidades** (auditado em CI)
+- 🔐 **Slack User OAuth** — cada usuário conecta a própria conta pelo perfil
+  pra postar com identidade real (não como bot)
+- 📤 **Reply / upload / edit / delete** mensagens em threads
+- 👥 **Channel members** pra autocomplete de @mention
+- 💾 **Persistência local** em `data/` (gitignored) — tokens, overrides, estado
 
 ## 🏗 Arquitetura
 
@@ -136,10 +135,12 @@ Detalhes técnicos em [`src/adapters/README.md`](./src/adapters/README.md).
 
 ## Pré-requisitos
 
-- Node.js 18+
+- Node.js 20 (use `.nvmrc`: `nvm use`)
 - npm
 - Token de bot Slack com escopos: `channels:history`, `channels:read`,
-  `groups:read`, `users:read`, `reactions:read`
+  `groups:read`, `users:read`, `reactions:read`, `chat:write`, `files:write`
+- Slack App OAuth (opcional, pra postar como usuário real):
+  `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI`
 
 ## Instalação
 
@@ -156,13 +157,19 @@ cp .env.example .env
 | Comando | Descrição |
 |---------|-----------|
 | `npm run dev` | Servidor de desenvolvimento (porta 8080) |
-| `npm run dev:vpn` | Dev + sync automático + lista IPs disponíveis |
+| `npm run dev:all` | Dev + sync automático em paralelo (recomendado) |
+| `npm run dev:vpn` | Dev + sync + lista IPs (rede mesh/VPN) |
 | `npm run build` | Build de produção |
 | `npm run preview` | Servir o build localmente |
-| `npm run share` | Sync + build + preview + watcher (recomendado) |
+| `npm run share` | Sync + build + preview + watcher |
 | `npm run sync` | Sincronizar canais cliente-* manualmente |
 | `npm run sync:sql` | Sincronizar canal de demandas técnicas |
-| `npm run lint` | Linter ESLint |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript sem emitir |
+| `npm test` | Vitest run |
+| `npm run test:watch` | Vitest watch mode |
+| `npm run test:coverage` | Tests + coverage report |
+| `npm run validate` | Lint + typecheck + test (pré-push) |
 
 ## Acesso inicial
 
@@ -206,6 +213,25 @@ TEAM_MEMBERS=["Nome Completo do Membro 1","Nome Completo do Membro 2"]
 `TEAM_MEMBERS` é a lista de usuários internos. Mensagens de quem está
 nesta lista são tratadas como "equipe"; o restante é tratado como cliente
 externo.
+
+## 🛡 Qualidade e CI
+
+Repositório com pipeline robusto:
+
+- **CI paralelo**: Lint + Typecheck + Build + Test em jobs separados
+- **Branch protection** na `main`: 5 status checks obrigatórios, sem bypass
+- **Pre-commit hook** (Husky + lint-staged): roda eslint --fix nos arquivos staged
+- **Commit-msg hook** (commitlint): força [Conventional Commits](https://www.conventionalcommits.org/)
+- **Secrets scan** (Gitleaks): bloqueia PR com token vazado
+- **Coverage threshold** em CI (regression-only mode)
+- **Bundle size check**: PR mostra delta de tamanho do bundle
+- **Lighthouse CI**: score de perf/a11y/SEO/best-practices em PRs
+- **Dependabot** + auto-merge de patches/minors
+- **Release Please**: changelog + tags semânticas automáticos
+- **Stale bot**: fecha PRs/issues abandonados
+- **CODEOWNERS** + auto-labeler + size labels (XS/S/M/L/XL)
+
+Veja [`.github/`](.github) pra detalhes.
 
 ## Privacidade
 
