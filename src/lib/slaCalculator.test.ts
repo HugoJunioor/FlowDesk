@@ -115,4 +115,22 @@ describe("isResolutionSlaExcluded", () => {
     } as Partial<SlackDemand>);
     expect(isResolutionSlaExcluded(d)).toBe(true);
   });
+
+  it("EXCLUI tambem com 'Dependencia de terceiros'", () => {
+    const d = makeDemand({
+      createdAt: "2026-04-20T10:00:00Z",
+      closure: { expirationReason: "Dependencia de terceiros" },
+      slaResolutionStatus: "expirado",
+    } as Partial<SlackDemand>);
+    expect(isResolutionSlaExcluded(d)).toBe(true);
+  });
+
+  it("NAO exclui com 'Demora para validar a correcao' (impacta SLA)", () => {
+    const d = makeDemand({
+      createdAt: "2026-04-20T10:00:00Z",
+      closure: { expirationReason: "Demora para validar a correcao" },
+      slaResolutionStatus: "expirado",
+    } as Partial<SlackDemand>);
+    expect(isResolutionSlaExcluded(d)).toBe(false);
+  });
 });
