@@ -43,6 +43,54 @@ describe("getResolutionMinutes", () => {
     expect(result).toBeGreaterThanOrEqual(0);
     expect(result).toBeLessThanOrEqual(120); // tolerancia pra timezone
   });
+
+  it("retorna null quando reply sintetico (reaction direto na main, sem reply real)", () => {
+    // Demanda criada e fechada via ✅ em ~1 segundo (sintetico do sync).
+    // Sem reply real da equipe = tempo desconhecido = null.
+    const createdAt = "2026-05-06T13:00:00Z";
+    const completedAt = "2026-05-06T13:00:01Z"; // +1 segundo
+    const replies = [
+      { isTeamMember: true, text: "[✅ Reacao de conclusao na mensagem principal]" },
+    ];
+    expect(getResolutionMinutes(createdAt, completedAt, replies)).toBe(null);
+  });
+
+  it("calcula tempo normal quando ha reply real da equipe (nao sintetico)", () => {
+    const replies = [
+      { isTeamMember: true, text: "Vou olhar agora" }, // reply real
+    ];
+    const result = getResolutionMinutes(
+      "2026-05-06T13:00:00Z",
+      "2026-05-06T15:00:00Z",
+      replies,
+    );
+    expect(result).not.toBe(null);
+    expect(result).toBeGreaterThanOrEqual(0);
+  });
+
+  it("backward compat: sem threadReplies, calcula direto", () => {
+    const result = getResolutionMinutes("2026-05-06T13:00:00Z", "2026-05-06T13:00:01Z");
+    expect(result).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("getFirstResponseMinutes — replies sinteticos", () => {
+  it("ignora reply sintetico de reaction (texto comeca com [✅)", () => {
+    const replies = [
+      { timestamp: "2026-05-06T13:00:01Z", isTeamMember: true, text: "[✅ Reacao de conclusao na mensagem principal]" },
+    ];
+    expect(getFirstResponseMinutes("2026-05-06T13:00:00Z", replies)).toBe(null);
+  });
+
+  it("usa primeira reply real ignorando sinteticos no comeco", () => {
+    const replies = [
+      { timestamp: "2026-05-06T13:00:01Z", isTeamMember: true, text: "[✅ Reacao]" }, // sintetico
+      { timestamp: "2026-05-06T14:00:00Z", isTeamMember: true, text: "Olhando agora" }, // real
+    ];
+    const result = getFirstResponseMinutes("2026-05-06T13:00:00Z", replies);
+    expect(result).not.toBe(null);
+    expect(result).toBeGreaterThan(0);
+  });
 });
 
 describe("getFirstResponseMinutes", () => {

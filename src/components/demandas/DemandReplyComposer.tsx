@@ -57,6 +57,9 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [dragOver, setDragOver] = useState(false);
   const [channelMembers, setChannelMembers] = useState<SlackChannelMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  // Indica se o user logado tem token Slack OAuth — UI mostra discreto
+  // entre toolbar e textarea pra deixar claro como sera postado
+  const [slackConnected, setSlackConnected] = useState<boolean | null>(null);
   const [mentionAnchor, setMentionAnchor] = useState<{ top: number; left: number } | null>(null);
   const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
   // Captura cursor pos quando dropdown abre, pra usar no click (evita race com blur)
@@ -94,6 +97,16 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
       .finally(() => { if (!cancelled) setMembersLoading(false); });
     return () => { cancelled = true; };
   }, [demand.slackChannel]);
+
+  // Verifica se user tem Slack conectado — UI mostra indicador discreto
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    let cancelled = false;
+    apiClient.auth.slackStatus(currentUser.email)
+      .then((res) => { if (!cancelled) setSlackConnected(res.connected); })
+      .catch(() => { if (!cancelled) setSlackConnected(false); });
+    return () => { cancelled = true; };
+  }, [currentUser?.email]);
 
   // Pessoas mencionaveis: MERGE dos membros do canal Slack + participantes
   // da thread (alguns que comentaram podem nao estar no canal). Dedup por nome.
@@ -450,6 +463,28 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           onChange={handleFileInputChange}
         />
       </div>
+
+      {/* Indicador discreto: posta como user real (OAuth) ou como bot JustFlow.
+          Click vai pro perfil pra conectar — link gentil, nao bloqueia. */}
+      {slackConnected !== null && (
+        <div className="flex items-center justify-end gap-1.5 mb-1 px-1 text-[10px]">
+          {slackConnected ? (
+            <span className="text-success/80 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              Postando com sua identidade Slack
+            </span>
+          ) : (
+            <a
+              href="/perfil"
+              className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              title="Conecte sua conta Slack pra postar com sua identidade real"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
+              Postando como JustFlow · conectar →
+            </a>
+          )}
+        </div>
+      )}
 
       <div className="relative">
         <Textarea
