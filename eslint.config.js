@@ -7,7 +7,7 @@ import react from "eslint-plugin-react";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".claude/**", "data/**", "coverage/**"] },
+  { ignores: ["dist", ".claude/**", "data/**", "coverage/**", "storybook-static/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

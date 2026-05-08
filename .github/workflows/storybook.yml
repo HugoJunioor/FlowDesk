@@ -1,0 +1,26 @@
+name: Storybook
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".storybook/**"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci --legacy-peer-deps
+      # Smoke test: garante que stories nao quebram o build
+      - run: npm run build-storybook --quiet
