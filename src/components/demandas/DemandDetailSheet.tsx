@@ -249,7 +249,25 @@ const DemandDetailSheet = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent
+        className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        // Mantem o dialog aberto quando o pointerdown e em elementos do
+        // mention dropdown (que vivem fora do dialog via portal). Sem isso
+        // Radix detecta como "click outside" e fecha o modal antes do
+        // nosso handler conseguir capturar a selecao.
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest("[data-mention-dropdown]")) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest("[data-mention-dropdown]")) {
+            e.preventDefault();
+          }
+        }}
+      >
         {/* Header fixo (alinhado com a coluna de conteudo, nao stretches edge-to-edge) */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0 max-w-4xl w-full mx-auto">
           <div className="flex items-center gap-2 flex-wrap">

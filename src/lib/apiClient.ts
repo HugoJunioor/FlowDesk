@@ -17,13 +17,12 @@ import { isDemoMode } from "@/components/DemoBanner";
  * Esquema garante que a maquina do master rode tudo localmente sem
  * depender de Railway (que nao pode ter token Slack real, infra publica).
  */
-const isDev = import.meta.env.DEV;
+// BASE_URL sempre vazio (URL relativa) — bate no servidor que serve o front,
+// que tem o stateSync plugin (dev) ou o middleware do preview (build local).
+// Override manual ainda eh respeitado via VITE_FLOWDESK_API_URL.
+// (Antes tinha fallback Railway, mas o repo flowdesk-api foi excluido.)
 const explicit = import.meta.env.VITE_FLOWDESK_API_URL;
-const BASE_URL = explicit
-  ? explicit
-  : isDev
-  ? ""
-  : "https://flowdesk-api-production-21cf.up.railway.app";
+const BASE_URL = explicit || "";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public body?: unknown) {
