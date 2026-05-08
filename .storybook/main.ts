@@ -12,7 +12,8 @@ const config: StorybookConfig = {
     "../src/**/*.stories.@(js|jsx|ts|tsx)",
   ],
   addons: [
-    "@storybook/addon-essentials",
+    // Em Storybook 10, addon-essentials foi integrado ao core. Apenas
+    // addons opcionais aqui (a11y eh extra util pra compliance).
     "@storybook/addon-a11y",
   ],
   framework: {
