@@ -51,3 +51,4 @@ src/config/branding.local.ts
 public/just-logo.*
 .env.bak*
 coverage
+storybook-static/
