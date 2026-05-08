@@ -39,9 +39,11 @@ export default defineConfig(({ command }) => ({
       "Content-Security-Policy": [
         "default-src 'self'",
         "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "font-src 'self' data:",
+        // Google Fonts: stylesheet em fonts.googleapis.com
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        // Avatars Slack vem de slack-edge.com (carrega como img)
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data: https://fonts.gstatic.com",
         "connect-src 'self'",
         "frame-ancestors 'none'",
         "base-uri 'self'",
