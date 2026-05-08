@@ -9,7 +9,6 @@
  * - Optimistic update do thread (callback onReplied/onUploaded)
  */
 import { useRef, useState, useEffect, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
-import { createPortal } from "react-dom";
 import { Bold, Italic, Strikethrough, Code, Code2, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon, List, ListOrdered, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -501,18 +500,19 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         {/* Mention dropdown */}
       </div>
 
-      {/* Mention dropdown — JANELA FLUTUANTE via Portal, escapa overflow do modal */}
-      {mentionFilter !== null && mentionAnchor && createPortal(
-        (() => {
+      {/* Mention dropdown — RENDERIZADO DENTRO DO DIALOG (sem portal).
+          position: fixed escapa overflow:hidden do DialogContent SEM tirar
+          o elemento da arvore do Radix Dialog — portanto Radix nao trata
+          clicks aqui como "outside" e o modal nao fecha. */}
+      {mentionFilter !== null && mentionAnchor && (() => {
           const filtered = mentionablePeople.filter((p) =>
             p.name.toLowerCase().includes(mentionFilter.toLowerCase())
           );
           return (
             <div
+              data-mention-dropdown
               className="fixed z-[9999] bg-popover border rounded-lg shadow-2xl max-h-72 overflow-y-auto min-w-[280px] max-w-[400px]"
               style={{ top: mentionAnchor.top, left: mentionAnchor.left }}
-              // Previne Radix Dialog de tratar como "click fora" (fecharia o modal)
-              onPointerDown={(e) => e.stopPropagation()}
             >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 py-1.5 border-b flex items-center gap-1.5 sticky top-0 bg-popover">
                 <AtSign size={10} /> Mencionar
@@ -538,11 +538,11 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                     isSelected ? "bg-primary/10 text-primary-foreground" : "hover:bg-muted"
                   }`}
                   onMouseEnter={() => setMentionSelectedIdx(idx)}
+                  // preventDefault no mouseDown evita textarea perder foco;
+                  // selecao acontece no click normal — Radix Dialog nao fecha mais
+                  // porque o dropdown esta DENTRO da arvore do Dialog (sem portal).
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    console.log("[mention] click:", person.name);
-                    selectMentionPerson(person);
-                  }}
+                  onClick={() => selectMentionPerson(person)}
                 >
                   {person.avatar ? (
                     <img src={person.avatar} alt="" className="w-6 h-6 rounded-full shrink-0" />
@@ -565,9 +565,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
               })}
             </div>
           );
-        })(),
-        document.body
-      )}
+        })()}
 
       {/* Lista de anexos */}
       {files.length > 0 && (
