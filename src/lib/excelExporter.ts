@@ -164,7 +164,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
     // resolutionHours: prefer stored (historical), else derive from business minutes
     const computedResHours: number | null = (() => {
       if (d.resolutionHours != null) return d.resolutionHours;
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+      const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       return resMins != null ? resMins / 60 : null;
     })();
 

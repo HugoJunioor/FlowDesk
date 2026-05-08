@@ -1,26 +1,16 @@
 /**
- * Cliente HTTP da flowdesk-api.
+ * Cliente HTTP da app.
  *
- * Centraliza chamadas REST. Lê base URL da env VITE_FLOWDESK_API_URL
- * (default: produção Railway). Em modo demo, requests caem em fallback
- * que devolve mock — front continua funcionando sem backend real.
+ * Centraliza chamadas REST pros endpoints /slack/* e /auth/slack/*
+ * servidos pelo plugin stateSync (Vite dev e preview). Em modo demo,
+ * requests caem em fallback que devolve mock — front continua funcionando
+ * sem backend real.
+ *
+ * BASE_URL: vazio por padrao (URL relativa, mesma origem do front).
+ * Override via VITE_FLOWDESK_API_URL pra apontar pra outro servidor.
  */
 import { isDemoMode } from "@/components/DemoBanner";
 
-/**
- * BASE_URL resolution:
- * - Em DEV (npm run dev): vazio → URL relativa, vai pro Vite dev server
- *   que tem os endpoints /slack/* locais (lendo SLACK_BOT_TOKEN do .env)
- * - Em PROD remoto (Vercel): VITE_FLOWDESK_API_URL aponta pra Railway
- * - Override manual: define VITE_FLOWDESK_API_URL no .env
- *
- * Esquema garante que a maquina do master rode tudo localmente sem
- * depender de Railway (que nao pode ter token Slack real, infra publica).
- */
-// BASE_URL sempre vazio (URL relativa) — bate no servidor que serve o front,
-// que tem o stateSync plugin (dev) ou o middleware do preview (build local).
-// Override manual ainda eh respeitado via VITE_FLOWDESK_API_URL.
-// (Antes tinha fallback Railway, mas o repo flowdesk-api foi excluido.)
 const explicit = import.meta.env.VITE_FLOWDESK_API_URL;
 const BASE_URL = explicit || "";
 
@@ -174,5 +164,27 @@ export const apiClient = {
         "/slack/status",
         { demoFallback: { enabled: false } }
       ),
+  },
+  // === Slack User OAuth ===
+  // Cada usuario do FlowDesk pode conectar SUA conta Slack pessoal.
+  // Quando conectado, mensagens enviadas via composer sao postadas com a
+  // identidade real (nao como bot JustFlow).
+  auth: {
+    /** URL pra iniciar fluxo OAuth — abre Slack pedindo permissao */
+    slackStartUrl: (email: string) =>
+      `/auth/slack/start?email=${encodeURIComponent(email)}`,
+    /** Verifica se user tem token Slack salvo */
+    slackStatus: (email: string) =>
+      request<{ connected: boolean; slackUserId?: string; teamName?: string; connectedAt?: string }>(
+        `/auth/slack/status?email=${encodeURIComponent(email)}`,
+        { demoFallback: { connected: false } }
+      ),
+    /** Remove token (desconecta) */
+    slackDisconnect: (email: string) =>
+      request<{ ok: boolean }>("/auth/slack/disconnect", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        demoFallback: { ok: true },
+      }),
   },
 };

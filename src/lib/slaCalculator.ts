@@ -194,7 +194,7 @@ export function computeDemandMetrics(demands: SlackDemand[]): DemandMetrics {
     } else if (d.slaResolutionStatus === "expirado") {
       slaResBreach++;
     } else {
-      const resMins = getResolutionMinutes(d.createdAt, d.completedAt);
+      const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       const cfg = PRIORITY_CONFIG[d.priority];
       if (resMins !== null && cfg?.sla) {
         if (resMins <= cfg.sla.resolutionHours * 60) slaResOk++;
