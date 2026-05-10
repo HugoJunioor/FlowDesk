@@ -9,11 +9,28 @@ const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 const OLDEST = new Date('2026-04-01T00:00:00-03:00').getTime() / 1000;
 const NOW = Date.now() / 1000;
 
-// Equipe interna (time interno). Qualquer usuario fora dessa lista = cliente externo.
-// Configurar via variavel de ambiente TEAM_MEMBERS (JSON array) ou editar localmente.
+// === IDENTIFICACAO DE EQUIPE ===
+// Regra primaria: dominio do email corporativo. Auto-atualiza pra novos
+// funcionarios sem precisar editar config.
+// Regra secundaria (fallback): lista manual de nomes — usar so pra
+// usuarios sem email exposto no Slack (caso raro).
+const TEAM_EMAIL_DOMAINS = (
+  process.env.TEAM_EMAIL_DOMAINS ? JSON.parse(process.env.TEAM_EMAIL_DOMAINS) : ["wearejust.it"]
+).map(d => d.toLowerCase());
+
 const TEAM_NAMES = new Set(
   process.env.TEAM_MEMBERS ? JSON.parse(process.env.TEAM_MEMBERS) : []
 );
+
+function isTeamUser(slackUser) {
+  if (slackUser.is_bot || slackUser.id === 'USLACKBOT') return false;
+  const email = (slackUser.profile?.email || '').toLowerCase();
+  if (email && TEAM_EMAIL_DOMAINS.some(d => email.endsWith('@' + d))) return true;
+  // Fallback pra usuarios sem email exposto
+  const realName = slackUser.real_name || slackUser.profile?.real_name || '';
+  const displayName = slackUser.profile?.display_name || '';
+  return TEAM_NAMES.has(realName) || TEAM_NAMES.has(displayName);
+}
 
 // === CACHE GLOBAL DE USUARIOS (preenchido no inicio via users.list) ===
 // Evita chamar users.info centenas de vezes (causa rate limit)
@@ -27,10 +44,9 @@ async function prefetchUsers() {
     const result = await client.users.list({ limit: 200, cursor });
     for (const u of result.members || []) {
       const realName = u.real_name || u.profile?.real_name || '';
-      const displayName = u.profile?.display_name || '';
       const name = realName || u.name || u.id;
       const isBot = u.is_bot || u.id === 'USLACKBOT';
-      const isTeam = !isBot && (TEAM_NAMES.has(realName) || TEAM_NAMES.has(displayName));
+      const isTeam = isTeamUser(u);
       USER_CACHE.set(u.id, { name, isBot, isTeam });
       total++;
     }
@@ -46,10 +62,9 @@ async function getUserInfo(userId) {
     const info = await client.users.info({ user: userId });
     const u = info.user;
     const realName = u.real_name || u.profile?.real_name || '';
-    const displayName = u.profile?.display_name || '';
     const name = realName || u.name || u.id;
     const isBot = u.is_bot || u.id === 'USLACKBOT';
-    const isTeam = !isBot && (TEAM_NAMES.has(realName) || TEAM_NAMES.has(displayName));
+    const isTeam = isTeamUser(u);
     const entry = { name, isBot, isTeam };
     USER_CACHE.set(userId, entry);
     return entry;
