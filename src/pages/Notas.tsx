@@ -11,7 +11,7 @@
  * Drag and drop nao tem dependencia externa — usar botoes "mover" no menu
  * da nota mantem simples e funcional em mobile/desktop.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,24 +62,40 @@ const Notas = () => {
   const [editor, setEditor] = useState<EditorState>({ open: false, note: null });
   const [confirmDelete, setConfirmDelete] = useState<Note | null>(null);
 
-  const reload = useCallback(async () => {
+  // Flag pra evitar atropelar o estado local enquanto o editor esta aberto
+  // (senao polling poderia sobrescrever titulo/conteudo que o user esta editando).
+  const editorOpenRef = useRef(false);
+  useEffect(() => { editorOpenRef.current = editor.open; }, [editor.open]);
+
+  const reload = useCallback(async (opts: { silent?: boolean } = {}) => {
     if (!email) return;
-    setLoading(true);
+    if (opts.silent && editorOpenRef.current) return; // nao mexe enquanto edita
+    if (!opts.silent) setLoading(true);
     try {
       const r = await apiClient.notes.list(email);
       setNotes(r.notes || []);
     } catch (e) {
-      toast({
-        title: "Erro ao carregar notas",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
+      if (!opts.silent) {
+        toast({
+          title: "Erro ao carregar notas",
+          description: e instanceof Error ? e.message : String(e),
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!opts.silent) setLoading(false);
     }
   }, [email, toast]);
 
+  // Primeira carga
   useEffect(() => { void reload(); }, [reload]);
+
+  // Auto-refresh a cada 10s — sincroniza notas entre abas/dispositivos.
+  // Silencioso e pausa enquanto o editor esta aberto.
+  useEffect(() => {
+    const id = setInterval(() => { void reload({ silent: true }); }, 10_000);
+    return () => clearInterval(id);
+  }, [reload]);
 
   // Tags unicas pro filtro
   const allTags = useMemo(() => {
