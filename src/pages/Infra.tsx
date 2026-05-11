@@ -8,7 +8,7 @@
  * Persistencia em data/infraDemands.json via apiClient.infra.
  * Responsavel padrao: Tiago Silva. Prioridade padrao: P3.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -89,23 +89,83 @@ const Infra = () => {
     }
   }, [demands, searchParams, setSearchParams]);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient.infra.list();
-      setDemands(res.demands || []);
-    } catch (e) {
-      toast({
-        title: "Erro ao carregar demandas",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  // Snapshot do ultimo fetch — usado pra detectar mudancas no polling
+  // (sem disparar toast na primeira carga).
+  const lastSnapshotRef = useRef<Map<string, SlackDemand> | null>(null);
+
+  /**
+   * Compara snapshot anterior com novo fetch e dispara toasts pras mudancas
+   * relevantes: demanda nova, status mudou, ou demanda excluida.
+   */
+  const diffAndNotify = useCallback((next: SlackDemand[]) => {
+    const prev = lastSnapshotRef.current;
+    if (!prev) return; // primeira carga, nao notifica
+    const nextMap = new Map(next.map((d) => [d.id, d]));
+
+    // Novas
+    for (const d of next) {
+      if (!prev.has(d.id)) {
+        toast({
+          title: "Nova demanda Infra",
+          description: `${d.infraKind === "deploy" ? "Deploy" : "SQL"} · ${d.title}`,
+        });
+      }
+    }
+    // Mudancas de status
+    for (const d of next) {
+      const old = prev.get(d.id);
+      if (old && old.status !== d.status) {
+        toast({
+          title: `Status alterado: ${d.title}`,
+          description: `${old.status} → ${d.status}`,
+        });
+      }
+    }
+    // Excluidas
+    for (const id of prev.keys()) {
+      if (!nextMap.has(id)) {
+        const old = prev.get(id);
+        if (old) {
+          toast({
+            title: "Demanda excluída",
+            description: old.title,
+          });
+        }
+      }
     }
   }, [toast]);
 
+  const reload = useCallback(async (opts: { silent?: boolean } = {}) => {
+    if (!opts.silent) setLoading(true);
+    try {
+      const res = await apiClient.infra.list();
+      const next = res.demands || [];
+      // So compara/notifica em polling silencioso (auto-refresh)
+      if (opts.silent) diffAndNotify(next);
+      setDemands(next);
+      lastSnapshotRef.current = new Map(next.map((d) => [d.id, d]));
+    } catch (e) {
+      // Erros silenciosos durante polling pra nao floodar o user
+      if (!opts.silent) {
+        toast({
+          title: "Erro ao carregar demandas",
+          description: e instanceof Error ? e.message : String(e),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      if (!opts.silent) setLoading(false);
+    }
+  }, [toast, diffAndNotify]);
+
+  // Primeira carga
   useEffect(() => { void reload(); }, [reload]);
+
+  // Polling a cada 10s pra detectar mudancas vindas de outros usuarios/abas
+  useEffect(() => {
+    const id = setInterval(() => { void reload({ silent: true }); }, 10_000);
+    return () => clearInterval(id);
+  }, [reload]);
 
   // Aplica primeiro o filtro de tipo (SQL/Deploy/Todos), depois o de status.
   // Assim os contadores dos quadros refletem a selecao de tipo atual.
@@ -473,11 +533,15 @@ const Infra = () => {
         open={!!selectedDemand}
         onClose={() => setSelectedDemand(null)}
         onChanged={() => {
-          // Refresh + atualiza demanda selecionada
+          // Refresh + atualiza demanda selecionada. Usa reload pra manter
+          // o snapshot do polling sincronizado e nao disparar toasts
+          // pras mudancas que o proprio user acabou de fazer.
           void apiClient.infra.list().then((res) => {
-            setDemands(res.demands || []);
+            const next = res.demands || [];
+            setDemands(next);
+            lastSnapshotRef.current = new Map(next.map((d) => [d.id, d]));
             if (selectedDemand) {
-              const updated = (res.demands || []).find((d) => d.id === selectedDemand.id);
+              const updated = next.find((d) => d.id === selectedDemand.id);
               setSelectedDemand(updated ?? null);
             }
           });
