@@ -10,6 +10,7 @@ export type ModuleId =
   | "dashboard"
   | "demandas"
   | "demandas_sql"
+  | "infra"
   | "usuarios"
   | "grupos"
   | "configuracoes"
@@ -33,6 +34,7 @@ export const MODULES: { id: ModuleId; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "LayoutDashboard" },
   { id: "demandas", label: "Demandas", icon: "MessageSquare" },
   { id: "demandas_sql", label: "Demandas SQL", icon: "Database" },
+  { id: "infra", label: "Infra", icon: "Wrench" },
   { id: "usuarios", label: "Usuários", icon: "Users" },
   { id: "grupos", label: "Grupos", icon: "ShieldCheck" },
   { id: "configuracoes", label: "Configurações", icon: "Settings" },

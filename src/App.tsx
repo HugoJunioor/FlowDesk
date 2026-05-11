@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Demandas from "./pages/Demandas.tsx";
 import DemandasSql from "./pages/DemandasSql.tsx";
+import Infra from "./pages/Infra.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import UserManagement from "./pages/UserManagement.tsx";
 import GroupsManagement from "./pages/GroupsManagement.tsx";
@@ -42,6 +43,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Index />} />
       <Route path="/demandas" element={<Demandas />} />
       <Route path="/demandas-sql" element={<DemandasSql />} />
+      <Route path="/infra" element={<Infra />} />
       <Route path="/configuracoes" element={<Configuracoes />} />
       <Route path="/perfil" element={<Profile />} />
       {currentUser?.role === "master" && (
