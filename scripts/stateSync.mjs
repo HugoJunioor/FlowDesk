@@ -75,6 +75,7 @@ export const SYNCED_KEYS = [
   "fd_auto_assign_rules",
   "fd_support_members",
   "fd_channel_routing",        // roteamento de canais Slack -> modulos
+  "fd_infra_databases",        // lista de bancos de dados (modulo Infra/SQL)
 ];
 
 function ensureDir() {
@@ -662,7 +663,10 @@ async function handleInfra(req, res) {
   if (req.method === "POST" && url === "/infra/demands") {
     try {
       const body = JSON.parse(await readBody(req));
-      const { title, description, priority, infraKind, requester, assignee, dueDate, client } = body;
+      const {
+        title, description, priority, infraKind, requester, assignee, dueDate, client,
+        infraQuery, infraDatabase, infraExternalLink,
+      } = body;
 
       if (!title || !title.trim()) {
         res.statusCode = 400;
@@ -685,14 +689,17 @@ async function handleInfra(req, res) {
         product: "",
         source: "internal",
         infraKind,
+        ...(infraQuery && infraQuery.trim() ? { infraQuery: infraQuery.trim() } : {}),
+        ...(infraDatabase && infraDatabase.trim() ? { infraDatabase: infraDatabase.trim() } : {}),
+        ...(infraExternalLink && infraExternalLink.trim() ? { infraExternalLink: infraExternalLink.trim() } : {}),
         requester: requester || { name: "Desconhecido", avatar: "" },
         assignee: assignee || { name: "Tiago Silva", avatar: "" },
         cc: [],
         createdAt: now,
         dueDate: dueDate || null,
         completedAt: null,
-        hasTask: false,
-        taskLink: "",
+        hasTask: !!(infraExternalLink && infraExternalLink.trim()),
+        taskLink: (infraExternalLink && infraExternalLink.trim()) || "",
         tags: [`infra-${infraKind}`],
         slackChannel: infraKind === "sql" ? "#infra-sql" : "#infra-deploy",
         slackPermalink: "",
@@ -727,7 +734,10 @@ async function handleInfra(req, res) {
       }
 
       // Whitelist de campos editaveis
-      const allowed = ["status", "assignee", "priority", "completedAt", "description", "title", "threadReplies"];
+      const allowed = [
+        "status", "assignee", "priority", "completedAt", "description", "title", "threadReplies",
+        "infraQuery", "infraDatabase", "infraExternalLink",
+      ];
       for (const k of allowed) {
         if (updates[k] !== undefined) demands[idx][k] = updates[k];
       }

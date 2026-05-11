@@ -13,7 +13,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wrench, Plus, Database, Rocket, Inbox, Loader2, Clock, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { Plus, Database, Rocket, Inbox, Loader2, Clock, CheckCircle2, AlertCircle, Trash2, Copy, ExternalLink, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -126,6 +126,17 @@ const Infra = () => {
     }
   };
 
+  const handleCopyQuery = async (d: SlackDemand) => {
+    const q = d.infraQuery || "";
+    if (!q) return;
+    try {
+      await navigator.clipboard.writeText(q);
+      toast({ title: "Query copiada", description: `${q.length} caracteres` });
+    } catch {
+      toast({ title: "Erro ao copiar", variant: "destructive" });
+    }
+  };
+
   const openModal = (kind: "sql" | "deploy") => {
     setModalDefaultKind(kind);
     setModalOpen(true);
@@ -200,9 +211,43 @@ const Infra = () => {
                             {sb.label}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-foreground truncate">{d.title}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm text-foreground truncate flex-1">{d.title}</p>
+                              {d.infraExternalLink && (
+                                <a
+                                  href={d.infraExternalLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] text-primary hover:underline flex items-center gap-0.5 shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title={d.infraExternalLink}
+                                >
+                                  <ExternalLink size={10} /> Link
+                                </a>
+                              )}
+                            </div>
                             {d.description && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{d.description}</p>
+                            )}
+                            {/* Banco + preview da query (so SQL) */}
+                            {d.infraKind === "sql" && (d.infraDatabase || d.infraQuery) && (
+                              <div className="mt-2 flex items-start gap-2 flex-wrap">
+                                {d.infraDatabase && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted border font-mono">
+                                    {d.infraDatabase}
+                                  </span>
+                                )}
+                                {d.infraQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyQuery(d)}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-muted border hover:bg-muted/70 flex items-center gap-1 font-mono"
+                                    title={d.infraQuery}
+                                  >
+                                    <Copy size={9} /> Copiar query ({d.infraQuery.length} chars)
+                                  </button>
+                                )}
+                              </div>
                             )}
                             <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                               <span className="flex items-center gap-1">

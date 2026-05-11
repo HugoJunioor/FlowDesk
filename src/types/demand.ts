@@ -203,6 +203,21 @@ export interface SlackDemand {
    * "sql" = operacoes SQL  |  "deploy" = deploy/release
    */
   infraKind?: "sql" | "deploy";
+  /**
+   * SQL query a ser executada (so faz sentido pra infraKind === "sql").
+   * Texto livre — equipe copia/cola e executa no banco apontado em `database`.
+   */
+  infraQuery?: string;
+  /**
+   * Banco de dados onde a query/operacao deve rodar.
+   * Lista configuravel pelo master via UI/storage compartilhado.
+   */
+  infraDatabase?: string;
+  /**
+   * Link externo (ex: ClickUp task, Notion page) relacionado a demanda.
+   * Apenas referencia visual — nao integra com API externa.
+   */
+  infraExternalLink?: string;
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;

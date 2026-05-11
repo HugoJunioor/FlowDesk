@@ -207,6 +207,12 @@ export const apiClient = {
       assignee?: { name: string; avatar: string };
       dueDate?: string | null;
       client?: string;
+      /** Query SQL (so faz sentido pra infraKind=sql) */
+      infraQuery?: string;
+      /** Banco onde rodar */
+      infraDatabase?: string;
+      /** Link externo da demanda (ex: ClickUp) */
+      infraExternalLink?: string;
     }) =>
       request<{ demand: import("@/types/demand").SlackDemand }>("/infra/demands", {
         method: "POST",
