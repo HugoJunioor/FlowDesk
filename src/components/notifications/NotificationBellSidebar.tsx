@@ -215,7 +215,10 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
             </div>
           ) : (
             <div className="divide-y">
-              {items.slice(0, 10).map((n) => {
+              {/* Quantidade exibida: minimo 4 (compacto quando pouco
+                  pendente); se tiver muitas nao lidas, mostra todas elas
+                  ate um teto de 15 pra nao crescer demais. */}
+              {items.slice(0, Math.max(4, Math.min(unreadCount, 15))).map((n) => {
                 const Icon = EVENT_ICON[n.event] || Bell;
                 return (
                   <button
