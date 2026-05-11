@@ -229,8 +229,8 @@ const Infra = () => {
                             {d.description && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{d.description}</p>
                             )}
-                            {/* Banco + preview da query (so SQL) */}
-                            {d.infraKind === "sql" && (d.infraDatabase || d.infraQuery) && (
+                            {/* Banco + preview da query/script (ambos tipos) */}
+                            {(d.infraDatabase || d.infraQuery) && (
                               <div className="mt-2 flex items-start gap-2 flex-wrap">
                                 {d.infraDatabase && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted border font-mono">
@@ -244,7 +244,7 @@ const Infra = () => {
                                     className="text-[10px] px-1.5 py-0.5 rounded bg-muted border hover:bg-muted/70 flex items-center gap-1 font-mono"
                                     title={d.infraQuery}
                                   >
-                                    <Copy size={9} /> Copiar query ({d.infraQuery.length} chars)
+                                    <Copy size={9} /> Copiar ({d.infraQuery.length} chars)
                                   </button>
                                 )}
                               </div>

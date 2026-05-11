@@ -222,9 +222,9 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         assignee: { name: "Tiago Silva", avatar: "" },
         dueDate: finalDueDate,
         client: client.trim() || undefined,
-        // SQL-specific (vai vazio em deploy)
-        infraQuery: kind === "sql" && query.trim() ? query.trim() : undefined,
-        infraDatabase: kind === "sql" && database ? database : undefined,
+        // Campos disponiveis pros 2 tipos (deploy tambem pode ter script/banco)
+        infraQuery: query.trim() || undefined,
+        infraDatabase: database || undefined,
         infraExternalLink: externalLink.trim() || undefined,
         // Anexos (so envia se houver — payload pode ficar grande, eh base64)
         ...(attachments.length > 0 ? { infraAttachments: attachments } : {}),
@@ -334,95 +334,90 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
               />
             </div>
 
-            {/* ===== Campos SQL-specific ===== */}
-            {kind === "sql" && (
-              <>
-                {/* Banco de dados */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Banco de Dados</label>
-                  {showAddDbInput ? (
-                    <div className="flex gap-2">
-                      <Input
-                        value={newDbName}
-                        onChange={(e) => setNewDbName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { e.preventDefault(); handleAddDatabase(); }
-                          if (e.key === "Escape") { setShowAddDbInput(false); setNewDbName(""); }
-                        }}
-                        placeholder="Nome do novo banco"
-                        autoFocus
-                      />
-                      <Button type="button" onClick={handleAddDatabase} size="sm">
-                        Adicionar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setShowAddDbInput(false); setNewDbName(""); }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Select value={database} onValueChange={setDatabase}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Selecione um banco..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {databases.length === 0 ? (
-                            <div className="py-2 px-3 text-xs text-muted-foreground">
-                              Nenhum banco cadastrado
-                            </div>
-                          ) : (
-                            databases.map((db) => (
-                              <SelectItem key={db} value={db}>{db}</SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAddDbInput(true)}
-                        title="Adicionar novo banco à lista"
-                        className="gap-1.5"
-                      >
-                        <Plus size={14} /> Novo
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Query */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Query SQL</label>
-                    {query.trim() && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCopyQuery}
-                        className="h-7 gap-1.5 text-xs"
-                      >
-                        <Copy size={12} /> Copiar query
-                      </Button>
-                    )}
-                  </div>
-                  <Textarea
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="SELECT * FROM ..."
-                    rows={6}
-                    className="font-mono text-xs"
-                    spellCheck={false}
+            {/* Banco de dados (disponivel pros 2 tipos) */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Banco de Dados (opcional)</label>
+              {showAddDbInput ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newDbName}
+                    onChange={(e) => setNewDbName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); handleAddDatabase(); }
+                      if (e.key === "Escape") { setShowAddDbInput(false); setNewDbName(""); }
+                    }}
+                    placeholder="Nome do novo banco"
+                    autoFocus
                   />
+                  <Button type="button" onClick={handleAddDatabase} size="sm">
+                    Adicionar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setShowAddDbInput(false); setNewDbName(""); }}
+                  >
+                    Cancelar
+                  </Button>
                 </div>
-              </>
-            )}
+              ) : (
+                <div className="flex gap-2">
+                  <Select value={database} onValueChange={setDatabase}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione um banco..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {databases.length === 0 ? (
+                        <div className="py-2 px-3 text-xs text-muted-foreground">
+                          Nenhum banco cadastrado
+                        </div>
+                      ) : (
+                        databases.map((db) => (
+                          <SelectItem key={db} value={db}>{db}</SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddDbInput(true)}
+                    title="Adicionar novo banco à lista"
+                    className="gap-1.5"
+                  >
+                    <Plus size={14} /> Novo
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Query / Script (disponivel pros 2 tipos) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Query / Script (opcional)</label>
+                {query.trim() && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyQuery}
+                    className="h-7 gap-1.5 text-xs"
+                  >
+                    <Copy size={12} /> Copiar
+                  </Button>
+                )}
+              </div>
+              <Textarea
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={kind === "sql" ? "SELECT * FROM ..." : "Comando de deploy, script, etc."}
+                rows={6}
+                className="font-mono text-xs"
+                spellCheck={false}
+              />
+            </div>
 
             {/* Link da demanda (ambos os tipos) */}
             <div className="space-y-1.5">
