@@ -122,7 +122,7 @@ const Notificacoes = () => {
                 <CheckCheck size={14} /> Marcar todas como lidas
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => navigate("/perfil/notificacoes")} className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/configuracoes")} className="gap-2">
               <Settings size={14} /> Preferências
             </Button>
           </div>

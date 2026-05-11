@@ -192,11 +192,6 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
           )}
         </nav>
 
-        {/* Notificacoes */}
-        <div className="px-2 py-2 border-t border-sidebar-border">
-          <NotificationBellSidebar collapsed={collapsed} onClick={() => setMobileOpen(false)} />
-        </div>
-
         {/* User info + profile link */}
         <div className="px-2 py-3 border-t border-sidebar-border">
           <NavLink
@@ -228,6 +223,8 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
 
         {/* Footer */}
         <div className="p-2 border-t border-sidebar-border space-y-1">
+          {/* Notificacoes — acima de Configuracoes */}
+          <NotificationBellSidebar collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           <NavLink
             to="/configuracoes"
             onClick={() => setMobileOpen(false)}
