@@ -19,6 +19,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { branding } from "@/config/brandingLoader";
 import type { ModuleId } from "@/types/permissions";
+import NotificationBellSidebar from "./notifications/NotificationBellSidebar";
 
 const navItems: {
   to: string;
@@ -190,6 +191,11 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
             </NavLink>
           )}
         </nav>
+
+        {/* Notificacoes */}
+        <div className="px-2 py-2 border-t border-sidebar-border">
+          <NotificationBellSidebar collapsed={collapsed} onClick={() => setMobileOpen(false)} />
+        </div>
 
         {/* User info + profile link */}
         <div className="px-2 py-3 border-t border-sidebar-border">
