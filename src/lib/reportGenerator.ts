@@ -211,7 +211,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
     const cfg = PRIORITY_CONFIG[d.priority];
     if (!cfg?.sla) continue;
     if (isExcludedFromFirstResponseSla(d)) continue;
-    const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+    const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
     if (frMins === null) continue;
     const key = monthKey(d.createdAt);
     if (!monthlyRespMap[key]) monthlyRespMap[key] = { atendido: 0, expirado: 0, totalRespMins: 0, countResp: 0 };
@@ -369,7 +369,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
 
       // First response: use stored value or compute from threadReplies
       const firstRespMinsArr = pDemands
-        .map(d => getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse))
+        .map(d => getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt))
         .filter((m): m is number => m !== null && m > 0);
       const avgRespMins = firstRespMinsArr.length > 0
         ? Math.round(firstRespMinsArr.reduce((s, m) => s + m, 0) / firstRespMinsArr.length)
@@ -455,7 +455,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .map((d) => {
       const client = extractClientName(d.slackChannel);
-      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+      const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
       const resMins = getResolutionMinutes(d.createdAt, d.completedAt, d.threadReplies);
       const cfg = PRIORITY_CONFIG[d.priority];
       const slaRespLimit = cfg?.sla ? parseResponseSla(cfg.sla.response) : null;

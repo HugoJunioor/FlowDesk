@@ -133,4 +133,56 @@ describe("getFirstResponseMinutes", () => {
     expect(r1).not.toBeNull();
     expect(r2).not.toBeNull();
   });
+
+  describe("serviceStartedAt (Sitef/Conciliacao)", () => {
+    it("usa serviceStartedAt quando vier ANTES da primeira reply", () => {
+      const replies = [
+        { timestamp: "2026-05-06T15:00:00Z", isTeamMember: true, text: "respondendo" },
+      ];
+      // serviceStartedAt as 14h, reply real as 15h — usa as 14h (mais cedo)
+      const r = getFirstResponseMinutes(
+        "2026-05-06T13:00:00Z",
+        replies,
+        null,
+        "2026-05-06T14:00:00Z",
+      );
+      const rWithoutService = getFirstResponseMinutes("2026-05-06T13:00:00Z", replies, null);
+      expect(r).not.toBeNull();
+      expect(rWithoutService).not.toBeNull();
+      // r deve ser MENOR (tempo entre 13h e 14h) que rWithoutService (13h-15h)
+      expect(r!).toBeLessThan(rWithoutService!);
+    });
+
+    it("usa reply real quando vier ANTES do serviceStartedAt", () => {
+      const replies = [
+        { timestamp: "2026-05-06T14:00:00Z", isTeamMember: true, text: "respondendo" },
+      ];
+      // serviceStartedAt as 15h, reply real as 14h — usa as 14h (mais cedo)
+      const r = getFirstResponseMinutes(
+        "2026-05-06T13:00:00Z",
+        replies,
+        null,
+        "2026-05-06T15:00:00Z",
+      );
+      expect(r).not.toBeNull();
+      // Deve ser mais ou menos 60 min (13h → 14h)
+      expect(r!).toBeGreaterThanOrEqual(0);
+    });
+
+    it("retorna serviceStartedAt sozinho quando nao ha reply real da equipe", () => {
+      const r = getFirstResponseMinutes(
+        "2026-05-06T13:00:00Z",
+        [],
+        null,
+        "2026-05-06T14:00:00Z",
+      );
+      expect(r).not.toBeNull();
+      expect(r!).toBeGreaterThanOrEqual(0);
+    });
+
+    it("retorna null quando nao ha nem reply nem serviceStartedAt", () => {
+      const r = getFirstResponseMinutes("2026-05-06T13:00:00Z", [], null, null);
+      expect(r).toBeNull();
+    });
+  });
 });

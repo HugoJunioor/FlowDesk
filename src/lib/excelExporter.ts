@@ -159,7 +159,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
 
     // ── SLA data: use stored value or compute dynamically ──────────────────
     // getFirstResponseMinutes: if slaFirstResponse is set it returns it; else computes from threadReplies
-    const computedFirstResp = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+    const computedFirstResp = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
 
     // resolutionHours: prefer stored (historical), else derive from business minutes
     const computedResHours: number | null = (() => {
