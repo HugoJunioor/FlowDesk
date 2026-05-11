@@ -23,6 +23,60 @@ export type ExpirationReason =
 
 export type SupportLevel = "N1" | "N2" | "N3" | "";
 
+/**
+ * Motivo de contato — taxonomia derivada da analise de demandas de abril/26.
+ * Diferente de DemandCategory (area/produto), este eh o "porque" do contato
+ * (o que estah quebrado / o que o cliente precisa). Classificado por IA via
+ * classifyContactReason em closureClassifier.
+ */
+export type ContactReason =
+  | "Saldo Nao Creditado / Pagamento Nao Compensado"
+  | "Falha na Vinculacao / Uso de Cartao"
+  | "Duvida / Solicitacao Interna / Outros"
+  | "Estorno / Reembolso / Cancelamento de Transacao"
+  | "Problema com PIX"
+  | "Ajuste de Dados Cadastrais (CPF / Nome)"
+  | "Bug em Importacao / Relatorio de Abastecimento"
+  | "Erro Fiscal (NF, Boleto, RPS, DANFE)"
+  | "Solicitacao de Relatorio / Extrato"
+  | "Retirada / Transferencia de Saldo"
+  | "Problema de Conciliacao / Layout de Arquivo"
+  | "Cadastro Duplicado / Exclusao"
+  | "Erro de Acesso (App, Portal, Senha)"
+  | "Lentidao / Instabilidade de Sistema"
+  | "Solicitacao / Gestao de Acesso e Permissoes"
+  | "Falha no Envio de Token / E-mail"
+  | "Erro em Abastecimento / Autorizacao"
+  | "Bug / Erro de Sistema (Outros)"
+  | "Falha no Saque (24h / ATM)"
+  | "KYC Reprovado / Falha de Identidade"
+  | "Erro em Fechamento de Periodo / Faturamento"
+  | "";
+
+export const CONTACT_REASON_OPTIONS: ContactReason[] = [
+  "Saldo Nao Creditado / Pagamento Nao Compensado",
+  "Falha na Vinculacao / Uso de Cartao",
+  "Duvida / Solicitacao Interna / Outros",
+  "Estorno / Reembolso / Cancelamento de Transacao",
+  "Problema com PIX",
+  "Ajuste de Dados Cadastrais (CPF / Nome)",
+  "Bug em Importacao / Relatorio de Abastecimento",
+  "Erro Fiscal (NF, Boleto, RPS, DANFE)",
+  "Solicitacao de Relatorio / Extrato",
+  "Retirada / Transferencia de Saldo",
+  "Problema de Conciliacao / Layout de Arquivo",
+  "Cadastro Duplicado / Exclusao",
+  "Erro de Acesso (App, Portal, Senha)",
+  "Lentidao / Instabilidade de Sistema",
+  "Solicitacao / Gestao de Acesso e Permissoes",
+  "Falha no Envio de Token / E-mail",
+  "Erro em Abastecimento / Autorizacao",
+  "Bug / Erro de Sistema (Outros)",
+  "Falha no Saque (24h / ATM)",
+  "KYC Reprovado / Falha de Identidade",
+  "Erro em Fechamento de Periodo / Faturamento",
+];
+
 export const CATEGORY_OPTIONS: DemandCategory[] = [
   "Portal do cliente", "Aplicativo", "Backoffice", "Cadastro",
   "Cartao", "Carteiras/Produto", "Faturas", "KYC",
@@ -104,6 +158,8 @@ export interface ClosureAttachment {
 
 export interface ClosureFields {
   category: DemandCategory;
+  /** Motivo de contato (porque o cliente abriu) — classificado por IA */
+  contactReason?: ContactReason;
   expirationReason: ExpirationReason;
   supportLevel: SupportLevel;
   internalComment: string;
@@ -111,6 +167,7 @@ export interface ClosureFields {
   attachments?: ClosureAttachment[];
   autoFilled: {
     category: boolean;
+    contactReason?: boolean;
     expirationReason: boolean;
     supportLevel: boolean;
   };
