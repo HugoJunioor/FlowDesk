@@ -4,6 +4,7 @@ import * as XLSX from "xlsx-js-style";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { getFirstResponseMinutes, getResolutionMinutes } from "./businessHours";
 import { isSlaCompliant } from "./slaCalculator";
+import { classifyContactReason } from "./closureClassifier";
 
 // ── Cell style constants ──────────────────────────────────────────────────────
 // xlsx-js-style uses 6-char hex (no alpha prefix)
@@ -138,7 +139,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
     "Aberto em", "Concluído em", "Tem Task?", "Link Task",
     "SLA 1ª Resposta", "Status 1ª Resposta", "Tempo Resolução",
     "Status Resolução SLA", "Categoria", "Nível Suporte", "Observação",
-    "Produto",
+    "Produto", "Motivo de Contato",
   ];
 
   const NUM_COLS = headers.length;
@@ -281,6 +282,12 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
 
     // ── Col 20: Produto (KPI: Telemedicina/Beneficios/Frotas, etc) ────────
     ws[XLSX.utils.encode_cell({ r, c: 20 })] = cell(d.product ?? "", ROW_BASE);
+
+    // ── Col 21: Motivo de Contato (classificado por IA) ───────────────────
+    // Usa o valor armazenado em closure se houver (master pode ter sobrescrito);
+    // senao, roda o classifier on-the-fly pra garantir que a coluna nao venha vazia.
+    const contactReason = d.closure?.contactReason || classifyContactReason(d).value;
+    ws[XLSX.utils.encode_cell({ r, c: 21 })] = cell(contactReason, ROW_BASE);
   });
 
   // Column widths
@@ -306,6 +313,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
     { wch: 13 }, // Nível Suporte
     { wch: 32 }, // Observação
     { wch: 16 }, // Produto
+    { wch: 38 }, // Motivo de Contato
   ];
 
   // Row heights: header taller, data rows with comfortable spacing
