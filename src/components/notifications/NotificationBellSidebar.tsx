@@ -22,7 +22,7 @@ import { NotificationItem, NotificationEvent } from "@/types/notification";
 import { showBrowserNotification, getPermission } from "@/lib/browserNotifications";
 import { runSlaReminderCheck } from "@/lib/slaReminderEngine";
 import { NotificationPreferences, DEFAULT_PREFERENCES } from "@/types/notification";
-import { mockDemands as allRealDemands } from "@/data/realDemands";
+import { getProcessedDemands } from "@/data/demandsLoader";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -101,7 +101,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
       try {
         // Busca demandas Infra + lista Slack importada estaticamente
         const infraRes = await apiClient.infra.list().catch(() => ({ demands: [] }));
-        const allDemands = [...(infraRes.demands || []), ...allRealDemands];
+        const allDemands = [...(infraRes.demands || []), ...getProcessedDemands()];
         await runSlaReminderCheck({
           user: currentUser,
           prefs: prefsRef.current,
