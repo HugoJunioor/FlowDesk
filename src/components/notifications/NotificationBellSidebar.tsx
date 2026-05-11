@@ -20,6 +20,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { NotificationItem, NotificationEvent } from "@/types/notification";
 import { showBrowserNotification, getPermission } from "@/lib/browserNotifications";
+import { runSlaReminderCheck } from "@/lib/slaReminderEngine";
+import { NotificationPreferences, DEFAULT_PREFERENCES } from "@/types/notification";
+import { getProcessedDemands } from "@/data/demandsLoader";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -66,22 +69,49 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
   // Cache da preferencia push do user (atualizada via prefs api).
   // Default true se prefs nao salvas (usuario decide quando ligar/desligar).
   const pushEnabledRef = useRef(false);
+  // Preferencias completas pro engine de lembretes SLA
+  const prefsRef = useRef<NotificationPreferences | null>(null);
 
   const email = currentUser?.email || "";
 
-  // Carrega preferencias do user pra saber se push esta habilitado
+  // Carrega preferencias do user (push enabled + SLA reminders)
   useEffect(() => {
     if (!email) return;
     apiClient.notifications.getPreferences(email)
       .then((r) => {
-        pushEnabledRef.current = r.preferences?.channels?.browserPush === true;
+        const merged: NotificationPreferences = r.preferences
+          ? { ...DEFAULT_PREFERENCES, ...r.preferences, userEmail: email }
+          : { userEmail: email, ...DEFAULT_PREFERENCES };
+        prefsRef.current = merged;
+        pushEnabledRef.current = merged.channels.browserPush === true;
       })
-      .catch(() => { pushEnabledRef.current = false; });
+      .catch(() => {
+        prefsRef.current = { userEmail: email, ...DEFAULT_PREFERENCES };
+        pushEnabledRef.current = false;
+      });
   }, [email]);
 
   const reload = useCallback(async () => {
     if (!email) return;
     setLoading(true);
+
+    // Engine de lembretes SLA — roda antes do list pra que as
+    // notificacoes criadas ja apareçam no proximo fetch.
+    if (currentUser && prefsRef.current) {
+      try {
+        // Busca demandas Infra + lista Slack importada estaticamente
+        const infraRes = await apiClient.infra.list().catch(() => ({ demands: [] }));
+        const allDemands = [...(infraRes.demands || []), ...getProcessedDemands()];
+        await runSlaReminderCheck({
+          user: currentUser,
+          prefs: prefsRef.current,
+          demands: allDemands,
+        });
+      } catch (e) {
+        console.warn("[sla-reminder] check falhou:", e);
+      }
+    }
+
     try {
       const r = await apiClient.notifications.list(email);
       const fetched = r.notifications || [];
@@ -117,7 +147,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
     } finally {
       setLoading(false);
     }
-  }, [email]);
+  }, [email, currentUser]);
 
   useEffect(() => {
     if (!email) return;
