@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Loader2, Save, Mail, BellRing, Inbox } from "lucide-react";
+import { Bell, Loader2, Save, Mail, BellRing, Inbox, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -23,6 +23,12 @@ import {
   EVENT_LABELS,
   NotificationEvent,
 } from "@/types/notification";
+import {
+  requestBrowserNotificationPermission,
+  getPermission,
+  isBrowserNotificationSupported,
+  showBrowserNotification,
+} from "@/lib/browserNotifications";
 
 const EVENT_ORDER: NotificationEvent[] = [
   "demand_assigned",
@@ -42,6 +48,7 @@ const NotificationPreferencesCard = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pushPerm, setPushPerm] = useState(getPermission());
 
   const email = currentUser?.email || "";
 
@@ -73,8 +80,39 @@ const NotificationPreferencesCard = () => {
     setDirty(true);
   };
 
-  const updateChannel = (channel: "inbox" | "browserPush" | "email", enabled: boolean) => {
+  const updateChannel = async (channel: "inbox" | "browserPush" | "email", enabled: boolean) => {
     if (!prefs) return;
+    // Pedir permissao do navegador ao ligar o toggle de push
+    if (channel === "browserPush" && enabled) {
+      if (!isBrowserNotificationSupported()) {
+        toast({
+          title: "Navegador não suporta",
+          description: "Use Chrome, Edge ou Firefox no desktop pra ativar push.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const perm = await requestBrowserNotificationPermission();
+      setPushPerm(perm);
+      if (perm === "denied") {
+        toast({
+          title: "Permissão negada",
+          description: "Habilite notificações nas configurações do navegador pra esse site.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (perm !== "granted") {
+        // user fechou o prompt sem decidir
+        return;
+      }
+      // Notificacao de teste pra confirmar que ta funcionando
+      showBrowserNotification({
+        title: "FlowDesk · Notificações ativas",
+        body: "Você vai receber novidades aqui daqui pra frente.",
+        tag: `setup_push_${Date.now()}`,
+      });
+    }
     setPrefs({ ...prefs, channels: { ...prefs.channels, [channel]: enabled } });
     setDirty(true);
   };
@@ -149,13 +187,34 @@ const NotificationPreferencesCard = () => {
                 <div>
                   <p className="text-sm font-medium">Push do navegador</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Notificações no sistema operacional (precisa permissão)
+                    Notificações no sistema operacional
+                    {pushPerm === "granted" && (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-success">
+                        <CheckCircle2 size={10} /> permitido
+                      </span>
+                    )}
+                    {pushPerm === "denied" && (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-destructive">
+                        <AlertCircle size={10} /> bloqueado no navegador
+                      </span>
+                    )}
+                    {pushPerm === "default" && (
+                      <span className="ml-1.5 text-warning">
+                        pedirá permissão ao ativar
+                      </span>
+                    )}
+                    {pushPerm === "unsupported" && (
+                      <span className="ml-1.5 text-muted-foreground italic">
+                        não suportado neste navegador
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
               <Switch
-                checked={prefs.channels.browserPush}
-                onCheckedChange={(v) => updateChannel("browserPush", v)}
+                checked={prefs.channels.browserPush && pushPerm === "granted"}
+                disabled={pushPerm === "denied" || pushPerm === "unsupported"}
+                onCheckedChange={(v) => void updateChannel("browserPush", v)}
               />
             </div>
 

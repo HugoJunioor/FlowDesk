@@ -6,7 +6,7 @@
  *
  * Adapta ao estado collapsed (so icone + badge) ou aberto (icone + label).
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell, CheckCheck, AlertCircle, MessageSquare, Loader2,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { NotificationItem, NotificationEvent } from "@/types/notification";
+import { showBrowserNotification, getPermission } from "@/lib/browserNotifications";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -56,14 +57,61 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // IDs ja vistos no polling — usado pra detectar notificacoes NOVAS
+  // e disparar push do navegador uma unica vez por id.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // Flag pra nao disparar push na PRIMEIRA carga (notificacoes antigas
+  // nao devem virar push agora). Inicia false, vira true apos 1a list.
+  const initializedRef = useRef(false);
+  // Cache da preferencia push do user (atualizada via prefs api).
+  // Default true se prefs nao salvas (usuario decide quando ligar/desligar).
+  const pushEnabledRef = useRef(false);
+
   const email = currentUser?.email || "";
+
+  // Carrega preferencias do user pra saber se push esta habilitado
+  useEffect(() => {
+    if (!email) return;
+    apiClient.notifications.getPreferences(email)
+      .then((r) => {
+        pushEnabledRef.current = r.preferences?.channels?.browserPush === true;
+      })
+      .catch(() => { pushEnabledRef.current = false; });
+  }, [email]);
 
   const reload = useCallback(async () => {
     if (!email) return;
     setLoading(true);
     try {
       const r = await apiClient.notifications.list(email);
-      setItems(r.notifications || []);
+      const fetched = r.notifications || [];
+
+      // Detecta novas (presentes no fetch mas nao no set anterior)
+      const previouslySeen = seenIdsRef.current;
+      const newOnes = initializedRef.current
+        ? fetched.filter((n) => !previouslySeen.has(n.id) && !n.read)
+        : [];
+
+      // Atualiza set de vistos com TUDO que veio (lidas + nao lidas)
+      const newSet = new Set<string>();
+      fetched.forEach((n) => newSet.add(n.id));
+      seenIdsRef.current = newSet;
+      initializedRef.current = true;
+
+      // Dispara push do navegador pras novas (se push habilitado + permitido)
+      if (pushEnabledRef.current && getPermission() === "granted" && newOnes.length > 0) {
+        for (const n of newOnes) {
+          const base = n.source === "infra" ? "/infra" : "/demandas";
+          showBrowserNotification({
+            title: n.title,
+            body: n.message,
+            tag: n.id,
+            url: `${base}?openId=${encodeURIComponent(n.demandId)}`,
+          });
+        }
+      }
+
+      setItems(fetched);
     } catch {
       /* silencia */
     } finally {
