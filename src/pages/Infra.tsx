@@ -9,6 +9,7 @@
  * Responsavel padrao: Tiago Silva. Prioridade padrao: P3.
  */
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,12 +64,27 @@ function formatRelativeDate(iso: string): string {
 const Infra = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [demands, setDemands] = useState<SlackDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("todas");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultKind, setModalDefaultKind] = useState<"sql" | "deploy">("sql");
   const [selectedDemand, setSelectedDemand] = useState<SlackDemand | null>(null);
+
+  // Abre Sheet automaticamente se ?openId=<id> na URL (vindo de notificacao)
+  useEffect(() => {
+    const openId = searchParams.get("openId");
+    if (!openId || demands.length === 0) return;
+    const found = demands.find((d) => d.id === openId);
+    if (found) {
+      setSelectedDemand(found);
+      // Remove o param da URL pra nao reabrir ao fechar o sheet
+      const next = new URLSearchParams(searchParams);
+      next.delete("openId");
+      setSearchParams(next, { replace: true });
+    }
+  }, [demands, searchParams, setSearchParams]);
 
   const reload = useCallback(async () => {
     setLoading(true);

@@ -90,7 +90,9 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
       void apiClient.notifications.markRead(n.id, true).then(reload);
     }
     onClick?.();
-    navigate(n.source === "infra" ? "/infra" : "/demandas");
+    // Navega direto pra demanda especifica via ?openId=
+    const base = n.source === "infra" ? "/infra" : "/demandas";
+    navigate(`${base}?openId=${encodeURIComponent(n.demandId)}`);
   };
 
   const handleMarkAllRead = async () => {

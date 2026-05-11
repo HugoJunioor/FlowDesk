@@ -70,6 +70,17 @@ export async function notify(params: {
   }
 }
 
+function shortContext(demand: SlackDemand): string {
+  // Pra Infra: prefixa SQL/Deploy + DB se houver
+  if (demand.source === "internal") {
+    const kind = demand.infraKind === "deploy" ? "Deploy" : "SQL";
+    const db = demand.infraDatabase ? ` · ${demand.infraDatabase}` : "";
+    return `Infra · ${kind}${db}`;
+  }
+  // Pra Slack: cliente do canal
+  return demand.slackChannel || "Demanda";
+}
+
 /** Demanda atribuida a alguem */
 export async function notifyAssigned(demand: SlackDemand, assigneeEmail?: string | null): Promise<void> {
   const email = assigneeEmail || emailFromName(demand.assignee?.name);
@@ -79,25 +90,25 @@ export async function notifyAssigned(demand: SlackDemand, assigneeEmail?: string
     event: "demand_assigned",
     source: demand.source === "internal" ? "infra" : "slack",
     demandId: demand.id,
-    title: "Demanda atribuída a você",
-    message: demand.title,
+    title: demand.title,
+    message: `${shortContext(demand)} · Atribuída a você por ${demand.requester?.name ?? "—"}`,
     actor: demand.requester?.name,
   });
 }
 
 /** Atendimento iniciado (status → em_andamento) */
 export async function notifyStarted(demand: SlackDemand, actorName?: string): Promise<void> {
-  // Notifica solicitante (quem abriu)
   const requesterEmail = emailFromName(demand.requester?.name);
   if (requesterEmail) {
+    const actor = actorName || demand.assignee?.name || "—";
     await notify({
       userEmail: requesterEmail,
       event: "demand_started",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
-      title: "Atendimento iniciado",
-      message: demand.title,
-      actor: actorName || demand.assignee?.name,
+      title: demand.title,
+      message: `${shortContext(demand)} · ${actor} iniciou o atendimento`,
+      actor,
     });
   }
 }
@@ -106,14 +117,15 @@ export async function notifyStarted(demand: SlackDemand, actorName?: string): Pr
 export async function notifyCompleted(demand: SlackDemand, actorName?: string): Promise<void> {
   const requesterEmail = emailFromName(demand.requester?.name);
   if (requesterEmail) {
+    const actor = actorName || demand.assignee?.name || "—";
     await notify({
       userEmail: requesterEmail,
       event: "demand_completed",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
-      title: "Demanda concluída ✅",
-      message: demand.title,
-      actor: actorName || demand.assignee?.name,
+      title: demand.title,
+      message: `${shortContext(demand)} · ${actor} concluiu a demanda ✅`,
+      actor,
     });
   }
 }
@@ -122,21 +134,21 @@ export async function notifyCompleted(demand: SlackDemand, actorName?: string): 
 export async function notifyReopened(demand: SlackDemand, actorName?: string): Promise<void> {
   const assigneeEmail = emailFromName(demand.assignee?.name);
   if (assigneeEmail) {
+    const actor = actorName || "—";
     await notify({
       userEmail: assigneeEmail,
       event: "demand_reopened",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
-      title: "Demanda reaberta",
-      message: demand.title,
-      actor: actorName,
+      title: demand.title,
+      message: `${shortContext(demand)} · ${actor} reabriu a demanda`,
+      actor,
     });
   }
 }
 
 /** Resposta nova na thread */
 export async function notifyReplied(demand: SlackDemand, replyAuthor: string): Promise<void> {
-  // Notifica assignee se nao foi quem respondeu
   const assigneeEmail = emailFromName(demand.assignee?.name);
   if (assigneeEmail && demand.assignee?.name !== replyAuthor) {
     await notify({
@@ -144,8 +156,8 @@ export async function notifyReplied(demand: SlackDemand, replyAuthor: string): P
       event: "demand_replied",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
-      title: "Nova resposta",
-      message: demand.title,
+      title: demand.title,
+      message: `${shortContext(demand)} · ${replyAuthor} respondeu`,
       actor: replyAuthor,
     });
   }
