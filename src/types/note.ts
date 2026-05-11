@@ -32,11 +32,11 @@ export const STATUS_ORDER: NoteStatus[] = ["todo", "doing", "done"];
 
 export const NOTE_COLORS: { name: string; value: string; bg: string }[] = [
   { name: "Padrão", value: "default", bg: "bg-card" },
-  { name: "Amarelo", value: "yellow", bg: "bg-yellow-50 dark:bg-yellow-950/30" },
-  { name: "Verde", value: "green", bg: "bg-green-50 dark:bg-green-950/30" },
-  { name: "Azul", value: "blue", bg: "bg-blue-50 dark:bg-blue-950/30" },
-  { name: "Roxo", value: "purple", bg: "bg-purple-50 dark:bg-purple-950/30" },
-  { name: "Rosa", value: "pink", bg: "bg-pink-50 dark:bg-pink-950/30" },
+  { name: "Amarelo", value: "yellow", bg: "bg-yellow-100 dark:bg-yellow-800/40 dark:border-yellow-700/40" },
+  { name: "Verde", value: "green", bg: "bg-green-100 dark:bg-green-800/40 dark:border-green-700/40" },
+  { name: "Azul", value: "blue", bg: "bg-blue-100 dark:bg-blue-800/40 dark:border-blue-700/40" },
+  { name: "Roxo", value: "purple", bg: "bg-purple-100 dark:bg-purple-800/40 dark:border-purple-700/40" },
+  { name: "Rosa", value: "pink", bg: "bg-pink-100 dark:bg-pink-800/40 dark:border-pink-700/40" },
 ];
 
 export function colorBgClass(color: string | null): string {
