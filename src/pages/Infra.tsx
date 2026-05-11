@@ -13,7 +13,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Database, Rocket, Inbox, Loader2, Clock, CheckCircle2, AlertCircle, Trash2, Copy, ExternalLink, Wrench } from "lucide-react";
+import { Plus, Database, Rocket, Inbox, Loader2, Clock, CheckCircle2, AlertCircle, Trash2, Copy, ExternalLink, Wrench, Paperclip, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -248,6 +248,39 @@ const Infra = () => {
                                   </button>
                                 )}
                               </div>
+                            )}
+                            {/* Anexos (download direto clicando) */}
+                            {d.infraAttachments && d.infraAttachments.length > 0 && (
+                              <div className="mt-2 flex items-start gap-1.5 flex-wrap">
+                                {d.infraAttachments.map((a) => (
+                                  <a
+                                    key={a.id}
+                                    href={a.dataUrl}
+                                    download={a.name}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-muted border hover:bg-muted/70 flex items-center gap-1"
+                                    title={`${a.name} (${(a.size / 1024).toFixed(0)} KB)`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Paperclip size={9} />
+                                    <span className="truncate max-w-[120px]">{a.name}</span>
+                                    <Download size={9} className="text-muted-foreground" />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                            {/* Data limite — destaca se passou */}
+                            {d.dueDate && d.status !== "concluida" && (
+                              (() => {
+                                const due = new Date(d.dueDate);
+                                const overdue = due < new Date();
+                                return (
+                                  <div className={`text-[10px] mt-1.5 flex items-center gap-1 ${overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                                    <Clock size={10} />
+                                    Prazo: {due.toLocaleDateString("pt-BR")} {String(due.getHours()).padStart(2, "0")}:{String(due.getMinutes()).padStart(2, "0")}
+                                    {overdue && " (vencido)"}
+                                  </div>
+                                );
+                              })()
                             )}
                             <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                               <span className="flex items-center gap-1">

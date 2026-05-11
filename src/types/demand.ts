@@ -218,6 +218,11 @@ export interface SlackDemand {
    * Apenas referencia visual — nao integra com API externa.
    */
   infraExternalLink?: string;
+  /**
+   * Anexos da demanda interna (base64 inline, max 5MB cada).
+   * Reusa estrutura ClosureAttachment ja existente.
+   */
+  infraAttachments?: ClosureAttachment[];
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;

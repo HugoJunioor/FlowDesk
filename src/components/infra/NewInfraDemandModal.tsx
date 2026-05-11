@@ -4,7 +4,7 @@
  * Tabs SQL | Deploy. Cada uma tem o mesmo formulario, so muda o infraKind
  * que vai ser enviado pro backend. Responsavel default = Tiago Silva.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -15,17 +15,58 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Database, Rocket, Loader2, Copy, Plus, ExternalLink } from "lucide-react";
+import { Database, Rocket, Loader2, Copy, Plus, ExternalLink, Paperclip, X, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { loadInfraDatabases, addInfraDatabase } from "@/lib/infraDatabases";
+import { addBusinessHours } from "@/lib/businessHours";
+import { PRIORITY_CONFIG } from "@/types/demand";
 
 interface NewInfraDemandModalProps {
   open: boolean;
   defaultKind: "sql" | "deploy";
   onClose: () => void;
   onCreated: () => void;
+}
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILES = 5;
+
+interface InfraAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  addedAt: string;
+}
+
+/** Formata YYYY-MM-DDTHH:MM pra value de input type=datetime-local */
+function toLocalInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Formata Date pra exibicao no preview (ex: "13/05 14:30") */
+function fmtPreview(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatBytes(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
 const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfraDemandModalProps) => {
@@ -47,6 +88,16 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
   const [externalLink, setExternalLink] = useState("");
   const [showAddDbInput, setShowAddDbInput] = useState(false);
   const [newDbName, setNewDbName] = useState("");
+  // Anexos
+  const [attachments, setAttachments] = useState<InfraAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preview da data limite calculada (auto via prioridade)
+  const autoDueDate = (() => {
+    const cfg = PRIORITY_CONFIG[priority];
+    if (!cfg?.sla) return null;
+    return addBusinessHours(new Date(), cfg.sla.resolutionHours);
+  })();
 
   // Carrega lista de bancos quando modal abre
   const refreshDatabases = useCallback(() => {
@@ -67,9 +118,54 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
       setExternalLink("");
       setShowAddDbInput(false);
       setNewDbName("");
+      setAttachments([]);
       refreshDatabases();
     }
   }, [open, defaultKind, refreshDatabases]);
+
+  const handleFileSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_FILES - attachments.length;
+    if (remaining <= 0) {
+      toast({ title: `Máximo ${MAX_FILES} anexos`, variant: "destructive" });
+      return;
+    }
+    const accepted: InfraAttachment[] = [];
+    for (const file of Array.from(files).slice(0, remaining)) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "Arquivo muito grande",
+          description: `${file.name}: ${formatBytes(file.size)} (máx 5MB)`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        accepted.push({
+          id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          type: file.type || "application/octet-stream",
+          size: file.size,
+          dataUrl,
+          addedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        toast({
+          title: "Erro ao ler arquivo",
+          description: file.name,
+          variant: "destructive",
+        });
+      }
+    }
+    if (accepted.length > 0) {
+      setAttachments((prev) => [...prev, ...accepted]);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const handleCopyQuery = async () => {
     if (!query.trim()) {
@@ -105,6 +201,14 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
     }
     setSaving(true);
     try {
+      // Data limite: se user nao preencheu, calcula auto baseado no SLA
+      // da prioridade (P1=4h, P2=8h, P3=24h uteis).
+      const finalDueDate = dueDate
+        ? new Date(dueDate).toISOString()
+        : autoDueDate
+        ? autoDueDate.toISOString()
+        : null;
+
       await apiClient.infra.create({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -116,12 +220,14 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         },
         // assignee fixo: Tiago Silva (regra de negocio)
         assignee: { name: "Tiago Silva", avatar: "" },
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        dueDate: finalDueDate,
         client: client.trim() || undefined,
         // SQL-specific (vai vazio em deploy)
         infraQuery: kind === "sql" && query.trim() ? query.trim() : undefined,
         infraDatabase: kind === "sql" && database ? database : undefined,
         infraExternalLink: externalLink.trim() || undefined,
+        // Anexos (so envia se houver — payload pode ficar grande, eh base64)
+        ...(attachments.length > 0 ? { infraAttachments: attachments } : {}),
       });
       toast({
         title: `Demanda de ${kind === "sql" ? "Operações SQL" : "Deploy"} criada`,
@@ -198,12 +304,23 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Data limite (opcional)</label>
+                <label className="text-sm font-medium">
+                  Data limite
+                  {!dueDate && autoDueDate && (
+                    <span className="ml-1.5 text-[10px] text-muted-foreground font-normal">
+                      (auto: {fmtPreview(autoDueDate)})
+                    </span>
+                  )}
+                </label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
+                  placeholder={autoDueDate ? toLocalInputValue(autoDueDate) : ""}
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Preenchido automaticamente pela prioridade (P{priority.slice(1)} = {PRIORITY_CONFIG[priority]?.sla?.resolution ?? "—"} úteis). Sobrescreva se precisar.
+                </p>
               </div>
             </div>
 
@@ -318,6 +435,66 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
                 onChange={(e) => setExternalLink(e.target.value)}
                 placeholder="https://app.clickup.com/t/... ou outro link de referência"
               />
+            </div>
+
+            {/* Anexos (ambos os tipos) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Paperclip size={12} /> Anexos (opcional)
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attachments.length >= MAX_FILES}
+                  className="h-7 text-xs"
+                >
+                  <Paperclip size={12} className="mr-1" /> Anexar
+                </Button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  void handleFileSelect(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {attachments.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Máximo {MAX_FILES} arquivos · 5MB por arquivo
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {attachments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center gap-2 px-2 py-1.5 bg-muted/40 border rounded text-xs"
+                    >
+                      <FileText size={12} className="text-muted-foreground shrink-0" />
+                      <span className="truncate flex-1" title={a.name}>{a.name}</span>
+                      <span className="text-muted-foreground text-[10px] shrink-0">
+                        {formatBytes(a.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(a.id)}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                        title="Remover"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground">
+                    {attachments.length}/{MAX_FILES} arquivos
+                  </p>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>

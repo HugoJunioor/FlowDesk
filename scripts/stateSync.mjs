@@ -665,7 +665,7 @@ async function handleInfra(req, res) {
       const body = JSON.parse(await readBody(req));
       const {
         title, description, priority, infraKind, requester, assignee, dueDate, client,
-        infraQuery, infraDatabase, infraExternalLink,
+        infraQuery, infraDatabase, infraExternalLink, infraAttachments,
       } = body;
 
       if (!title || !title.trim()) {
@@ -692,6 +692,7 @@ async function handleInfra(req, res) {
         ...(infraQuery && infraQuery.trim() ? { infraQuery: infraQuery.trim() } : {}),
         ...(infraDatabase && infraDatabase.trim() ? { infraDatabase: infraDatabase.trim() } : {}),
         ...(infraExternalLink && infraExternalLink.trim() ? { infraExternalLink: infraExternalLink.trim() } : {}),
+        ...(Array.isArray(infraAttachments) && infraAttachments.length > 0 ? { infraAttachments } : {}),
         requester: requester || { name: "Desconhecido", avatar: "" },
         assignee: assignee || { name: "Tiago Silva", avatar: "" },
         cc: [],
@@ -736,7 +737,7 @@ async function handleInfra(req, res) {
       // Whitelist de campos editaveis
       const allowed = [
         "status", "assignee", "priority", "completedAt", "description", "title", "threadReplies",
-        "infraQuery", "infraDatabase", "infraExternalLink",
+        "infraQuery", "infraDatabase", "infraExternalLink", "infraAttachments", "dueDate",
       ];
       for (const k of allowed) {
         if (updates[k] !== undefined) demands[idx][k] = updates[k];

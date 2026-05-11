@@ -213,6 +213,15 @@ export const apiClient = {
       infraDatabase?: string;
       /** Link externo da demanda (ex: ClickUp) */
       infraExternalLink?: string;
+      /** Anexos em base64 (max 5MB cada, max 5 arquivos) */
+      infraAttachments?: Array<{
+        id: string;
+        name: string;
+        type: string;
+        size: number;
+        dataUrl: string;
+        addedAt: string;
+      }>;
     }) =>
       request<{ demand: import("@/types/demand").SlackDemand }>("/infra/demands", {
         method: "POST",
