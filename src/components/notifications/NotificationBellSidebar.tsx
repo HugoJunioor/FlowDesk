@@ -1,0 +1,277 @@
+/**
+ * Variante do sino de notificacoes pro Sidebar.
+ *
+ * Mesma logica do NotificationBell (popover + polling + badge), mas
+ * com visual de nav-item — alinha com os outros links do sidebar.
+ *
+ * Adapta ao estado collapsed (so icone + badge) ou aberto (icone + label).
+ */
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Bell, CheckCheck, AlertCircle, MessageSquare, Loader2,
+  CheckCircle2, Clock, UserCheck, RotateCcw, Plus,
+} from "lucide-react";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiClient } from "@/lib/apiClient";
+import { NotificationItem, NotificationEvent } from "@/types/notification";
+import { showBrowserNotification, getPermission } from "@/lib/browserNotifications";
+
+const POLL_INTERVAL_MS = 30_000;
+
+const EVENT_ICON: Record<NotificationEvent, typeof Bell> = {
+  demand_assigned: UserCheck,
+  demand_replied: MessageSquare,
+  demand_started: Loader2,
+  demand_completed: CheckCircle2,
+  demand_reopened: RotateCcw,
+  demand_overdue: AlertCircle,
+  demand_due_soon: Clock,
+  demand_created: Plus,
+};
+
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60_000) return "agora";
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
+
+interface NotificationBellSidebarProps {
+  collapsed: boolean;
+  onClick?: () => void;
+}
+
+const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebarProps) => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // IDs ja vistos no polling — usado pra detectar notificacoes NOVAS
+  // e disparar push do navegador uma unica vez por id.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // Flag pra nao disparar push na PRIMEIRA carga (notificacoes antigas
+  // nao devem virar push agora). Inicia false, vira true apos 1a list.
+  const initializedRef = useRef(false);
+  // Cache da preferencia push do user (atualizada via prefs api).
+  // Default true se prefs nao salvas (usuario decide quando ligar/desligar).
+  const pushEnabledRef = useRef(false);
+
+  const email = currentUser?.email || "";
+
+  // Carrega preferencias do user pra saber se push esta habilitado
+  useEffect(() => {
+    if (!email) return;
+    apiClient.notifications.getPreferences(email)
+      .then((r) => {
+        pushEnabledRef.current = r.preferences?.channels?.browserPush === true;
+      })
+      .catch(() => { pushEnabledRef.current = false; });
+  }, [email]);
+
+  const reload = useCallback(async () => {
+    if (!email) return;
+    setLoading(true);
+    try {
+      const r = await apiClient.notifications.list(email);
+      const fetched = r.notifications || [];
+
+      // Detecta novas (presentes no fetch mas nao no set anterior)
+      const previouslySeen = seenIdsRef.current;
+      const newOnes = initializedRef.current
+        ? fetched.filter((n) => !previouslySeen.has(n.id) && !n.read)
+        : [];
+
+      // Atualiza set de vistos com TUDO que veio (lidas + nao lidas)
+      const newSet = new Set<string>();
+      fetched.forEach((n) => newSet.add(n.id));
+      seenIdsRef.current = newSet;
+      initializedRef.current = true;
+
+      // Dispara push do navegador pras novas (se push habilitado + permitido)
+      if (pushEnabledRef.current && getPermission() === "granted" && newOnes.length > 0) {
+        for (const n of newOnes) {
+          const base = n.source === "infra" ? "/infra" : "/demandas";
+          showBrowserNotification({
+            title: n.title,
+            body: n.message,
+            tag: n.id,
+            url: `${base}?openId=${encodeURIComponent(n.demandId)}`,
+          });
+        }
+      }
+
+      setItems(fetched);
+    } catch {
+      /* silencia */
+    } finally {
+      setLoading(false);
+    }
+  }, [email]);
+
+  useEffect(() => {
+    if (!email) return;
+    void reload();
+    const id = setInterval(reload, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [email, reload]);
+
+  useEffect(() => {
+    if (open) void reload();
+  }, [open, reload]);
+
+  const unreadCount = items.filter((n) => !n.read).length;
+
+  const handleClick = async (n: NotificationItem) => {
+    setOpen(false);
+    if (!n.read) {
+      void apiClient.notifications.markRead(n.id, true).then(reload);
+    }
+    onClick?.();
+    // Navega direto pra demanda especifica via ?openId=
+    const base = n.source === "infra" ? "/infra" : "/demandas";
+    navigate(`${base}?openId=${encodeURIComponent(n.demandId)}`);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!email) return;
+    await apiClient.notifications.markAllRead(email);
+    void reload();
+  };
+
+  if (!email) return null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+          aria-label="Notificações"
+        >
+          <div className="relative shrink-0">
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </div>
+          {!collapsed && (
+            <span className="flex-1 text-left">
+              Notificações
+              {unreadCount > 0 && (
+                <span className="ml-1.5 text-[10px] text-primary font-semibold">
+                  {unreadCount} nova{unreadCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="w-[380px] p-0 max-h-[500px] overflow-hidden flex flex-col ml-2">
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 border-b">
+          <div className="flex items-center gap-2">
+            <Bell size={14} />
+            <span className="font-medium text-sm">Notificações</span>
+            {unreadCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                {unreadCount} nova{unreadCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[11px] gap-1"
+              onClick={handleMarkAllRead}
+            >
+              <CheckCheck size={11} /> Marcar todas
+            </Button>
+          )}
+        </div>
+
+        {/* Lista */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && items.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              <Loader2 size={14} className="animate-spin inline mr-1.5" /> Carregando...
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              <Bell size={20} className="mx-auto mb-2 opacity-40" />
+              Nenhuma notificação ainda
+            </div>
+          ) : (
+            <div className="divide-y">
+              {items.slice(0, 10).map((n) => {
+                const Icon = EVENT_ICON[n.event] || Bell;
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleClick(n)}
+                    className={`w-full text-left p-3 hover:bg-muted/40 transition-colors flex gap-3 ${
+                      !n.read ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className={`mt-0.5 ${!n.read ? "text-primary" : "text-muted-foreground"}`}>
+                      <Icon size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={`text-xs ${!n.read ? "font-semibold" : "font-medium"} truncate`}>
+                          {n.title}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {timeAgo(n.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        {n.message}
+                      </p>
+                      {n.actor && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          por {n.actor}
+                        </p>
+                      )}
+                    </div>
+                    {!n.read && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {items.length > 0 && (
+          <div className="p-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs"
+              onClick={() => { setOpen(false); onClick?.(); navigate("/notificacoes"); }}
+            >
+              Ver todas as notificações
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+export default NotificationBellSidebar;

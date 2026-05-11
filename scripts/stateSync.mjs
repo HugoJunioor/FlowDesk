@@ -24,6 +24,8 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
 const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");
 const INFRA_FILE = path.join(__dirname, "..", "data", "infraDemands.json");
+const NOTIFICATIONS_FILE = path.join(__dirname, "..", "data", "notifications.json");
+const NOTIFICATION_PREFS_FILE = path.join(__dirname, "..", "data", "notificationPreferences.json");
 
 // Gera/le token de autenticacao dos endpoints. Persiste em data/auth-token
 // (gitignored). Se nao existir, gera um novo de 32 bytes (256 bits).
@@ -768,6 +770,189 @@ async function handleInfra(req, res) {
   return res.end(JSON.stringify({ error: "Endpoint Infra nao encontrado" }));
 }
 
+// ===================================================================
+// === NOTIFICATIONS — inbox de eventos por usuario =================
+// ===================================================================
+// Cada notificacao tem userEmail (destinatario). Listagem filtra por
+// email da pessoa logada. Preferencias guardadas em arquivo separado.
+
+function readNotifications() {
+  if (!fs.existsSync(NOTIFICATIONS_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+function writeNotifications(list) {
+  const dir = path.dirname(NOTIFICATIONS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = NOTIFICATIONS_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, NOTIFICATIONS_FILE);
+}
+
+function readNotificationPrefs() {
+  if (!fs.existsSync(NOTIFICATION_PREFS_FILE)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(NOTIFICATION_PREFS_FILE, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeNotificationPrefs(prefs) {
+  const dir = path.dirname(NOTIFICATION_PREFS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = NOTIFICATION_PREFS_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(prefs, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, NOTIFICATION_PREFS_FILE);
+}
+
+function makeNotificationId() {
+  return `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Mantem so as 500 notificacoes mais recentes (FIFO).
+ * Evita arquivo crescer indefinidamente. Suficiente pra ~3 meses de uso ativo.
+ */
+const MAX_NOTIFICATIONS = 500;
+
+async function handleNotifications(req, res) {
+  const url = req.url || "";
+  res.setHeader("Content-Type", "application/json");
+
+  // GET /notifications?email=user@... — lista do user
+  if (req.method === "GET" && url.startsWith("/notifications") && !url.includes("/preferences")) {
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
+    const all = readNotifications();
+    const mine = all
+      .filter((n) => (n.userEmail || "").toLowerCase() === email)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return res.end(JSON.stringify({ notifications: mine }));
+  }
+
+  // POST /notifications — cria uma nova (chamada pelo proprio FlowDesk em eventos)
+  if (req.method === "POST" && url === "/notifications") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { userEmail, event, source, demandId, title, message, actor } = body;
+      if (!userEmail || !event || !demandId) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "userEmail, event e demandId obrigatorios" }));
+      }
+      const notif = {
+        id: makeNotificationId(),
+        userEmail: userEmail.toLowerCase(),
+        event,
+        source: source || "slack",
+        demandId,
+        title: title || "Notificação",
+        message: message || "",
+        actor,
+        createdAt: new Date().toISOString(),
+        read: false,
+      };
+      const all = readNotifications();
+      all.unshift(notif);
+      // Limita tamanho mantendo as mais recentes
+      const trimmed = all.slice(0, MAX_NOTIFICATIONS);
+      writeNotifications(trimmed);
+      return res.end(JSON.stringify({ notification: notif }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // PATCH /notifications/:id — marca como lida/nao lida
+  const patchMatch = url.match(/^\/notifications\/([^/]+)$/);
+  if (req.method === "PATCH" && patchMatch) {
+    try {
+      const id = decodeURIComponent(patchMatch[1]);
+      const updates = JSON.parse(await readBody(req));
+      const all = readNotifications();
+      const idx = all.findIndex((n) => n.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "notificacao nao encontrada" }));
+      }
+      if (typeof updates.read === "boolean") {
+        all[idx].read = updates.read;
+        all[idx].readAt = updates.read ? new Date().toISOString() : undefined;
+      }
+      writeNotifications(all);
+      return res.end(JSON.stringify({ notification: all[idx] }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // POST /notifications/mark-all-read?email=... — marca todas as do user como lidas
+  if (req.method === "POST" && url.startsWith("/notifications/mark-all-read")) {
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
+    const all = readNotifications();
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of all) {
+      if ((n.userEmail || "").toLowerCase() === email && !n.read) {
+        n.read = true;
+        n.readAt = now;
+        count++;
+      }
+    }
+    writeNotifications(all);
+    return res.end(JSON.stringify({ ok: true, count }));
+  }
+
+  // GET /notifications/preferences?email=... — pega preferencias do user
+  if (req.method === "GET" && url.startsWith("/notifications/preferences")) {
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
+    const all = readNotificationPrefs();
+    return res.end(JSON.stringify({ preferences: all[email] || null }));
+  }
+
+  // PUT /notifications/preferences — atualiza preferencias
+  if (req.method === "PUT" && url === "/notifications/preferences") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { userEmail } = body;
+      if (!userEmail) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "userEmail obrigatorio" }));
+      }
+      const all = readNotificationPrefs();
+      all[userEmail.toLowerCase()] = body;
+      writeNotificationPrefs(all);
+      return res.end(JSON.stringify({ preferences: body }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  res.statusCode = 404;
+  return res.end(JSON.stringify({ error: "Endpoint Notifications nao encontrado" }));
+}
+
 function handler(req, res, next) {
   // Slack OAuth endpoints (login do user, redirect, callback)
   if (req.url?.startsWith("/auth/slack/")) {
@@ -790,6 +975,14 @@ function handler(req, res, next) {
     if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
     if (!isAuthenticated(req)) return reject401(res);
     return handleInfra(req, res);
+  }
+
+  // Notifications (inbox por usuario + preferencias)
+  if (req.url?.startsWith("/notifications")) {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    if (!isAuthenticated(req)) return reject401(res);
+    return handleNotifications(req, res);
   }
 
   // Endpoint que devolve o token de auth.
