@@ -1,12 +1,17 @@
 export type DemandPriority = "p1" | "p2" | "p3" | "sem_classificacao";
 export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada";
-export type DemandType = "Tarefa/Ajuda" | "Problema/Bug" | "Update" | "Remessa" | "Outro";
+export type DemandType =
+  | "Tarefa/Ajuda" | "Problema/Bug" | "Update" | "Remessa"
+  | "Sitef" | "Conciliacao"
+  | "Outro";
 
 export type DemandCategory =
   | "Portal do cliente" | "Aplicativo" | "Backoffice" | "Cadastro"
   | "Cartao" | "Carteiras/Produto" | "Faturas" | "KYC"
   | "Transacao" | "Relatorio" | "SMS" | "Conta Tesouro"
-  | "Boleto" | "NF" | "Saldo" | "Pagamento" | "";
+  | "Boleto" | "NF" | "Saldo" | "Pagamento"
+  | "Inclusao de Rede" | "Criacao de Nova Conciliacao" | "Sitef"
+  | "";
 
 export type ExpirationReason =
   | "Falta de retorno do cliente" | "Falta de retorno da equipe"
@@ -23,6 +28,7 @@ export const CATEGORY_OPTIONS: DemandCategory[] = [
   "Cartao", "Carteiras/Produto", "Faturas", "KYC",
   "Transacao", "Relatorio", "SMS", "Conta Tesouro",
   "Boleto", "NF", "Saldo", "Pagamento",
+  "Inclusao de Rede", "Criacao de Nova Conciliacao", "Sitef",
 ];
 
 export const EXPIRATION_REASON_OPTIONS: ExpirationReason[] = [

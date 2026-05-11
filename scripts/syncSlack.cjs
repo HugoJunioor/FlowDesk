@@ -265,13 +265,39 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         return 'p3';
       })();
 
+      // Workflows especificos (botname) tem precedencia sobre o campo "Tipo de demanda".
+      // "Nova conciliação" e "Remessa Sitef" sao templates do Slack — identifica
+      // unicamente pelo nome do bot/app emissor.
+      const workflowName = (msg.username || '').toLowerCase();
+      const isSitefWorkflow = workflowName.includes('remessa sitef') || workflowName.includes('sitef');
+      const isConciliacaoWorkflow = workflowName.includes('nova conciliacao') ||
+                                    workflowName.includes('nova conciliação') ||
+                                    workflowName.includes('conciliacao') ||
+                                    workflowName.includes('conciliação');
+
       const demandType = (() => {
+        if (isSitefWorkflow) return 'Sitef';
+        if (isConciliacaoWorkflow) return 'Conciliacao';
         const t = (fields['Tipo de demanda'] || fields['Tipo de execução'] || fields['Tipo de execucao'] || '').toLowerCase();
         if (t.includes('bug') || t.includes('problema')) return 'Problema/Bug';
         if (t.includes('update')) return 'Update';
         if (t.includes('remessa')) return 'Remessa';
         if (t.includes('tarefa') || t.includes('ajuda')) return 'Tarefa/Ajuda';
         return 'Outro';
+      })();
+
+      // Categoria pra Sitef/Conciliacao baseada no campo "Tipo" do form de conciliacao
+      // (ex: "Criação de nova conciliação", "Inclusão de rede") — ou direto "Sitef".
+      const autoCategoryFromWorkflow = (() => {
+        if (isSitefWorkflow) return 'Sitef';
+        if (isConciliacaoWorkflow) {
+          const t = (fields['Tipo'] || '').toLowerCase();
+          if (t.includes('inclus') && t.includes('rede')) return 'Inclusao de Rede';
+          if (t.includes('cria') && t.includes('conciliac')) return 'Criacao de Nova Conciliacao';
+          // Default Conciliacao: trata como criacao se nao especificar
+          return 'Criacao de Nova Conciliacao';
+        }
+        return null;
       })();
 
       const requesterMatch = resolvedText.match(/enviada por @(.+?)[\s\n]/i) ||
@@ -319,6 +345,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       if (product) tags.push(product.toLowerCase());
       if (demandType !== 'Outro') tags.push(demandType.toLowerCase().replace('/', '-'));
 
+      // Pra demandas Sitef/Conciliacao, pre-classifica categoria via closure object
+      // (a UI de fechamento ja le isso; user pode sobrescrever depois)
+      const closure = autoCategoryFromWorkflow
+        ? { category: autoCategoryFromWorkflow }
+        : undefined;
+
       const demand = {
         id: demandId,
         title: title.replace(/\*/g, '').trim(),
@@ -332,6 +364,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         product,
         requester: { name: requesterName.replace(/@/g, ''), avatar: '' },
         assignee: assigneeName ? { name: assigneeName, avatar: '' } : null,
+        ...(closure ? { closure } : {}),
         cc,
         createdAt: new Date(parseFloat(msg.ts) * 1000).toISOString(),
         dueDate,

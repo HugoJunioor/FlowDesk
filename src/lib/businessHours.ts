@@ -1,13 +1,18 @@
 import { SlackDemand } from "@/types/demand";
 
-/** Demandas de conciliação e remessa SITEF não contam no SLA de 1ª resposta */
-export function isExcludedFromFirstResponseSla(d: SlackDemand): boolean {
-  const title = d.title.toLowerCase();
-  const workflow = d.workflow.toLowerCase();
-  return (
-    workflow.includes("concilia") || title.includes("concilia") ||
-    workflow.includes("remessa") || title.includes("remessa sitef") || title.includes("remessa tef")
-  );
+/**
+ * Demandas Sitef/Conciliacao tem fluxo proprio de atendimento:
+ * - Inicio do atendimento marcado por reaction de :loading: em qualquer
+ *   mensagem da thread (campo serviceStartedAt — implementado na Fase 2)
+ * - 1a resposta SLA: 4h uteis ate o emoji ser adicionado
+ * - Resolucao SLA: 24h uteis (P3) ate completedAt
+ *
+ * Esta funcao mantida pra retro-compatibilidade com codigo legacy mas agora
+ * retorna sempre false. As novas regras de SLA pra esses tipos sao aplicadas
+ * via demandType === 'Sitef' | 'Conciliacao' nos consumers (slaCalculator).
+ */
+export function isExcludedFromFirstResponseSla(_d: SlackDemand): boolean {
+  return false;
 }
 
 /**
