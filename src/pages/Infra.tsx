@@ -19,8 +19,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import NewInfraDemandModal from "@/components/infra/NewInfraDemandModal";
+import InfraDemandSheet from "@/components/infra/InfraDemandSheet";
 
-type Tab = "todos" | "sql" | "deploy";
+type Tab = "todas" | "novas" | "em_andamento" | "em_atraso" | "concluidas" | "sql" | "deploy";
+
+function isOverdue(d: SlackDemand): boolean {
+  if (d.status === "concluida") return false;
+  if (!d.dueDate) return false;
+  return new Date(d.dueDate) < new Date();
+}
 
 function priorityLabel(p: SlackDemand["priority"]) {
   return PRIORITY_CONFIG[p]?.shortLabel ?? "—";
@@ -57,9 +64,10 @@ const Infra = () => {
   const { toast } = useToast();
   const [demands, setDemands] = useState<SlackDemand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("todos");
+  const [activeTab, setActiveTab] = useState<Tab>("todas");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultKind, setModalDefaultKind] = useState<"sql" | "deploy">("sql");
+  const [selectedDemand, setSelectedDemand] = useState<SlackDemand | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -79,9 +87,29 @@ const Infra = () => {
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const filtered = demands.filter((d) =>
-    activeTab === "todos" ? true : d.infraKind === activeTab
-  );
+  const filtered = demands.filter((d) => {
+    switch (activeTab) {
+      case "todas": return true;
+      case "novas": return d.status === "aberta";
+      case "em_andamento": return d.status === "em_andamento";
+      case "em_atraso": return isOverdue(d);
+      case "concluidas": return d.status === "concluida";
+      case "sql": return d.infraKind === "sql";
+      case "deploy": return d.infraKind === "deploy";
+      default: return true;
+    }
+  });
+
+  // Counters reutilizaveis
+  const counts = {
+    todas: demands.length,
+    novas: demands.filter(d => d.status === "aberta").length,
+    em_andamento: demands.filter(d => d.status === "em_andamento").length,
+    em_atraso: demands.filter(isOverdue).length,
+    concluidas: demands.filter(d => d.status === "concluida").length,
+    sql: demands.filter(d => d.infraKind === "sql").length,
+    deploy: demands.filter(d => d.infraKind === "deploy").length,
+  };
 
   const handleAttend = async (d: SlackDemand) => {
     try {
@@ -163,19 +191,36 @@ const Infra = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)}>
-          <TabsList>
-            <TabsTrigger value="todos">
-              Todas <span className="ml-2 text-xs text-muted-foreground">({demands.length})</span>
+        {/* Tabs — primeira linha = por status, segunda = por tipo */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)} className="space-y-2">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="todas">
+              Todas <span className="ml-2 text-xs text-muted-foreground">({counts.todas})</span>
             </TabsTrigger>
+            <TabsTrigger value="novas">
+              <AlertCircle size={12} className="mr-1.5 text-warning" />
+              Novas <span className="ml-2 text-xs text-muted-foreground">({counts.novas})</span>
+            </TabsTrigger>
+            <TabsTrigger value="em_andamento">
+              <Loader2 size={12} className="mr-1.5 text-info" />
+              Em andamento <span className="ml-2 text-xs text-muted-foreground">({counts.em_andamento})</span>
+            </TabsTrigger>
+            <TabsTrigger value="em_atraso" className={counts.em_atraso > 0 ? "text-destructive" : ""}>
+              <Clock size={12} className="mr-1.5" />
+              Em atraso <span className="ml-2 text-xs">({counts.em_atraso})</span>
+            </TabsTrigger>
+            <TabsTrigger value="concluidas">
+              <CheckCircle2 size={12} className="mr-1.5 text-success" />
+              Concluídas <span className="ml-2 text-xs text-muted-foreground">({counts.concluidas})</span>
+            </TabsTrigger>
+            <span className="w-px h-5 bg-border mx-1" />
             <TabsTrigger value="sql">
               <Database size={12} className="mr-1.5" />
-              Operações SQL <span className="ml-2 text-xs text-muted-foreground">({demands.filter(d => d.infraKind === "sql").length})</span>
+              SQL <span className="ml-2 text-xs text-muted-foreground">({counts.sql})</span>
             </TabsTrigger>
             <TabsTrigger value="deploy">
               <Rocket size={12} className="mr-1.5" />
-              Deploy <span className="ml-2 text-xs text-muted-foreground">({demands.filter(d => d.infraKind === "deploy").length})</span>
+              Deploy <span className="ml-2 text-xs text-muted-foreground">({counts.deploy})</span>
             </TabsTrigger>
           </TabsList>
 
@@ -189,11 +234,19 @@ const Infra = () => {
                 <CardContent className="py-12 text-center">
                   <Inbox size={32} className="text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Nenhuma demanda {activeTab !== "todos" ? `de ${activeTab === "sql" ? "SQL" : "Deploy"}` : ""} cadastrada
+                    {activeTab === "todas" && "Nenhuma demanda cadastrada"}
+                    {activeTab === "novas" && "Nenhuma demanda aberta no momento"}
+                    {activeTab === "em_andamento" && "Nenhuma demanda em andamento"}
+                    {activeTab === "em_atraso" && "Tudo em dia — nenhuma demanda em atraso ✨"}
+                    {activeTab === "concluidas" && "Nenhuma demanda concluída ainda"}
+                    {activeTab === "sql" && "Nenhuma demanda de SQL"}
+                    {activeTab === "deploy" && "Nenhuma demanda de Deploy"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Clique em "Nova SQL" ou "Novo Deploy" pra abrir.
-                  </p>
+                  {activeTab === "todas" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Clique em "Nova SQL" ou "Novo Deploy" pra abrir.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -201,7 +254,11 @@ const Infra = () => {
                 {filtered.map((d) => {
                   const sb = statusBadge(d.status);
                   return (
-                    <Card key={d.id} className="hover:shadow-sm transition-shadow">
+                    <Card
+                      key={d.id}
+                      className="hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer"
+                      onClick={() => setSelectedDemand(d)}
+                    >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           <div className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold border ${priorityColor(d.priority)}`}>
@@ -240,7 +297,7 @@ const Infra = () => {
                                 {d.infraQuery && (
                                   <button
                                     type="button"
-                                    onClick={() => handleCopyQuery(d)}
+                                    onClick={(e) => { e.stopPropagation(); handleCopyQuery(d); }}
                                     className="text-[10px] px-1.5 py-0.5 rounded bg-muted border hover:bg-muted/70 flex items-center gap-1 font-mono"
                                     title={d.infraQuery}
                                   >
@@ -297,12 +354,19 @@ const Infra = () => {
                           </div>
                           <div className="flex items-center gap-1">
                             {d.status === "aberta" && (
-                              <Button size="sm" variant="outline" onClick={() => handleAttend(d)}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); handleAttend(d); }}
+                              >
                                 Atender
                               </Button>
                             )}
                             {d.status !== "concluida" && (
-                              <Button size="sm" onClick={() => handleConclude(d)}>
+                              <Button
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); handleConclude(d); }}
+                              >
                                 Concluir
                               </Button>
                             )}
@@ -310,7 +374,7 @@ const Infra = () => {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDelete(d)}
+                                onClick={(e) => { e.stopPropagation(); handleDelete(d); }}
                                 title="Excluir"
                               >
                                 <Trash2 size={14} className="text-destructive" />
@@ -336,6 +400,23 @@ const Infra = () => {
         onCreated={() => {
           setModalOpen(false);
           void reload();
+        }}
+      />
+
+      {/* Sheet de detalhe da demanda */}
+      <InfraDemandSheet
+        demand={selectedDemand}
+        open={!!selectedDemand}
+        onClose={() => setSelectedDemand(null)}
+        onChanged={() => {
+          // Refresh + atualiza demanda selecionada
+          void apiClient.infra.list().then((res) => {
+            setDemands(res.demands || []);
+            if (selectedDemand) {
+              const updated = (res.demands || []).find((d) => d.id === selectedDemand.id);
+              setSelectedDemand(updated ?? null);
+            }
+          });
         }}
       />
     </AppLayout>
