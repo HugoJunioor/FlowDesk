@@ -223,7 +223,7 @@ export function computeDemandMetrics(demands: SlackDemand[]): DemandMetrics {
     if (isExcludedFromFirstResponseSla(d)) continue;
     const cfg = PRIORITY_CONFIG[d.priority];
     if (!cfg?.sla) continue;
-    const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+    const frMins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
     if (frMins !== null) {
       countFirstResp++;
       sumFirstResp += frMins;

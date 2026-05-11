@@ -58,7 +58,7 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
     if (isExcludedFromFirstResponseSla(d)) return false;
     const config = PRIORITY_CONFIG[d.priority];
     if (!config.sla) return false;
-    const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+    const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
     if (mins === null) {
       // Sem resposta ainda - verificar se ja passou do prazo de resposta
       const slaMinutes = parseResponseSla(config.sla.response);
