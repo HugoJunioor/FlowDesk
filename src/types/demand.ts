@@ -192,6 +192,37 @@ export interface SlackDemand {
    * NULL = atendimento ainda nao iniciado.
    */
   serviceStartedAt?: string | null;
+  /**
+   * Origem da demanda: "slack" (vem do sync de canais Slack, padrao) ou
+   * "internal" (criada direto no FlowDesk via modulo Infra). Demandas
+   * internas nao tem permalink Slack e tem listagem propria.
+   */
+  source?: "slack" | "internal";
+  /**
+   * Sub-tipo de demanda interna (so quando source === "internal"):
+   * "sql" = operacoes SQL  |  "deploy" = deploy/release
+   */
+  infraKind?: "sql" | "deploy";
+  /**
+   * SQL query a ser executada (so faz sentido pra infraKind === "sql").
+   * Texto livre — equipe copia/cola e executa no banco apontado em `database`.
+   */
+  infraQuery?: string;
+  /**
+   * Banco de dados onde a query/operacao deve rodar.
+   * Lista configuravel pelo master via UI/storage compartilhado.
+   */
+  infraDatabase?: string;
+  /**
+   * Link externo (ex: ClickUp task, Notion page) relacionado a demanda.
+   * Apenas referencia visual — nao integra com API externa.
+   */
+  infraExternalLink?: string;
+  /**
+   * Anexos da demanda interna (base64 inline, max 5MB cada).
+   * Reusa estrutura ClosureAttachment ja existente.
+   */
+  infraAttachments?: ClosureAttachment[];
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;
