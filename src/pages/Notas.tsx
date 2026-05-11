@@ -29,12 +29,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   StickyNote, Plus, Search, MoreHorizontal, Pencil, Trash2,
   ArrowRight, ArrowLeft, Loader2, LayoutGrid, List as ListIcon, Tag, X,
+  CheckSquare, Square,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/apiClient";
 import {
-  Note, NoteStatus, STATUS_LABELS, STATUS_ORDER, NOTE_COLORS, colorBgClass,
+  Note, NoteStatus, ChecklistItem, STATUS_LABELS, STATUS_ORDER,
+  NOTE_COLORS, colorBgClass, newChecklistItem,
 } from "@/types/note";
 
 type View = "kanban" | "list";
@@ -111,6 +113,21 @@ const Notas = () => {
     }
     return m;
   }, [filtered, view]);
+
+  /** Toggle de item de checklist direto no card (sem abrir editor) */
+  const handleToggleItem = async (note: Note, itemId: string) => {
+    const items = (note.items || []).map((it) =>
+      it.id === itemId ? { ...it, done: !it.done } : it
+    );
+    // Optimistic
+    setNotes((prev) => prev.map((x) => (x.id === note.id ? { ...x, items } : x)));
+    try {
+      await apiClient.notes.update(note.id, email, { items });
+    } catch {
+      toast({ title: "Erro ao atualizar item", variant: "destructive" });
+      void reload();
+    }
+  };
 
   const handleMove = async (n: Note, dir: -1 | 1) => {
     const idx = STATUS_ORDER.indexOf(n.status);
@@ -244,6 +261,7 @@ const Notas = () => {
                 onEdit={openEdit}
                 onMove={handleMove}
                 onDelete={(n) => setConfirmDelete(n)}
+                onToggleItem={handleToggleItem}
               />
             ))}
           </div>
@@ -264,6 +282,7 @@ const Notas = () => {
                         onEdit={() => openEdit(n)}
                         onMove={handleMove}
                         onDelete={() => setConfirmDelete(n)}
+                        onToggleItem={handleToggleItem}
                       />
                     ))}
                   </div>
@@ -310,9 +329,10 @@ interface KanbanColumnProps {
   onEdit: (n: Note) => void;
   onMove: (n: Note, dir: -1 | 1) => void;
   onDelete: (n: Note) => void;
+  onToggleItem: (n: Note, itemId: string) => void;
 }
 
-function KanbanColumn({ status, notes, onAdd, onEdit, onMove, onDelete }: KanbanColumnProps) {
+function KanbanColumn({ status, notes, onAdd, onEdit, onMove, onDelete, onToggleItem }: KanbanColumnProps) {
   return (
     <div className="bg-muted/30 rounded-lg p-2 min-h-[200px]">
       <div className="flex items-center justify-between mb-2 px-1">
@@ -336,6 +356,7 @@ function KanbanColumn({ status, notes, onAdd, onEdit, onMove, onDelete }: Kanban
             onEdit={() => onEdit(n)}
             onMove={onMove}
             onDelete={() => onDelete(n)}
+            onToggleItem={onToggleItem}
           />
         ))}
         {notes.length === 0 && (
@@ -356,12 +377,16 @@ interface NoteCardProps {
   onEdit: () => void;
   onMove: (n: Note, dir: -1 | 1) => void;
   onDelete: () => void;
+  onToggleItem: (n: Note, itemId: string) => void;
 }
 
-function NoteCard({ note, compact, onEdit, onMove, onDelete }: NoteCardProps) {
+function NoteCard({ note, compact, onEdit, onMove, onDelete, onToggleItem }: NoteCardProps) {
   const idx = STATUS_ORDER.indexOf(note.status);
   const canLeft = idx > 0;
   const canRight = idx < STATUS_ORDER.length - 1;
+  const items = note.items || [];
+  const doneCount = items.filter((i) => i.done).length;
+  const progressPct = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
 
   return (
     <Card
@@ -406,6 +431,45 @@ function NoteCard({ note, compact, onEdit, onMove, onDelete }: NoteCardProps) {
             {note.content}
           </p>
         )}
+        {items.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {/* Progress bar */}
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <span className="font-medium">{doneCount}/{items.length}</span>
+              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+            {/* Lista (mostra ate 5 no card; resto so no editor) */}
+            <ul className="space-y-0.5">
+              {items.slice(0, 5).map((it) => (
+                <li key={it.id} className="flex items-start gap-1.5 text-xs">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleItem(note, it.id);
+                    }}
+                    className="mt-0.5 text-muted-foreground hover:text-primary transition-colors shrink-0"
+                    aria-label={it.done ? "Desmarcar" : "Marcar"}
+                  >
+                    {it.done ? <CheckSquare size={12} className="text-primary" /> : <Square size={12} />}
+                  </button>
+                  <span className={`flex-1 truncate ${it.done ? "line-through text-muted-foreground" : ""}`}>
+                    {it.text}
+                  </span>
+                </li>
+              ))}
+              {items.length > 5 && (
+                <li className="text-[10px] text-muted-foreground pl-5">
+                  +{items.length - 5} item{items.length - 5 > 1 ? "s" : ""}...
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
         {note.tags.length > 0 && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             {note.tags.slice(0, 4).map((t) => (
@@ -440,6 +504,8 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [color, setColor] = useState<string>("default");
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [itemInput, setItemInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Reset ao abrir
@@ -451,15 +517,34 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
       setStatus(state.note.status);
       setTags(state.note.tags);
       setColor(state.note.color || "default");
+      setItems(state.note.items || []);
     } else {
       setTitle("");
       setContent("");
       setStatus(state.defaultStatus || "todo");
       setTags([]);
       setColor("default");
+      setItems([]);
     }
     setTagInput("");
+    setItemInput("");
   }, [state]);
+
+  const addItem = () => {
+    const t = itemInput.trim();
+    if (!t) return;
+    setItems([...items, newChecklistItem(t)]);
+    setItemInput("");
+  };
+
+  const toggleItem = (id: string) =>
+    setItems(items.map((it) => (it.id === id ? { ...it, done: !it.done } : it)));
+
+  const removeItem = (id: string) =>
+    setItems(items.filter((it) => it.id !== id));
+
+  const updateItemText = (id: string, text: string) =>
+    setItems(items.map((it) => (it.id === id ? { ...it, text } : it)));
 
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, "").toLowerCase();
@@ -484,6 +569,7 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
           status,
           tags,
           color: color === "default" ? null : color,
+          items,
         });
         toast({ title: "Nota atualizada" });
       } else {
@@ -494,6 +580,7 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
           status,
           tags,
           color: color === "default" ? null : color,
+          items,
         });
         toast({ title: "Nota criada" });
       }
@@ -567,6 +654,57 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
                   />
                 ))}
               </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              <CheckSquare size={11} className="inline mr-1" /> Lista de itens
+              {items.length > 0 && (
+                <span className="ml-2 text-[10px]">
+                  ({items.filter((i) => i.done).length}/{items.length})
+                </span>
+              )}
+            </label>
+            {items.length > 0 && (
+              <ul className="space-y-1 mb-2 max-h-40 overflow-y-auto">
+                {items.map((it) => (
+                  <li key={it.id} className="flex items-center gap-2 group">
+                    <button
+                      onClick={() => toggleItem(it.id)}
+                      className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                      aria-label={it.done ? "Desmarcar" : "Marcar"}
+                    >
+                      {it.done ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
+                    </button>
+                    <Input
+                      value={it.text}
+                      onChange={(e) => updateItemText(it.id, e.target.value)}
+                      className={`h-7 text-xs flex-1 ${it.done ? "line-through text-muted-foreground" : ""}`}
+                    />
+                    <button
+                      onClick={() => removeItem(it.id)}
+                      className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                      aria-label="Remover item"
+                    >
+                      <X size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <Input
+                value={itemInput}
+                onChange={(e) => setItemInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); addItem(); }
+                }}
+                placeholder="Adicionar item da lista..."
+                className="h-8 text-xs"
+              />
+              <Button size="sm" variant="outline" onClick={addItem} className="h-8 gap-1">
+                <Plus size={12} /> Item
+              </Button>
             </div>
           </div>
           <div>

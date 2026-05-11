@@ -999,7 +999,7 @@ async function handleNotes(req, res) {
   if (req.method === "POST" && url === "/notes") {
     try {
       const body = JSON.parse(await readBody(req));
-      const { userEmail, title, content, status, tags, color } = body;
+      const { userEmail, title, content, status, tags, color, items } = body;
       if (!userEmail || !title) {
         res.statusCode = 400;
         return res.end(JSON.stringify({ error: "userEmail e title obrigatorios" }));
@@ -1013,6 +1013,7 @@ async function handleNotes(req, res) {
         status: status || "todo",
         tags: Array.isArray(tags) ? tags : [],
         color: color || null,
+        items: Array.isArray(items) ? items : [],
         order: Date.now(),
         createdAt: now,
         updatedAt: now,
@@ -1050,7 +1051,7 @@ async function handleNotes(req, res) {
         res.statusCode = 403;
         return res.end(JSON.stringify({ error: "sem permissao" }));
       }
-      const allowed = ["title", "content", "status", "tags", "color", "order"];
+      const allowed = ["title", "content", "status", "tags", "color", "order", "items"];
       for (const k of allowed) {
         if (k in updates) all[idx][k] = updates[k];
       }

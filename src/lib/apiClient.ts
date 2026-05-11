@@ -333,6 +333,7 @@ export const apiClient = {
       status?: import("@/types/note").NoteStatus;
       tags?: string[];
       color?: string | null;
+      items?: import("@/types/note").ChecklistItem[];
     }) =>
       request<{ note: import("@/types/note").Note }>("/notes", {
         method: "POST",
@@ -342,7 +343,7 @@ export const apiClient = {
     update: (
       id: string,
       userEmail: string,
-      updates: Partial<Pick<import("@/types/note").Note, "title" | "content" | "status" | "tags" | "color" | "order">>,
+      updates: Partial<Pick<import("@/types/note").Note, "title" | "content" | "status" | "tags" | "color" | "order" | "items">>,
     ) =>
       request<{ note: import("@/types/note").Note }>(
         `/notes/${encodeURIComponent(id)}?email=${encodeURIComponent(userEmail)}`,
