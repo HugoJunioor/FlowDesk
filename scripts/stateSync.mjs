@@ -1027,17 +1027,28 @@ async function handleNotes(req, res) {
     }
   }
 
-  // PATCH /notes/:id — atualiza
-  const patchMatch = url.match(/^\/notes\/([^/?]+)$/);
-  if (req.method === "PATCH" && patchMatch) {
+  // PATCH /notes/:id?email=... — atualiza (so o dono)
+  const idMatch = url.match(/^\/notes\/([^/?]+)(\?.*)?$/);
+  if (req.method === "PATCH" && idMatch) {
     try {
-      const id = decodeURIComponent(patchMatch[1]);
+      const id = decodeURIComponent(idMatch[1]);
+      const u = new URL(url, "http://localhost");
+      const email = (u.searchParams.get("email") || "").toLowerCase();
+      if (!email) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "email obrigatorio" }));
+      }
       const updates = JSON.parse(await readBody(req));
       const all = readNotes();
       const idx = all.findIndex((n) => n.id === id);
       if (idx === -1) {
         res.statusCode = 404;
         return res.end(JSON.stringify({ error: "nota nao encontrada" }));
+      }
+      // Garante ownership — nota so pode ser editada pelo proprio dono
+      if ((all[idx].userEmail || "").toLowerCase() !== email) {
+        res.statusCode = 403;
+        return res.end(JSON.stringify({ error: "sem permissao" }));
       }
       const allowed = ["title", "content", "status", "tags", "color", "order"];
       for (const k of allowed) {
@@ -1052,10 +1063,21 @@ async function handleNotes(req, res) {
     }
   }
 
-  // DELETE /notes/:id
-  if (req.method === "DELETE" && patchMatch) {
-    const id = decodeURIComponent(patchMatch[1]);
+  // DELETE /notes/:id?email=... (so o dono)
+  if (req.method === "DELETE" && idMatch) {
+    const id = decodeURIComponent(idMatch[1]);
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
     const all = readNotes();
+    const target = all.find((n) => n.id === id);
+    if (target && (target.userEmail || "").toLowerCase() !== email) {
+      res.statusCode = 403;
+      return res.end(JSON.stringify({ error: "sem permissao" }));
+    }
     const filtered = all.filter((n) => n.id !== id);
     writeNotes(filtered);
     return res.end(JSON.stringify({ ok: true }));

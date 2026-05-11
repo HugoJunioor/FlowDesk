@@ -119,7 +119,7 @@ const Notas = () => {
     // Optimistic
     setNotes((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: next } : x)));
     try {
-      await apiClient.notes.update(n.id, { status: next });
+      await apiClient.notes.update(n.id, email, { status: next });
     } catch (e) {
       toast({ title: "Erro ao mover", variant: "destructive" });
       void reload();
@@ -132,7 +132,7 @@ const Notas = () => {
     setConfirmDelete(null);
     setNotes((prev) => prev.filter((n) => n.id !== id));
     try {
-      await apiClient.notes.remove(id);
+      await apiClient.notes.remove(id, email);
       toast({ title: "Nota excluída" });
     } catch {
       toast({ title: "Erro ao excluir", variant: "destructive" });
@@ -478,7 +478,7 @@ function NoteEditor({ state, userEmail, onClose, onSaved }: NoteEditorProps) {
     setSaving(true);
     try {
       if (state.note) {
-        await apiClient.notes.update(state.note.id, {
+        await apiClient.notes.update(state.note.id, userEmail, {
           title: title.trim(),
           content,
           status,

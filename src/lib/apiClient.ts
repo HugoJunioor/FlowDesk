@@ -341,20 +341,24 @@ export const apiClient = {
       }),
     update: (
       id: string,
+      userEmail: string,
       updates: Partial<Pick<import("@/types/note").Note, "title" | "content" | "status" | "tags" | "color" | "order">>,
     ) =>
       request<{ note: import("@/types/note").Note }>(
-        `/notes/${encodeURIComponent(id)}`,
+        `/notes/${encodeURIComponent(id)}?email=${encodeURIComponent(userEmail)}`,
         {
           method: "PATCH",
           body: JSON.stringify(updates),
           demoFallback: { note: {} as import("@/types/note").Note },
         }
       ),
-    remove: (id: string) =>
-      request<{ ok: boolean }>(`/notes/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-        demoFallback: { ok: true },
-      }),
+    remove: (id: string, userEmail: string) =>
+      request<{ ok: boolean }>(
+        `/notes/${encodeURIComponent(id)}?email=${encodeURIComponent(userEmail)}`,
+        {
+          method: "DELETE",
+          demoFallback: { ok: true },
+        }
+      ),
   },
 };
