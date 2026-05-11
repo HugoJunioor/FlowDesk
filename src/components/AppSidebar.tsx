@@ -19,6 +19,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { branding } from "@/config/brandingLoader";
 import type { ModuleId } from "@/types/permissions";
+import NotificationBellSidebar from "./notifications/NotificationBellSidebar";
 
 const navItems: {
   to: string;
@@ -222,6 +223,8 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
 
         {/* Footer */}
         <div className="p-2 border-t border-sidebar-border space-y-1">
+          {/* Notificacoes — acima de Configuracoes */}
+          <NotificationBellSidebar collapsed={collapsed} onClick={() => setMobileOpen(false)} />
           <NavLink
             to="/configuracoes"
             onClick={() => setMobileOpen(false)}

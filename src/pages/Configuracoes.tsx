@@ -15,6 +15,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { COLOR_THEMES } from "@/config/themes";
 import { AVAILABLE_LANGUAGES } from "@/lib/i18n";
 import type { Language } from "@/types/auth";
+import NotificationPreferencesCard from "@/components/notifications/NotificationPreferencesCard";
 
 const Configuracoes = () => {
   const { mode, colorTheme, toggleMode, setColorTheme } = useTheme();
@@ -173,28 +174,24 @@ const Configuracoes = () => {
           </CardContent>
         </Card>
 
-        {/* Em breve — apenas Notificacoes e Seguranca (idioma saiu daqui) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { icon: Bell, title: t("settings.notifications"), desc: t("settings.notifications.description") },
-            { icon: Shield, title: t("settings.security"), desc: t("settings.security.description") },
-          ].map((item) => (
-            <Card key={item.title} className="border border-border shadow-sm opacity-60">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <item.icon size={18} className="text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="mt-3 text-[10px]">{t("settings.soon")}</Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Notificacoes — card funcional com toggles */}
+        <NotificationPreferencesCard />
+
+        {/* Em breve — apenas Seguranca agora */}
+        <Card className="border border-border shadow-sm opacity-60">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-muted">
+                <Shield size={18} className="text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">{t("settings.security")}</p>
+                <p className="text-xs text-muted-foreground">{t("settings.security.description")}</p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="mt-3 text-[10px]">{t("settings.soon")}</Badge>
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );
