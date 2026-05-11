@@ -318,4 +318,48 @@ export const apiClient = {
         }
       ),
   },
+
+  // Bloco de notas pessoal
+  notes: {
+    list: (email: string) =>
+      request<{ notes: import("@/types/note").Note[] }>(
+        `/notes?email=${encodeURIComponent(email)}`,
+        { demoFallback: { notes: [] } }
+      ),
+    create: (body: {
+      userEmail: string;
+      title: string;
+      content?: string;
+      status?: import("@/types/note").NoteStatus;
+      tags?: string[];
+      color?: string | null;
+      items?: import("@/types/note").ChecklistItem[];
+    }) =>
+      request<{ note: import("@/types/note").Note }>("/notes", {
+        method: "POST",
+        body: JSON.stringify(body),
+        demoFallback: { note: {} as import("@/types/note").Note },
+      }),
+    update: (
+      id: string,
+      userEmail: string,
+      updates: Partial<Pick<import("@/types/note").Note, "title" | "content" | "status" | "tags" | "color" | "order" | "items">>,
+    ) =>
+      request<{ note: import("@/types/note").Note }>(
+        `/notes/${encodeURIComponent(id)}?email=${encodeURIComponent(userEmail)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+          demoFallback: { note: {} as import("@/types/note").Note },
+        }
+      ),
+    remove: (id: string, userEmail: string) =>
+      request<{ ok: boolean }>(
+        `/notes/${encodeURIComponent(id)}?email=${encodeURIComponent(userEmail)}`,
+        {
+          method: "DELETE",
+          demoFallback: { ok: true },
+        }
+      ),
+  },
 };
