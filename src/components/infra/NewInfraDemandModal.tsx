@@ -33,6 +33,31 @@ interface NewInfraDemandModalProps {
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_FILES = 5;
 
+/**
+ * Tipos de execucao SQL pre-definidos. Substituem o titulo livre
+ * em demandas SQL pra padronizar metricas e relatorios.
+ *
+ * Os 3 primeiros (UPDATE, INSERT, DELETE) sao os mais comuns —
+ * ficam separados no topo do dropdown via grupo.
+ */
+const SQL_EXECUTION_TYPES_PRIMARY = ["UPDATE", "INSERT", "DELETE"] as const;
+
+const SQL_EXECUTION_TYPES_OTHERS = [
+  "SELECT",
+  "Criação de tabela",
+  "Criação de coluna",
+  "Alteração de coluna",
+  "Drop de tabela",
+  "Drop de coluna",
+  "Criar FUNCTION",
+  "Alterar FUNCTION",
+  "Criar TRIGGER",
+  "Alterar TRIGGER",
+  "Criar INDEX",
+  "Backup / Restore",
+  "Outro",
+] as const;
+
 interface InfraAttachment {
   id: string;
   name: string;
@@ -122,6 +147,13 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
       refreshDatabases();
     }
   }, [open, defaultKind, refreshDatabases]);
+
+  // Quando troca de tab (SQL <-> Deploy), limpa o titulo pra evitar
+  // que valor selecionado num tipo fique no outro (ex: "UPDATE" indo
+  // pro Deploy onde ele e texto livre).
+  useEffect(() => {
+    setTitle("");
+  }, [kind]);
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -267,16 +299,50 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
 
           {/* Form igual pra ambas tabs — o kind so muda no payload */}
           <TabsContent value={kind} className="space-y-4 mt-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Título *</label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={kind === "sql" ? "Ex: Update na tabela X" : "Ex: Deploy v2.4.1 — release patch"}
-                maxLength={150}
-                autoFocus
-              />
-            </div>
+            {kind === "sql" ? (
+              /* SQL: dropdown de tipos pre-definidos (vira o title) */
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Tipo de execução *</label>
+                <Select value={title} onValueChange={setTitle}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo de execução..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Destaques no topo */}
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                      Mais comuns
+                    </div>
+                    {SQL_EXECUTION_TYPES_PRIMARY.map((t) => (
+                      <SelectItem key={t} value={t} className="font-semibold">
+                        {t}
+                      </SelectItem>
+                    ))}
+                    <div className="border-t my-1" />
+                    <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                      Outros
+                    </div>
+                    {SQL_EXECUTION_TYPES_OTHERS.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  Use o campo "Descrição" abaixo pra detalhes (tabela, colunas, contexto).
+                </p>
+              </div>
+            ) : (
+              /* Deploy: titulo livre */
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Título *</label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Deploy v2.4.1 — release patch"
+                  maxLength={150}
+                  autoFocus
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Descrição</label>
