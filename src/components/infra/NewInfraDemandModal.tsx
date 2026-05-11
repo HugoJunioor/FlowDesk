@@ -222,8 +222,8 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         assignee: { name: "Tiago Silva", avatar: "" },
         dueDate: finalDueDate,
         client: client.trim() || undefined,
-        // Campos disponiveis pros 2 tipos (deploy tambem pode ter script/banco)
-        infraQuery: query.trim() || undefined,
+        // Query so faz sentido em SQL (deploy nao tem). Banco fica em ambos.
+        infraQuery: kind === "sql" && query.trim() ? query.trim() : undefined,
         infraDatabase: database || undefined,
         infraExternalLink: externalLink.trim() || undefined,
         // Anexos (so envia se houver — payload pode ficar grande, eh base64)
@@ -393,31 +393,33 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
               )}
             </div>
 
-            {/* Query / Script (disponivel pros 2 tipos) */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Query / Script (opcional)</label>
-                {query.trim() && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopyQuery}
-                    className="h-7 gap-1.5 text-xs"
-                  >
-                    <Copy size={12} /> Copiar
-                  </Button>
-                )}
+            {/* Query SQL (so SQL — deploy nao tem query) */}
+            {kind === "sql" && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Query SQL (opcional)</label>
+                  {query.trim() && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyQuery}
+                      className="h-7 gap-1.5 text-xs"
+                    >
+                      <Copy size={12} /> Copiar
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="SELECT * FROM ..."
+                  rows={6}
+                  className="font-mono text-xs"
+                  spellCheck={false}
+                />
               </div>
-              <Textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={kind === "sql" ? "SELECT * FROM ..." : "Comando de deploy, script, etc."}
-                rows={6}
-                className="font-mono text-xs"
-                spellCheck={false}
-              />
-            </div>
+            )}
 
             {/* Link da demanda (ambos os tipos) */}
             <div className="space-y-1.5">
