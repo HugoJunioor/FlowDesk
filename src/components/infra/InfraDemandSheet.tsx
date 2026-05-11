@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
+import { notifyStarted, notifyCompleted, notifyReopened } from "@/lib/notificationEvents";
 
 interface InfraDemandSheetProps {
   demand: SlackDemand | null;
@@ -88,6 +89,14 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
     setSaving(true);
     try {
       await apiClient.infra.update(demand.id, updates);
+      // Dispara notificacao baseada na mudanca
+      if (updates.status === "em_andamento" && demand.status !== "em_andamento") {
+        void notifyStarted(demand, currentUser?.name);
+      } else if (updates.status === "concluida" && demand.status !== "concluida") {
+        void notifyCompleted(demand, currentUser?.name);
+      } else if (updates.status === "aberta" && demand.status === "concluida") {
+        void notifyReopened(demand, currentUser?.name);
+      }
       toast({ title: "Demanda atualizada" });
       onChanged();
     } catch (e) {

@@ -255,4 +255,67 @@ export const apiClient = {
         demoFallback: { ok: true },
       }),
   },
+  // === Notifications (inbox de eventos) ===
+  notifications: {
+    /** Lista notificacoes do user (mais recentes primeiro) */
+    list: (email: string) =>
+      request<{ notifications: import("@/types/notification").NotificationItem[] }>(
+        `/notifications?email=${encodeURIComponent(email)}`,
+        { demoFallback: { notifications: [] } }
+      ),
+    /** Cria notificacao nova (FlowDesk chama internamente em eventos) */
+    create: (body: {
+      userEmail: string;
+      event: import("@/types/notification").NotificationEvent;
+      source?: "slack" | "infra";
+      demandId: string;
+      title?: string;
+      message?: string;
+      actor?: string;
+    }) =>
+      request<{ notification: import("@/types/notification").NotificationItem }>("/notifications", {
+        method: "POST",
+        body: JSON.stringify(body),
+        demoFallback: {
+          notification: {} as import("@/types/notification").NotificationItem,
+        },
+      }),
+    /** Marca uma notificacao como lida/nao lida */
+    markRead: (id: string, read: boolean) =>
+      request<{ notification: import("@/types/notification").NotificationItem }>(
+        `/notifications/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ read }),
+          demoFallback: {
+            notification: {} as import("@/types/notification").NotificationItem,
+          },
+        }
+      ),
+    /** Marca TODAS as do user como lidas */
+    markAllRead: (email: string) =>
+      request<{ ok: boolean; count: number }>(
+        `/notifications/mark-all-read?email=${encodeURIComponent(email)}`,
+        {
+          method: "POST",
+          demoFallback: { ok: true, count: 0 },
+        }
+      ),
+    /** Pega preferencias do user */
+    getPreferences: (email: string) =>
+      request<{ preferences: import("@/types/notification").NotificationPreferences | null }>(
+        `/notifications/preferences?email=${encodeURIComponent(email)}`,
+        { demoFallback: { preferences: null } }
+      ),
+    /** Atualiza preferencias do user */
+    savePreferences: (prefs: import("@/types/notification").NotificationPreferences) =>
+      request<{ preferences: import("@/types/notification").NotificationPreferences }>(
+        "/notifications/preferences",
+        {
+          method: "PUT",
+          body: JSON.stringify(prefs),
+          demoFallback: { preferences: prefs },
+        }
+      ),
+  },
 };
