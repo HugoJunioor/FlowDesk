@@ -23,6 +23,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
 const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");
+const INFRA_FILE = path.join(__dirname, "..", "data", "infraDemands.json");
 
 // Gera/le token de autenticacao dos endpoints. Persiste em data/auth-token
 // (gitignored). Se nao existir, gera um novo de 32 bytes (256 bits).
@@ -74,6 +75,7 @@ export const SYNCED_KEYS = [
   "fd_auto_assign_rules",
   "fd_support_members",
   "fd_channel_routing",        // roteamento de canais Slack -> modulos
+  "fd_infra_databases",        // lista de bancos de dados (modulo Infra/SQL)
 ];
 
 function ensureDir() {
@@ -618,6 +620,154 @@ async function handleSlack(req, res) {
   }
 }
 
+// ===================================================================
+// === INFRA DEMANDS — armazenamento JSON pra demandas internas ======
+// ===================================================================
+// Demandas Internas do modulo Infra (sem Slack). Persiste em
+// data/infraDemands.json (gitignored). Estrutura compativel com
+// SlackDemand pra reusar SLA/UI existentes.
+
+function readInfraDemands() {
+  if (!fs.existsSync(INFRA_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(INFRA_FILE, "utf-8"));
+  } catch (e) {
+    console.error("[infra] erro lendo infraDemands.json:", e.message);
+    return [];
+  }
+}
+
+function writeInfraDemands(demands) {
+  const dir = path.dirname(INFRA_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  // Escrita atomica: temp + rename
+  const tmp = INFRA_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(demands, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, INFRA_FILE);
+}
+
+function makeInfraId() {
+  return `infra_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function handleInfra(req, res) {
+  const url = req.url || "";
+  res.setHeader("Content-Type", "application/json");
+
+  // GET /infra/demands — lista
+  if (req.method === "GET" && url === "/infra/demands") {
+    return res.end(JSON.stringify({ demands: readInfraDemands() }));
+  }
+
+  // POST /infra/demands — cria
+  if (req.method === "POST" && url === "/infra/demands") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const {
+        title, description, priority, infraKind, requester, assignee, dueDate, client,
+        infraQuery, infraDatabase, infraExternalLink, infraAttachments,
+      } = body;
+
+      if (!title || !title.trim()) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "title obrigatorio" }));
+      }
+      if (!infraKind || !["sql", "deploy"].includes(infraKind)) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "infraKind deve ser 'sql' ou 'deploy'" }));
+      }
+
+      const now = new Date().toISOString();
+      const demand = {
+        id: makeInfraId(),
+        title: title.trim(),
+        description: (description || "").trim(),
+        priority: priority || "p3",
+        status: "aberta",
+        demandType: "Tarefa/Ajuda",
+        workflow: "Infra (interno)",
+        product: "",
+        source: "internal",
+        infraKind,
+        ...(infraQuery && infraQuery.trim() ? { infraQuery: infraQuery.trim() } : {}),
+        ...(infraDatabase && infraDatabase.trim() ? { infraDatabase: infraDatabase.trim() } : {}),
+        ...(infraExternalLink && infraExternalLink.trim() ? { infraExternalLink: infraExternalLink.trim() } : {}),
+        ...(Array.isArray(infraAttachments) && infraAttachments.length > 0 ? { infraAttachments } : {}),
+        requester: requester || { name: "Desconhecido", avatar: "" },
+        assignee: assignee || { name: "Tiago Silva", avatar: "" },
+        cc: [],
+        createdAt: now,
+        dueDate: dueDate || null,
+        completedAt: null,
+        hasTask: !!(infraExternalLink && infraExternalLink.trim()),
+        taskLink: (infraExternalLink && infraExternalLink.trim()) || "",
+        tags: [`infra-${infraKind}`],
+        slackChannel: infraKind === "sql" ? "#infra-sql" : "#infra-deploy",
+        slackPermalink: "",
+        replies: 0,
+        threadReplies: [],
+        files: [],
+        // Campo livre pra "cliente afetado" (texto solto) — opcional
+        ...(client ? { product: client } : {}),
+      };
+
+      const demands = readInfraDemands();
+      demands.unshift(demand); // mais novo primeiro
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ demand }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // PATCH /infra/demands/:id — atualiza (status, assignee, etc)
+  const patchMatch = url.match(/^\/infra\/demands\/([^/]+)$/);
+  if (req.method === "PATCH" && patchMatch) {
+    try {
+      const id = decodeURIComponent(patchMatch[1]);
+      const updates = JSON.parse(await readBody(req));
+      const demands = readInfraDemands();
+      const idx = demands.findIndex((d) => d.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+      }
+
+      // Whitelist de campos editaveis
+      const allowed = [
+        "status", "assignee", "priority", "completedAt", "description", "title", "threadReplies",
+        "infraQuery", "infraDatabase", "infraExternalLink", "infraAttachments", "dueDate",
+      ];
+      for (const k of allowed) {
+        if (updates[k] !== undefined) demands[idx][k] = updates[k];
+      }
+
+      // Auto-set completedAt quando status vira concluida
+      if (updates.status === "concluida" && !demands[idx].completedAt) {
+        demands[idx].completedAt = new Date().toISOString();
+      }
+
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ demand: demands[idx] }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // DELETE /infra/demands/:id — apaga
+  if (req.method === "DELETE" && patchMatch) {
+    const id = decodeURIComponent(patchMatch[1]);
+    const demands = readInfraDemands().filter((d) => d.id !== id);
+    writeInfraDemands(demands);
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  res.statusCode = 404;
+  return res.end(JSON.stringify({ error: "Endpoint Infra nao encontrado" }));
+}
+
 function handler(req, res, next) {
   // Slack OAuth endpoints (login do user, redirect, callback)
   if (req.url?.startsWith("/auth/slack/")) {
@@ -632,6 +782,14 @@ function handler(req, res, next) {
     if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
     res.setHeader("Content-Type", "application/json");
     return handleSlack(req, res);
+  }
+
+  // Infra demands (internas, persistencia em data/infraDemands.json)
+  if (req.url?.startsWith("/infra/")) {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    if (!isAuthenticated(req)) return reject401(res);
+    return handleInfra(req, res);
   }
 
   // Endpoint que devolve o token de auth.
