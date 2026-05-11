@@ -156,6 +156,11 @@ async function fetchAllReplies(channelId, threadTs) {
 // Demandas ja fechadas antes sao preservadas pela logica de preservacao.
 const CHECK_REACTIONS = ['large_green_circle'];
 
+// Reactions que marcam INICIO de atendimento em demandas Sitef/Conciliacao.
+// Quando equipe adiciona :loading: numa reply do thread, o timestamp daquela
+// reply vira o serviceStartedAt da demanda (usado pra SLA de 1a resposta).
+const LOADING_REACTIONS = ['loading', 'hourglass_flowing_sand', 'hourglass'];
+
 async function fetchChannelMessages(channelId, channelName, previousPriorities = new Map(), existingIds = new Set()) {
   const demands = [];
   let cursor;
@@ -209,7 +214,9 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
           for (const reply of replies.slice(1)) {
             const info = reply.user ? await getUserInfo(reply.user) : { name: reply.username || 'Bot', isTeam: false };
             const replyText = resolveUserMentions(reply.text || '');
-            const hasCheckReaction = (reply.reactions || []).some(r => CHECK_REACTIONS.includes(r.name));
+            const reactions = reply.reactions || [];
+            const hasCheckReaction = reactions.some(r => CHECK_REACTIONS.includes(r.name));
+            const hasLoadingReaction = reactions.some(r => LOADING_REACTIONS.includes(r.name));
 
             threadReplies.push({
               author: info.name,
@@ -217,6 +224,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
               timestamp: new Date(parseFloat(reply.ts) * 1000).toISOString(),
               isTeamMember: info.isTeam,
               hasCheckReaction,
+              ...(hasLoadingReaction ? { hasLoadingReaction: true } : {}),
               files: mapSlackFiles(reply.files),
             });
           }
@@ -351,6 +359,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         ? { category: autoCategoryFromWorkflow }
         : undefined;
 
+      // Inicio do atendimento: timestamp da PRIMEIRA reply (cronologica) com
+      // reaction :loading:. Usado pra SLA de 1a resposta em Sitef/Conciliacao.
+      // Replies ja vem em ordem cronologica do conversations.replies.
+      const loadingReply = threadReplies.find(r => r.hasLoadingReaction);
+      const serviceStartedAt = loadingReply ? loadingReply.timestamp : null;
+
       const demand = {
         id: demandId,
         title: title.replace(/\*/g, '').trim(),
@@ -367,6 +381,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         ...(closure ? { closure } : {}),
         cc,
         createdAt: new Date(parseFloat(msg.ts) * 1000).toISOString(),
+        serviceStartedAt,
         dueDate,
         completedAt: null,
         hasTask,

@@ -245,6 +245,11 @@ function isSyntheticReply(r: { text?: string }): boolean {
 /**
  * SLA de primeira resposta: minutos uteis entre criacao e primeira resposta da equipe.
  * Se slaFirstResponseOverride for fornecido (dados historicos da planilha), usa diretamente.
+ *
+ * Pra demandas Sitef/Conciliacao com serviceStartedAt definido (emoji :loading:
+ * em alguma reply), considera tambem o tempo da reaction como possivel "primeira
+ * resposta" — usa o que vier ANTES (reaction ou reply textual da equipe).
+ *
  * Retorna null se nao ha resposta real da equipe (replies sinteticos de reaction
  * sao ignorados — ver isSyntheticReply).
  */
@@ -252,6 +257,7 @@ export function getFirstResponseMinutes(
   createdAt: string,
   threadReplies: { timestamp: string; isTeamMember: boolean; text?: string }[],
   slaFirstResponseOverride?: number | null,
+  serviceStartedAt?: string | null,
 ): number | null {
   // Dados historicos com SLA pre-calculado da planilha
   if (slaFirstResponseOverride !== undefined && slaFirstResponseOverride !== null) {
@@ -262,9 +268,16 @@ export function getFirstResponseMinutes(
     .filter((r) => r.isTeamMember && !isSyntheticReply(r))
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-  if (teamReplies.length === 0) return null;
+  const firstReplyTs = teamReplies.length > 0 ? new Date(teamReplies[0].timestamp).getTime() : null;
+  const serviceTs = serviceStartedAt ? new Date(serviceStartedAt).getTime() : null;
 
-  return getBusinessMinutesBetween(new Date(createdAt), new Date(teamReplies[0].timestamp));
+  // Pega o que vier ANTES entre a primeira reply real da equipe e o inicio
+  // de atendimento via :loading:. Se nenhum dos dois existe, retorna null.
+  const candidates = [firstReplyTs, serviceTs].filter((t): t is number => t !== null);
+  if (candidates.length === 0) return null;
+  const effectiveTs = Math.min(...candidates);
+
+  return getBusinessMinutesBetween(new Date(createdAt), new Date(effectiveTs));
 }
 
 /**
