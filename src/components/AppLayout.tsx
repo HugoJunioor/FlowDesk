@@ -51,7 +51,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         setMobileOpen={setMobileOpen}
       />
 
-      {/* Mobile header */}
+      {/* Mobile header — sino vai aqui */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-primary border-b border-primary/80 flex items-center px-4 z-30">
         <button
           onClick={() => setMobileOpen(true)}
@@ -70,17 +70,18 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       </div>
 
-      {/* Desktop: sino fixo no canto superior direito */}
-      <div
-        className={`hidden lg:flex fixed top-3 right-4 z-20 transition-all duration-300 ${
-          collapsed ? "" : ""
+      {/* Desktop header — barra fina fixa com sino a direita.
+          Acompanha o sidebar (margem esquerda muda com collapsed). */}
+      <header
+        className={`hidden lg:flex fixed top-0 right-0 h-12 bg-background/80 backdrop-blur-sm border-b z-20 items-center justify-end px-4 transition-all duration-300 ${
+          collapsed ? "left-16" : "left-60"
         }`}
       >
         <NotificationBell />
-      </div>
+      </header>
 
       <main
-        className={`transition-all duration-300 p-4 sm:p-6 pt-20 lg:pt-8 animate-fade-in overflow-x-hidden ${
+        className={`transition-all duration-300 p-4 sm:p-6 pt-20 lg:pt-16 animate-fade-in overflow-x-hidden ${
           collapsed ? "lg:ml-16" : "lg:ml-60"
         }`}
       >
