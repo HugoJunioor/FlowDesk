@@ -26,6 +26,7 @@ const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");
 const INFRA_FILE = path.join(__dirname, "..", "data", "infraDemands.json");
 const NOTIFICATIONS_FILE = path.join(__dirname, "..", "data", "notifications.json");
 const NOTIFICATION_PREFS_FILE = path.join(__dirname, "..", "data", "notificationPreferences.json");
+const NOTES_FILE = path.join(__dirname, "..", "data", "notes.json");
 
 // Gera/le token de autenticacao dos endpoints. Persiste em data/auth-token
 // (gitignored). Se nao existir, gera um novo de 32 bytes (256 bits).
@@ -953,6 +954,140 @@ async function handleNotifications(req, res) {
   return res.end(JSON.stringify({ error: "Endpoint Notifications nao encontrado" }));
 }
 
+// ===== Notes (bloco de notas por usuario) =====
+function readNotes() {
+  if (!fs.existsSync(NOTES_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(NOTES_FILE, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+function writeNotes(list) {
+  const dir = path.dirname(NOTES_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = NOTES_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, NOTES_FILE);
+}
+
+function makeNoteId() {
+  return `note_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function handleNotes(req, res) {
+  const url = req.url || "";
+  res.setHeader("Content-Type", "application/json");
+
+  // GET /notes?email=... — lista do user
+  if (req.method === "GET" && url.startsWith("/notes") && !url.match(/^\/notes\/[^?]/)) {
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
+    const all = readNotes();
+    const mine = all
+      .filter((n) => (n.userEmail || "").toLowerCase() === email)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    return res.end(JSON.stringify({ notes: mine }));
+  }
+
+  // POST /notes — cria nova
+  if (req.method === "POST" && url === "/notes") {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { userEmail, title, content, status, tags, color, items } = body;
+      if (!userEmail || !title) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "userEmail e title obrigatorios" }));
+      }
+      const now = new Date().toISOString();
+      const note = {
+        id: makeNoteId(),
+        userEmail: userEmail.toLowerCase(),
+        title,
+        content: content || "",
+        status: status || "todo",
+        tags: Array.isArray(tags) ? tags : [],
+        color: color || null,
+        items: Array.isArray(items) ? items : [],
+        order: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const all = readNotes();
+      all.push(note);
+      writeNotes(all);
+      return res.end(JSON.stringify({ note }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // PATCH /notes/:id?email=... — atualiza (so o dono)
+  const idMatch = url.match(/^\/notes\/([^/?]+)(\?.*)?$/);
+  if (req.method === "PATCH" && idMatch) {
+    try {
+      const id = decodeURIComponent(idMatch[1]);
+      const u = new URL(url, "http://localhost");
+      const email = (u.searchParams.get("email") || "").toLowerCase();
+      if (!email) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "email obrigatorio" }));
+      }
+      const updates = JSON.parse(await readBody(req));
+      const all = readNotes();
+      const idx = all.findIndex((n) => n.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "nota nao encontrada" }));
+      }
+      // Garante ownership — nota so pode ser editada pelo proprio dono
+      if ((all[idx].userEmail || "").toLowerCase() !== email) {
+        res.statusCode = 403;
+        return res.end(JSON.stringify({ error: "sem permissao" }));
+      }
+      const allowed = ["title", "content", "status", "tags", "color", "order", "items"];
+      for (const k of allowed) {
+        if (k in updates) all[idx][k] = updates[k];
+      }
+      all[idx].updatedAt = new Date().toISOString();
+      writeNotes(all);
+      return res.end(JSON.stringify({ note: all[idx] }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // DELETE /notes/:id?email=... (so o dono)
+  if (req.method === "DELETE" && idMatch) {
+    const id = decodeURIComponent(idMatch[1]);
+    const u = new URL(url, "http://localhost");
+    const email = (u.searchParams.get("email") || "").toLowerCase();
+    if (!email) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: "email obrigatorio" }));
+    }
+    const all = readNotes();
+    const target = all.find((n) => n.id === id);
+    if (target && (target.userEmail || "").toLowerCase() !== email) {
+      res.statusCode = 403;
+      return res.end(JSON.stringify({ error: "sem permissao" }));
+    }
+    const filtered = all.filter((n) => n.id !== id);
+    writeNotes(filtered);
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  res.statusCode = 404;
+  return res.end(JSON.stringify({ error: "Endpoint Notes nao encontrado" }));
+}
+
 function handler(req, res, next) {
   // Slack OAuth endpoints (login do user, redirect, callback)
   if (req.url?.startsWith("/auth/slack/")) {
@@ -983,6 +1118,14 @@ function handler(req, res, next) {
     if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
     if (!isAuthenticated(req)) return reject401(res);
     return handleNotifications(req, res);
+  }
+
+  // Notes (bloco de notas por usuario)
+  if (req.url?.startsWith("/notes")) {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    if (!isAuthenticated(req)) return reject401(res);
+    return handleNotes(req, res);
   }
 
   // Endpoint que devolve o token de auth.
