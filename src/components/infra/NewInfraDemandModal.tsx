@@ -22,6 +22,7 @@ import { apiClient } from "@/lib/apiClient";
 import { loadInfraDatabases, addInfraDatabase } from "@/lib/infraDatabases";
 import { addBusinessHours } from "@/lib/businessHours";
 import { PRIORITY_CONFIG } from "@/types/demand";
+import { notifyAssigned } from "@/lib/notificationEvents";
 
 interface NewInfraDemandModalProps {
   open: boolean;
@@ -241,7 +242,7 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         ? autoDueDate.toISOString()
         : null;
 
-      await apiClient.infra.create({
+      const created = await apiClient.infra.create({
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
@@ -261,6 +262,10 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         // Anexos (so envia se houver — payload pode ficar grande, eh base64)
         ...(attachments.length > 0 ? { infraAttachments: attachments } : {}),
       });
+      // Notifica o assignee (Tiago Silva) que tem nova demanda
+      if (created?.demand) {
+        void notifyAssigned(created.demand);
+      }
       toast({
         title: `Demanda de ${kind === "sql" ? "Operações SQL" : "Deploy"} criada`,
         description: "Atribuída a Tiago Silva.",

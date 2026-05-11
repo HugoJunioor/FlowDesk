@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Menu, Workflow } from "lucide-react";
 import AppSidebar from "./AppSidebar";
 import { branding } from "@/config/brandingLoader";
+import NotificationBell from "./notifications/NotificationBell";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -64,6 +65,18 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <Workflow size={18} className="ml-3 text-primary" />
         )}
         <span className="ml-1.5 text-sm font-semibold text-white">{branding.name}</span>
+        <div className="ml-auto text-white">
+          <NotificationBell />
+        </div>
+      </div>
+
+      {/* Desktop: sino fixo no canto superior direito */}
+      <div
+        className={`hidden lg:flex fixed top-3 right-4 z-20 transition-all duration-300 ${
+          collapsed ? "" : ""
+        }`}
+      >
+        <NotificationBell />
       </div>
 
       <main

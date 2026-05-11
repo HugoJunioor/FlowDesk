@@ -20,6 +20,7 @@ import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import NewInfraDemandModal from "@/components/infra/NewInfraDemandModal";
 import InfraDemandSheet from "@/components/infra/InfraDemandSheet";
+import { notifyStarted, notifyCompleted } from "@/lib/notificationEvents";
 
 type Tab = "todas" | "novas" | "em_andamento" | "em_atraso" | "concluidas" | "sql" | "deploy";
 
@@ -114,6 +115,7 @@ const Infra = () => {
   const handleAttend = async (d: SlackDemand) => {
     try {
       await apiClient.infra.update(d.id, { status: "em_andamento" });
+      void notifyStarted(d, currentUser?.name);
       toast({ title: "Demanda em atendimento" });
       void reload();
     } catch (e) {
@@ -128,6 +130,7 @@ const Infra = () => {
   const handleConclude = async (d: SlackDemand) => {
     try {
       await apiClient.infra.update(d.id, { status: "concluida" });
+      void notifyCompleted(d, currentUser?.name);
       toast({ title: "Demanda concluída" });
       void reload();
     } catch (e) {
