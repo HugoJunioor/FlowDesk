@@ -340,7 +340,18 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const isWorkflow = msg.subtype === 'bot_message' || !!msg.bot_id;
       const workflow = msg.username || (isWorkflow ? 'Fluxo de Trabalho' : 'Mensagem');
 
-      const product = fields['Produto'] || '';
+      // Produto: priorizar campo "Produto" do formulario. Se vazio, detectar
+      // pelo nome do workflow do bot (ex: "Nova solicitação KPI telemedicina"
+      // → "Telemedicina"). Cobre KPI/Smartvale que tem 1 workflow por produto.
+      const product = (() => {
+        const explicit = fields['Produto'];
+        if (explicit) return explicit;
+        const w = (msg.username || '').toLowerCase();
+        if (w.includes('telemedic')) return 'Telemedicina';
+        if (w.includes('benefici') || w.includes('benefício')) return 'Beneficios';
+        if (w.includes('frota')) return 'Frotas';
+        return '';
+      })();
 
       const taskLinkMatch = resolvedText.match(/(https:\/\/app\.clickup\.com\/[^\s>]+)/i) ||
                             resolvedText.match(/Link da task[:\s]*\n?(https?:\/\/[^\s>]+)/i) ||

@@ -96,6 +96,25 @@ export function generateInteractiveReport(options: ReportOptions): string {
   }
   const clientEntries = Object.entries(clientMap).sort((a, b) => b[1].total - a[1].total);
 
+  // Product breakdown (KPI: Telemedicina/Beneficios/Frotas, Smartvale: X/Y...)
+  // Ignora demandas sem produto definido. Agrupa por cliente + produto pra
+  // mostrar contexto (qual produto de qual cliente).
+  const productMap: Record<string, { total: number; p1: number; p2: number; p3: number; concluida: number; expirada: number }> = {};
+  for (const d of demands) {
+    const product = (d.product || "").trim();
+    if (!product) continue;
+    const client = extractClientName(d.slackChannel);
+    const key = `${client} — ${product}`;
+    if (!productMap[key]) productMap[key] = { total: 0, p1: 0, p2: 0, p3: 0, concluida: 0, expirada: 0 };
+    productMap[key].total++;
+    if (d.priority === "p1") productMap[key].p1++;
+    else if (d.priority === "p2") productMap[key].p2++;
+    else if (d.priority === "p3") productMap[key].p3++;
+    if (d.status === "concluida") productMap[key].concluida++;
+    else if (d.status === "expirada") productMap[key].expirada++;
+  }
+  const productEntries = Object.entries(productMap).sort((a, b) => b[1].total - a[1].total);
+
   // Assignee workload
   const assigneeMap: Record<string, { total: number; aberta: number; concluida: number }> = {};
   for (const d of demands) {
@@ -1221,6 +1240,43 @@ export function generateInteractiveReport(options: ReportOptions): string {
     </div>
   </div>
 </div>
+
+<!-- ===== SECTION 5b: Distribuição por Produto ===== -->
+${productEntries.length > 0 ? `
+<div id="produto-breakdown" class="section-page">
+  <div class="section-title">📦 Distribuição por Produto</div>
+  <div class="section-subtitle">Demandas agrupadas por cliente + produto (telemedicina, benefícios, frotas, etc)</div>
+  <div class="section-divider"></div>
+  <div class="chart-card">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#f3f4f6;border-bottom:2px solid #e5e7eb;">
+          <th style="text-align:left;padding:8px 12px;">Cliente — Produto</th>
+          <th style="text-align:right;padding:8px 12px;">Total</th>
+          <th style="text-align:right;padding:8px 12px;color:#dc2626;">P1</th>
+          <th style="text-align:right;padding:8px 12px;color:#f59e0b;">P2</th>
+          <th style="text-align:right;padding:8px 12px;color:#3b82f6;">P3</th>
+          <th style="text-align:right;padding:8px 12px;color:#22c55e;">Concluídas</th>
+          <th style="text-align:right;padding:8px 12px;color:#ef4444;">Expiradas</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${productEntries.map(([key, v]) => `
+          <tr style="border-bottom:1px solid #f3f4f6;">
+            <td style="padding:8px 12px;">${escapeHtml(key)}</td>
+            <td style="text-align:right;padding:8px 12px;font-weight:600;">${v.total}</td>
+            <td style="text-align:right;padding:8px 12px;">${v.p1 || "—"}</td>
+            <td style="text-align:right;padding:8px 12px;">${v.p2 || "—"}</td>
+            <td style="text-align:right;padding:8px 12px;">${v.p3 || "—"}</td>
+            <td style="text-align:right;padding:8px 12px;">${v.concluida || "—"}</td>
+            <td style="text-align:right;padding:8px 12px;">${v.expirada || "—"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  </div>
+</div>
+` : ""}
 
 <!-- ===== SECTION 6: Média de Tempo por Prioridade ===== -->
 <div id="prio-avg" class="section-page">
