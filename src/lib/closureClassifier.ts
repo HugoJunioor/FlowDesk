@@ -1,5 +1,5 @@
 import {
-  SlackDemand, DemandCategory, ExpirationReason, SupportLevel,
+  SlackDemand, DemandCategory, ContactReason, ExpirationReason, SupportLevel,
   ClosureFields, SUPPORT_LEVEL_MEMBERS, PRIORITY_CONFIG,
 } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween } from "./businessHours";
@@ -201,14 +201,17 @@ export function classifyClosureFields(demand: SlackDemand): ClosureFields {
   const category = classifyCategory(demand);
   const supportLevel = classifySupportLevel(demand);
   const expirationReason = classifyExpirationReason(demand);
+  const contactReason = classifyContactReason(demand);
 
   return {
     category: category.value,
+    contactReason: contactReason.value || undefined,
     expirationReason: expirationReason.value,
     supportLevel: supportLevel.value,
     internalComment: "",
     autoFilled: {
       category: !!category.value,
+      contactReason: !!contactReason.value,
       expirationReason: !!expirationReason.value,
       supportLevel: !!supportLevel.value,
     },
@@ -248,4 +251,157 @@ export function generateBlankFieldsReport(demands: SlackDemand[]): BlankFieldRep
   }
 
   return report;
+}
+
+// === CONTACT REASON CLASSIFIER ===
+// Mapeamento de motivo -> keywords derivado dos 158 titulos rotulados na
+// planilha "Analise_Motivos_Contato_Abril2026.xlsx". Keywords sao
+// normalizadas (lowercase, sem acentos) — texto da demanda passa pelo
+// mesmo normalize antes de comparar.
+
+const CONTACT_REASON_KEYWORDS: Record<Exclude<ContactReason, "">, string[]> = {
+  "Saldo Nao Creditado / Pagamento Nao Compensado": [
+    "saldo nao", "saldo indispon", "nao creditou", "compensou", "compensaç",
+    "compensac", "conta tesouro", "carteira nao encontrada", "carteira negativada",
+    "qr code", "saldo dispon", "credito nao", "extrato conta tesouro",
+    "saldos dashboard", "saldo em cadastro", "consultar saldo",
+    "pagamento nao confirmado",
+  ],
+  "Falha na Vinculacao / Uso de Cartao": [
+    "vincular", "vinculaç", "vinculac", "falha ao vincular", "falha cartao",
+    "falha cartão", "cartao nao passa", "cartão nao passa", "cartoes rejeitad",
+    "tah nao encontrad", "bag nao encontrad", "cartao despesa", "cartão despesa",
+    "combo voucher", "combovoucher", "vincular cartao", "vincular cartão",
+    "erro ao vincular",
+  ],
+  "Duvida / Solicitacao Interna / Outros": [
+    "compra negada", "duvida", "dúvida", "ajuda", "valid", "ajuste valor",
+    "ajuste - app", "dx academy", "medida correta", "artes graficas",
+    "inclusao de cidade", "destaxa", "ajuste app interno",
+  ],
+  "Estorno / Reembolso / Cancelamento de Transacao": [
+    "estorno", "reembolso", "cancelamento", "cancelar", "duplicada", "duplicado",
+    "transacao duplicada", "transação duplicada", "venda duplicada",
+    "vendas duplicadas", "cancelar lote", "estorno mastercard", "estorno saque",
+    "remessa cancelamento", "remessas de contas",
+  ],
+  "Problema com PIX": [
+    "pix",
+  ],
+  "Ajuste de Dados Cadastrais (CPF / Nome)": [
+    "cpf", "alteracao de dados", "alteração de dados", "alterar cadastro",
+    "dados errado", "ajuste de cadastro", "correcao de cadastro",
+    "correção de cadastro", "ajustes de cpf", "transferencia de cartao",
+    "transferência de cartão", "transferencia de creditos",
+  ],
+  "Bug em Importacao / Relatorio de Abastecimento": [
+    "importacao", "importação", "log abastecimento", "listar abastecimento",
+    "duplicidade de id", "duplicidade autorizacao", "duplicidade autorização",
+    "verificacao abastecimentos", "verificação abastecimentos",
+    "plano de manutencao", "plano de manutenção", "importacao de usuarios",
+    "importação de usuários", "log - import",
+  ],
+  "Erro Fiscal (NF, Boleto, RPS, DANFE)": [
+    "nota fiscal", "nf ", "danfe", "boleto", "rps", "sefaz",
+    "uf do tomador", "comprovante", "divergencia de cnpj",
+    "divergência de cnpj", "geracao de boletos", "geração de boletos",
+    "emitir nota", "emissao de nota", "emissão de nota", "fechamento contabil",
+    "fechamento contábil",
+  ],
+  "Solicitacao de Relatorio / Extrato": [
+    "relatorio", "relatório", "extrato", "exportar relatorio",
+    "exportar relatório", "composicao custo", "composição custo",
+    "composicao de custo", "venda_id", "tra_id",
+  ],
+  "Retirada / Transferencia de Saldo": [
+    "retirada", "retirar saldo", "retirada de saldo", "retirada de valor",
+  ],
+  "Problema de Conciliacao / Layout de Arquivo": [
+    "conciliac", "conciliaç", "layout arquivo", "layout xcard", "netunna",
+    "habilitacao arquivos", "habilitação arquivos", "alinhamento", "boa vista",
+  ],
+  "Cadastro Duplicado / Exclusao": [
+    "cadastro duplicado", "exclusao de cadastro", "exclusão de cadastro",
+    "duplicar account", "cadastros duplicad",
+  ],
+  "Erro de Acesso (App, Portal, Senha)": [
+    "access denied", "senha", "erro ao logar", "erro logar", "erro internet",
+    "concluir cadastro da senha",
+  ],
+  "Lentidao / Instabilidade de Sistema": [
+    "lentidao", "lentidão", "lento", "instabilidade", "conexao inoperante",
+    "conexão inoperante", "backoffice com lentidao",
+  ],
+  "Solicitacao / Gestao de Acesso e Permissoes": [
+    "liberacao para edicao", "liberação para edição", "acesso master",
+    "acesso segregado", "perfil caixa", "servidor sitef", "solicitacao de acesso",
+    "solicitação de acesso", "gestao de acesso", "gestão de acesso",
+  ],
+  "Falha no Envio de Token / E-mail": [
+    "token", "push notifications", "e-mail com falha", "notificacao de consulta",
+    "notificação de consulta",
+  ],
+  "Erro em Abastecimento / Autorizacao": [
+    "autorizar abastecimento", "bombas internas", "rodofrota", "app externo",
+    "inconsistencia notada", "inconsistência notada",
+  ],
+  "Bug / Erro de Sistema (Outros)": [
+    "portal de despesa", "encerrar atendimento", "anexar comprovante",
+    "anexar despesa", "erro portal",
+  ],
+  "Falha no Saque (24h / ATM)": [
+    "saque", "sacar", "24h", "atm",
+  ],
+  "KYC Reprovado / Falha de Identidade": [
+    "kyc",
+  ],
+  "Erro em Fechamento de Periodo / Faturamento": [
+    "fechamento periodo", "fechamento período", "fechar somente recolhidas",
+    "faturamento",
+  ],
+};
+
+/**
+ * Normaliza texto pra matching: lowercase + remove acentos.
+ * Mantem espacos e caracteres soltos pra preservar fronteiras de palavras.
+ */
+function normalizeText(text: string): string {
+  return text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Classifica o motivo de contato baseado no titulo + descricao da demanda.
+ * Algoritmo: keyword matching com score = numero de matches. Ganha o motivo
+ * com maior score. Empate: ordem da lista (mais especifico primeiro).
+ *
+ * Confianca:
+ * - alta: 2+ keywords matchando
+ * - media: 1 keyword match (mas > 0 score)
+ * - baixa: 0 matches → retorna "" (sem classificacao)
+ */
+export function classifyContactReason(demand: SlackDemand): {
+  value: ContactReason;
+  confidence: "alta" | "media" | "baixa";
+  matchedKeywords: string[];
+} {
+  const text = normalizeText(`${demand.title} ${demand.description}`);
+
+  let bestReason: ContactReason = "";
+  let bestScore = 0;
+  let bestMatches: string[] = [];
+
+  for (const [reason, keywords] of Object.entries(CONTACT_REASON_KEYWORDS)) {
+    const matches = keywords.filter((kw) => text.includes(normalizeText(kw)));
+    if (matches.length > bestScore) {
+      bestScore = matches.length;
+      bestReason = reason as ContactReason;
+      bestMatches = matches;
+    }
+  }
+
+  return {
+    value: bestReason,
+    confidence: bestScore >= 2 ? "alta" : bestScore === 1 ? "media" : "baixa",
+    matchedKeywords: bestMatches,
+  };
 }
