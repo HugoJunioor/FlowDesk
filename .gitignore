@@ -41,6 +41,12 @@ src/data/sqlDemands.ts
 /.claude/
 /resposta-*.md
 /ticket-*.md
+/build_xlsx.py
+/redes_integrador*.csv
+/redes_integrador*.xlsx
+*.local.csv
+*.local.xlsx
+*.local.py
 
 # Documentos privados de contexto e operacao (uso interno)
 /CONTEXT.md
