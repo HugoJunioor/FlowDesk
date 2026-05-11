@@ -10,6 +10,7 @@ import Index from "./pages/Index.tsx";
 import Demandas from "./pages/Demandas.tsx";
 import DemandasSql from "./pages/DemandasSql.tsx";
 import Infra from "./pages/Infra.tsx";
+import Notificacoes from "./pages/Notificacoes.tsx";
 import Configuracoes from "./pages/Configuracoes.tsx";
 import UserManagement from "./pages/UserManagement.tsx";
 import GroupsManagement from "./pages/GroupsManagement.tsx";
@@ -44,6 +45,7 @@ const AppRoutes = () => {
       <Route path="/demandas" element={<Demandas />} />
       <Route path="/demandas-sql" element={<DemandasSql />} />
       <Route path="/infra" element={<Infra />} />
+      <Route path="/notificacoes" element={<Notificacoes />} />
       <Route path="/configuracoes" element={<Configuracoes />} />
       <Route path="/perfil" element={<Profile />} />
       {currentUser?.role === "master" && (

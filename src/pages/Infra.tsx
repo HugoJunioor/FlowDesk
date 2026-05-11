@@ -9,6 +9,7 @@
  * Responsavel padrao: Tiago Silva. Prioridade padrao: P3.
  */
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import NewInfraDemandModal from "@/components/infra/NewInfraDemandModal";
 import InfraDemandSheet from "@/components/infra/InfraDemandSheet";
+import { notifyStarted, notifyCompleted } from "@/lib/notificationEvents";
 
 type Tab = "todas" | "novas" | "em_andamento" | "em_atraso" | "concluidas" | "sql" | "deploy";
 
@@ -62,12 +64,27 @@ function formatRelativeDate(iso: string): string {
 const Infra = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [demands, setDemands] = useState<SlackDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("todas");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultKind, setModalDefaultKind] = useState<"sql" | "deploy">("sql");
   const [selectedDemand, setSelectedDemand] = useState<SlackDemand | null>(null);
+
+  // Abre Sheet automaticamente se ?openId=<id> na URL (vindo de notificacao)
+  useEffect(() => {
+    const openId = searchParams.get("openId");
+    if (!openId || demands.length === 0) return;
+    const found = demands.find((d) => d.id === openId);
+    if (found) {
+      setSelectedDemand(found);
+      // Remove o param da URL pra nao reabrir ao fechar o sheet
+      const next = new URLSearchParams(searchParams);
+      next.delete("openId");
+      setSearchParams(next, { replace: true });
+    }
+  }, [demands, searchParams, setSearchParams]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -114,6 +131,7 @@ const Infra = () => {
   const handleAttend = async (d: SlackDemand) => {
     try {
       await apiClient.infra.update(d.id, { status: "em_andamento" });
+      void notifyStarted(d, currentUser?.name);
       toast({ title: "Demanda em atendimento" });
       void reload();
     } catch (e) {
@@ -128,6 +146,7 @@ const Infra = () => {
   const handleConclude = async (d: SlackDemand) => {
     try {
       await apiClient.infra.update(d.id, { status: "concluida" });
+      void notifyCompleted(d, currentUser?.name);
       toast({ title: "Demanda concluída" });
       void reload();
     } catch (e) {

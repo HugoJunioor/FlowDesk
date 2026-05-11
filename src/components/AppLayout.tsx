@@ -50,7 +50,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         setMobileOpen={setMobileOpen}
       />
 
-      {/* Mobile header */}
+      {/* Mobile header (sino fica no sidebar agora, nao precisa duplicar aqui) */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-primary border-b border-primary/80 flex items-center px-4 z-30">
         <button
           onClick={() => setMobileOpen(true)}
