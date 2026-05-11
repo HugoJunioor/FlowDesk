@@ -138,6 +138,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
     "Aberto em", "Concluído em", "Tem Task?", "Link Task",
     "SLA 1ª Resposta", "Status 1ª Resposta", "Tempo Resolução",
     "Status Resolução SLA", "Categoria", "Nível Suporte", "Observação",
+    "Produto",
   ];
 
   const NUM_COLS = headers.length;
@@ -277,6 +278,9 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
 
     // ── Col 19: Observação ────────────────────────────────────────────────
     ws[XLSX.utils.encode_cell({ r, c: 19 })] = cell(d.closure?.internalComment ?? "", ROW_BASE);
+
+    // ── Col 20: Produto (KPI: Telemedicina/Beneficios/Frotas, etc) ────────
+    ws[XLSX.utils.encode_cell({ r, c: 20 })] = cell(d.product ?? "", ROW_BASE);
   });
 
   // Column widths
@@ -301,6 +305,7 @@ function buildDemandasSheet(demands: SlackDemand[]): XLSX.WorkSheet {
     { wch: 18 }, // Categoria
     { wch: 13 }, // Nível Suporte
     { wch: 32 }, // Observação
+    { wch: 16 }, // Produto
   ];
 
   // Row heights: header taller, data rows with comfortable spacing
