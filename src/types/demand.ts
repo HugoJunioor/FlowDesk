@@ -84,6 +84,11 @@ export interface ThreadReply {
   timestamp: string;
   isTeamMember: boolean;
   hasCheckReaction?: boolean;
+  /**
+   * True se essa reply recebeu reaction de :loading: (ou equivalente).
+   * Usado pra marcar inicio de atendimento em demandas Sitef/Conciliacao.
+   */
+  hasLoadingReaction?: boolean;
   /** Arquivos anexados nessa reply */
   files?: SlackFile[];
 }
@@ -124,6 +129,12 @@ export interface SlackDemand {
   assignee: SlackUser | null;
   cc: string[];
   createdAt: string;
+  /**
+   * Timestamp em que o atendimento foi iniciado (apenas Sitef/Conciliacao).
+   * Definido pelo sync quando alguem reage com :loading: em alguma reply.
+   * NULL = atendimento ainda nao iniciado.
+   */
+  serviceStartedAt?: string | null;
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;

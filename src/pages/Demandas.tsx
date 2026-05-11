@@ -322,7 +322,7 @@ const Demandas = () => {
             if (isExcludedFromFirstResponseSla(d)) return false;
             const cfg2 = PRIORITY_CONFIG[d.priority];
             if (!cfg2.sla) return false;
-            const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse);
+            const mins = getFirstResponseMinutes(d.createdAt, d.threadReplies, d.slaFirstResponse, d.serviceStartedAt);
             const slaMinutes = parseResponseSla(cfg2.sla.response);
             if (mins === null) {
               const elapsed = (now.getTime() - new Date(d.createdAt).getTime()) / 60000;
