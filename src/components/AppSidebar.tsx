@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserCircle,
   Hash,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -27,6 +28,7 @@ const navItems: {
 }[] = [
   { to: "/", icon: LayoutDashboard, labelKey: "nav.dashboard", module: "dashboard" },
   { to: "/demandas", icon: MessageSquare, labelKey: "nav.demands", module: "demandas" },
+  { to: "/infra", icon: Wrench, labelKey: "nav.infra", module: "infra" },
 ];
 
 interface AppSidebarProps {

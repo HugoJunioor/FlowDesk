@@ -187,4 +187,57 @@ export const apiClient = {
         demoFallback: { ok: true },
       }),
   },
+  // === Demandas internas (modulo Infra) ===
+  // Demandas criadas direto no FlowDesk (nao passam por Slack).
+  // Persistidas em data/infraDemands.json no servidor.
+  infra: {
+    /** Lista todas as demandas internas */
+    list: () =>
+      request<{ demands: import("@/types/demand").SlackDemand[] }>(
+        "/infra/demands",
+        { demoFallback: { demands: [] } }
+      ),
+    /** Cria uma nova demanda interna (SQL ou Deploy) */
+    create: (body: {
+      title: string;
+      description?: string;
+      priority?: "p1" | "p2" | "p3";
+      infraKind: "sql" | "deploy";
+      requester?: { name: string; avatar: string };
+      assignee?: { name: string; avatar: string };
+      dueDate?: string | null;
+      client?: string;
+    }) =>
+      request<{ demand: import("@/types/demand").SlackDemand }>("/infra/demands", {
+        method: "POST",
+        body: JSON.stringify(body),
+        demoFallback: {
+          demand: {
+            id: `infra_demo_${Date.now()}`,
+            title: body.title,
+            description: body.description || "",
+            priority: body.priority || "p3",
+            status: "aberta",
+            source: "internal",
+            infraKind: body.infraKind,
+          } as unknown as import("@/types/demand").SlackDemand,
+        },
+      }),
+    /** Atualiza uma demanda existente (status, assignee, etc) */
+    update: (id: string, updates: Partial<import("@/types/demand").SlackDemand>) =>
+      request<{ demand: import("@/types/demand").SlackDemand }>(
+        `/infra/demands/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+          demoFallback: { demand: {} as import("@/types/demand").SlackDemand },
+        }
+      ),
+    /** Remove uma demanda (admin only) */
+    remove: (id: string) =>
+      request<{ ok: boolean }>(`/infra/demands/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        demoFallback: { ok: true },
+      }),
+  },
 };

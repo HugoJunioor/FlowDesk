@@ -56,6 +56,7 @@ const TRANSLATIONS: Translations = {
     // Navegacao / Sidebar
     "nav.dashboard": "Dashboard",
     "nav.demands": "Demandas",
+    "nav.infra": "Infra",
     "nav.demands_sql": "Demandas SQL",
     "nav.users": "Usuários",
     "nav.groups": "Grupos",
@@ -137,6 +138,7 @@ const TRANSLATIONS: Translations = {
 
     "nav.dashboard": "Dashboard",
     "nav.demands": "Requests",
+    "nav.infra": "Infra",
     "nav.demands_sql": "SQL Requests",
     "nav.users": "Users",
     "nav.groups": "Groups",
@@ -215,6 +217,7 @@ const TRANSLATIONS: Translations = {
 
     "nav.dashboard": "Panel",
     "nav.demands": "Solicitudes",
+    "nav.infra": "Infra",
     "nav.demands_sql": "Solicitudes SQL",
     "nav.users": "Usuarios",
     "nav.groups": "Grupos",

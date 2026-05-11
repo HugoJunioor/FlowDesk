@@ -192,6 +192,17 @@ export interface SlackDemand {
    * NULL = atendimento ainda nao iniciado.
    */
   serviceStartedAt?: string | null;
+  /**
+   * Origem da demanda: "slack" (vem do sync de canais Slack, padrao) ou
+   * "internal" (criada direto no FlowDesk via modulo Infra). Demandas
+   * internas nao tem permalink Slack e tem listagem propria.
+   */
+  source?: "slack" | "internal";
+  /**
+   * Sub-tipo de demanda interna (so quando source === "internal"):
+   * "sql" = operacoes SQL  |  "deploy" = deploy/release
+   */
+  infraKind?: "sql" | "deploy";
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;
