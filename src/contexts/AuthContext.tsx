@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Rate limit: 5 tentativas / 5 min por login (anti brute-force)
     const RL_KEY = `fd_login_rl_${loginInput.toLowerCase().trim()}`;
     const RL_MAX = 5;
-    const RL_WINDOW = 5 * 60 * 1000;
+    const RL_WINDOW = 15 * 60 * 1000; // 15min de lockout apos 5 tentativas falhas
     try {
       const raw = localStorage.getItem(RL_KEY);
       if (raw) {
