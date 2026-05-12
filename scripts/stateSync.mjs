@@ -266,13 +266,15 @@ function reject429(res, retryAfter) {
   res.end(JSON.stringify({ error: "Too Many Requests", retryAfter }));
 }
 
-// Limpa buckets expirados periodicamente (evita memory leak)
-setInterval(() => {
+// Limpa buckets expirados periodicamente (evita memory leak).
+// .unref() pra nao impedir o processo Node de encerrar (importante em build).
+const rateCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of rateBuckets) {
     if (now > bucket.resetAt) rateBuckets.delete(key);
   }
 }, 5 * 60_000);
+if (typeof rateCleanupTimer?.unref === "function") rateCleanupTimer.unref();
 
 // ===== Logger estruturado =====
 // Formato JSON Lines pra logs serem facilmente ingestionados por qualquer
