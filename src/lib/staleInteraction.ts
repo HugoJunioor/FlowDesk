@@ -2,19 +2,23 @@ import { SlackDemand } from "@/types/demand";
 import { getBusinessMinutesBetween } from "@/lib/businessHours";
 
 /**
- * Retorna horas UTEIS desde a ultima interacao (mensagem) na thread.
+ * Retorna horas UTEIS desde a ULTIMA INTERACAO DA EQUIPE na thread.
  * Considera apenas Seg-Sex 8h-18h, descontando feriados e fins de semana.
  *
- * Se nao houver replies, usa createdAt. Retorna null para demandas
- * concluidas/expiradas (nao aplicavel).
+ * "Interacao da equipe" = reply de alguem com isTeamMember=true. Replies
+ * do proprio solicitante NAO zeram o contador — afinal, se o cliente
+ * cutuca e a equipe nao responde, a demanda continua sem atendimento.
+ *
+ * Se nao houver replies da equipe, usa createdAt (demanda esquecida
+ * desde a abertura). Retorna null para demandas concluidas/expiradas.
  */
 export function getHoursSinceLastInteraction(d: SlackDemand): number | null {
   if (d.status === "concluida" || d.status === "expirada") return null;
 
-  const replies = d.threadReplies || [];
+  const teamReplies = (d.threadReplies || []).filter((r) => r.isTeamMember);
   const lastTs =
-    replies.length > 0
-      ? Math.max(...replies.map((r) => new Date(r.timestamp).getTime()))
+    teamReplies.length > 0
+      ? Math.max(...teamReplies.map((r) => new Date(r.timestamp).getTime()))
       : new Date(d.createdAt).getTime();
 
   const businessMinutes = getBusinessMinutesBetween(new Date(lastTs), new Date());
@@ -42,5 +46,5 @@ export function formatStaleTime(hours: number): string {
   const h = Math.floor(hours % HOURS_PER_DAY);
   if (days === 0) return `${h}h`;
   if (h === 0) return `${days}d`;
-  return `${days}d e ${h}h`;
+  return `${days}d ${h}h`;
 }
