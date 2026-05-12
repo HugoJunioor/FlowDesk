@@ -21,6 +21,7 @@ import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import NewInfraDemandModal from "@/components/infra/NewInfraDemandModal";
 import InfraDemandSheet from "@/components/infra/InfraDemandSheet";
 import { notifyStarted, notifyCompleted } from "@/lib/notificationEvents";
+import StaleBadge from "@/components/demandas/StaleBadge";
 
 /** Filtro por status — exibido como cards (quadros) clicaveis */
 type StatusFilter = "todas" | "novas" | "em_andamento" | "em_atraso" | "concluidas";
@@ -475,6 +476,7 @@ const Infra = () => {
                               <span>Atribuído a <strong className="text-foreground">{d.assignee?.name ?? "—"}</strong></span>
                               <span>•</span>
                               <span>{formatRelativeDate(d.createdAt)}</span>
+                              <StaleBadge demand={d} className="ml-auto" />
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
