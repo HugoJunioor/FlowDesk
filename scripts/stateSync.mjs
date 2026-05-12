@@ -186,21 +186,123 @@ async function runSqlSyncAndRebuild() {
   }
 }
 
-/** CORS: ECHO da Origin do request (so se for permitida) — evita expor "*" */
+/**
+ * CORS: ECHO da Origin do request quando permitida. Em ordem de prioridade:
+ *
+ * 1. FLOWDESK_ALLOWED_ORIGINS (csv) — se definido, usa essa allowlist EXATA
+ *    Ex: FLOWDESK_ALLOWED_ORIGINS=https://flowdesk.just.com.br,https://admin.just.com.br
+ * 2. Fallback dev: aceita localhost/LAN/Tailscale (RFC1918 + 100.64/10)
+ */
+const ALLOWED_ORIGINS = (process.env.FLOWDESK_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.length > 0) {
+    return ALLOWED_ORIGINS.includes(origin);
+  }
+  // Dev/fallback: LAN privada + Tailscale + loopback
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.|172\.[1-3][0-9]\.|100\.[6-9][0-9]\.|100\.[1-9][0-9]{2}\.|\[::1\])/.test(origin);
+}
+
 function setCors(req, res) {
   const origin = req.headers.origin;
-  // Aceita apenas origens locais/internas; rejeita qualquer site externo
-  const isLocalish =
-    !origin ||
-    /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.|172\.[1-3][0-9]\.|100\.[6-9][0-9]\.|100\.[1-9][0-9]{2}\.|\[::1\])/.test(origin);
-  if (origin && isLocalish) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-FlowDesk-Token");
 }
+
+// ===== Rate limiting in-memory por IP =====
+// Token bucket simples: cada IP tem N requests por janela de M segundos.
+// Limites diferentes por categoria de rota.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMITS = {
+  auth: 10,         // /auth/* — 10 req/min por IP
+  write: 60,        // POST/PUT/PATCH/DELETE — 60 req/min
+  default: 300,     // GETs — 300 req/min
+};
+const rateBuckets = new Map(); // chave: `${ip}:${categoria}` -> { count, resetAt }
+
+function ipOf(req) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string") return fwd.split(",")[0].trim();
+  return req.socket?.remoteAddress || "unknown";
+}
+
+function categoryFor(req) {
+  if (req.url?.startsWith("/auth/")) return "auth";
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return "write";
+  return "default";
+}
+
+function checkRateLimit(req) {
+  const ip = ipOf(req);
+  const cat = categoryFor(req);
+  const key = `${ip}:${cat}`;
+  const limit = RATE_LIMITS[cat] || RATE_LIMITS.default;
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now > bucket.resetAt) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { ok: true };
+  }
+  bucket.count++;
+  if (bucket.count > limit) {
+    return { ok: false, retryAfter: Math.ceil((bucket.resetAt - now) / 1000) };
+  }
+  return { ok: true };
+}
+
+function reject429(res, retryAfter) {
+  res.statusCode = 429;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Retry-After", String(retryAfter));
+  res.end(JSON.stringify({ error: "Too Many Requests", retryAfter }));
+}
+
+// Limpa buckets expirados periodicamente (evita memory leak)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets) {
+    if (now > bucket.resetAt) rateBuckets.delete(key);
+  }
+}, 5 * 60_000);
+
+// ===== Logger estruturado =====
+// Formato JSON Lines pra logs serem facilmente ingestionados por qualquer
+// stack (jq, vector, loki, etc). Em dev mostra pretty.
+const LOG_LEVEL = (process.env.FLOWDESK_LOG_LEVEL || "info").toLowerCase();
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+function shouldLog(level) {
+  return (LOG_LEVELS[level] ?? 2) <= (LOG_LEVELS[LOG_LEVEL] ?? 2);
+}
+function log(level, msg, fields = {}) {
+  if (!shouldLog(level)) return;
+  const entry = {
+    ts: new Date().toISOString(),
+    level,
+    msg,
+    ...fields,
+  };
+  const line = JSON.stringify(entry);
+  if (level === "error") console.error(line);
+  else if (level === "warn") console.warn(line);
+  else console.log(line);
+}
+
+// Versao do app — lida do package.json no boot
+let APP_VERSION = "unknown";
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"));
+  APP_VERSION = pkg.version || "unknown";
+} catch { /* ignore */ }
+const STARTED_AT = new Date().toISOString();
 
 function reject401(res, msg = "Unauthorized") {
   res.statusCode = 401;
@@ -1089,6 +1191,49 @@ async function handleNotes(req, res) {
 }
 
 function handler(req, res, next) {
+  const start = Date.now();
+
+  // Health check — sem auth, sem rate limit (precisa estar sempre acessivel
+  // pra monitoring externo / load balancer / k8s readiness)
+  if (req.url === "/health" || req.url === "/healthz") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({
+      status: "ok",
+      version: APP_VERSION,
+      startedAt: STARTED_AT,
+      uptimeSeconds: Math.floor((Date.now() - new Date(STARTED_AT).getTime()) / 1000),
+    }));
+  }
+
+  // Rate limit (antes de qualquer rota com I/O)
+  if (req.url?.startsWith("/auth/") || req.url?.startsWith("/slack/") ||
+      req.url?.startsWith("/infra/") || req.url?.startsWith("/notifications") ||
+      req.url?.startsWith("/notes") || req.url?.startsWith("/__state")) {
+    const rl = checkRateLimit(req);
+    if (!rl.ok) {
+      setCors(req, res);
+      log("warn", "rate_limit_exceeded", { ip: ipOf(req), url: req.url, retryAfter: rl.retryAfter });
+      return reject429(res, rl.retryAfter);
+    }
+  }
+
+  // Wrapper pra logar todas as respostas com duracao
+  const origEnd = res.end.bind(res);
+  res.end = function (...args) {
+    const durationMs = Date.now() - start;
+    if (res.statusCode >= 400 || durationMs > 500) {
+      log(res.statusCode >= 500 ? "error" : "info", "request", {
+        method: req.method,
+        url: req.url,
+        status: res.statusCode,
+        durationMs,
+        ip: ipOf(req),
+      });
+    }
+    return origEnd(...args);
+  };
+
   // Slack OAuth endpoints (login do user, redirect, callback)
   if (req.url?.startsWith("/auth/slack/")) {
     setCors(req, res);

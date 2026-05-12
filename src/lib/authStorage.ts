@@ -35,6 +35,22 @@ export async function checkPasswordAndMigrate(user: FlowDeskUser, password: stri
 
 // ── Password generation ───────────────────────────────────────────────────────
 
+/**
+ * Gera senha aleatoria forte (16 chars) pra bootstrap inicial do master.
+ * Usado quando VITE_BOOTSTRAP_PASSWORD nao esta definido.
+ */
+export function generateRandomPassword(length = 16): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*";
+  const arr = new Uint8Array(length);
+  // Usa crypto.getRandomValues quando disponivel (browser e Node 19+)
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(arr);
+  } else {
+    for (let i = 0; i < length; i++) arr[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(arr, (b) => chars[b % chars.length]).join("");
+}
+
 export function generateTempPassword(): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const lower = "abcdefghjkmnpqrstuvwxyz";
@@ -105,7 +121,26 @@ export async function initializeAuth(): Promise<void> {
   const users = getUsers();
   const isDemo = (typeof import.meta !== "undefined" && import.meta.env?.VITE_DEMO_MODE === "true");
   if (users.length === 0) {
-    const passwordHash = await hashPassword("Admin@1");
+    // Em demo mode mantem senha conhecida pro reviewer testar.
+    // Em prod, a senha vem de VITE_BOOTSTRAP_PASSWORD ou eh gerada aleatoria
+    // e printada no console (operador precisa anotar e trocar no 1o login).
+    let bootstrapPassword: string;
+    let logBootstrap = false;
+    if (isDemo) {
+      bootstrapPassword = "Admin@1";
+    } else {
+      const envPwd = (typeof import.meta !== "undefined")
+        ? import.meta.env?.VITE_BOOTSTRAP_PASSWORD as string | undefined
+        : undefined;
+      if (envPwd && envPwd.length >= 8) {
+        bootstrapPassword = envPwd;
+      } else {
+        // Senha aleatoria de 16 chars — operador precisa anotar do console
+        bootstrapPassword = generateRandomPassword(16);
+        logBootstrap = true;
+      }
+    }
+    const passwordHash = await hashPassword(bootstrapPassword);
     const master: FlowDeskUser = {
       id: "master-001",
       login: "master",
@@ -114,13 +149,20 @@ export async function initializeAuth(): Promise<void> {
       role: "master",
       status: "active",
       passwordHash,
-      isFirstAccess: false,
+      // Forca troca de senha no primeiro login (exceto demo)
+      isFirstAccess: !isDemo,
       passwordResetRequested: false,
       groups: [],
       createdAt: new Date().toISOString(),
       createdBy: "system",
     };
     saveUsers([master]);
+    if (logBootstrap) {
+       
+      console.warn(
+        `[FlowDesk] Master user criado.\n  Login: master\n  Senha: ${bootstrapPassword}\n  ANOTE AGORA — vai ser pedido pra trocar no 1o login.`,
+      );
+    }
     localStorage.setItem(
       GROUPS_KEY,
       JSON.stringify(["Suporte", "Desenvolvimento", "Gestão", "Comercial"])
