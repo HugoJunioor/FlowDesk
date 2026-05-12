@@ -43,9 +43,9 @@ describe("formatStaleTime", () => {
     expect(formatStaleTime(10)).toBe("1d");
   });
 
-  it("formata dias + horas conectando com 'e'", () => {
-    expect(formatStaleTime(13)).toBe("1d e 3h");
-    expect(formatStaleTime(25)).toBe("2d e 5h");
+  it("formata dias + horas", () => {
+    expect(formatStaleTime(13)).toBe("1d 3h");
+    expect(formatStaleTime(25)).toBe("2d 5h");
   });
 
   it("zero horas vira 0min", () => {
@@ -71,7 +71,7 @@ describe("getHoursSinceLastInteraction", () => {
     expect(typeof result).toBe("number");
   });
 
-  it("usa timestamp do reply mais recente quando ha replies", () => {
+  it("usa timestamp do reply mais recente da equipe quando ha replies", () => {
     const d = makeDemand({
       status: "aberta",
       threadReplies: [
@@ -82,6 +82,25 @@ describe("getHoursSinceLastInteraction", () => {
     const result = getHoursSinceLastInteraction(d);
     expect(result).not.toBe(null);
     expect(result).toBeGreaterThanOrEqual(0);
+  });
+
+  it("ignora replies do solicitante (so conta da equipe)", () => {
+    // Sem reply de equipe — mesmo com replies do cliente recentes,
+    // o tempo deve ser medido desde a createdAt da demanda.
+    const dSemEquipe = makeDemand({
+      status: "aberta",
+      createdAt: "2026-04-15T10:00:00Z",
+      threadReplies: [
+        { author: "cliente", text: "tem novidade?", timestamp: "2026-05-01T10:00:00Z", isTeamMember: false },
+      ],
+    });
+    const dEsperado = makeDemand({
+      status: "aberta",
+      createdAt: "2026-04-15T10:00:00Z",
+      threadReplies: [],
+    });
+    expect(getHoursSinceLastInteraction(dSemEquipe))
+      .toBe(getHoursSinceLastInteraction(dEsperado));
   });
 });
 
