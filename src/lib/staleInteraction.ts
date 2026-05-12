@@ -28,11 +28,11 @@ export function isStale(d: SlackDemand, thresholdHours = 24): boolean {
 }
 
 /**
- * Formata horas uteis em texto curto.
+ * Formata horas uteis em texto curto, conectando dias e horas com "e".
  * Considera 1 dia util = 10 horas uteis (8h-18h).
  *   < 1h    = "Xmin"
  *   < 10h   = "Xh"
- *   >= 10h  = "Xd Yh" (Xd = dias uteis, Yh = horas uteis restantes)
+ *   >= 10h  = "Xd e Yh" (Xd = dias uteis, Yh = horas uteis restantes)
  */
 export function formatStaleTime(hours: number): string {
   const totalMinutes = Math.round(hours * 60);
@@ -42,5 +42,5 @@ export function formatStaleTime(hours: number): string {
   const h = Math.floor(hours % HOURS_PER_DAY);
   if (days === 0) return `${h}h`;
   if (h === 0) return `${days}d`;
-  return `${days}d ${h}h`;
+  return `${days}d e ${h}h`;
 }
