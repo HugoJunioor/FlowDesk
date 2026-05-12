@@ -43,9 +43,9 @@ describe("formatStaleTime", () => {
     expect(formatStaleTime(10)).toBe("1d");
   });
 
-  it("formata dias + horas", () => {
-    expect(formatStaleTime(13)).toBe("1d 3h");
-    expect(formatStaleTime(25)).toBe("2d 5h");
+  it("formata dias + horas conectando com 'e'", () => {
+    expect(formatStaleTime(13)).toBe("1d e 3h");
+    expect(formatStaleTime(25)).toBe("2d e 5h");
   });
 
   it("zero horas vira 0min", () => {
