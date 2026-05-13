@@ -27,15 +27,13 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { pool } from '../config/database';
 import { logger } from '../shared/logging/logger';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+// Resolve a partir do cwd (esperado: rodar de apps/api). Se cwd for
+// diferente, define IMPORT_SOURCE_DIR explicitamente.
 const SOURCE_DIR = process.env.IMPORT_SOURCE_DIR ||
-  path.resolve(__dirname, '..', '..', '..', 'web', 'data');
+  path.resolve(process.cwd(), '..', 'web', 'data');
 
 interface CliFlags {
   dryRun: boolean;
