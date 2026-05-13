@@ -10,6 +10,7 @@ import { healthRoutes } from '@modules/health/health.routes';
 import { templateRoutes } from '@modules/_template/_template.routes';
 import { authRoutes } from '@modules/auth/auth.routes';
 import { notificacaoRoutes } from '@modules/notificacao/notificacao.routes';
+import { notaRoutes } from '@modules/nota/nota.routes';
 
 export const apiRouter = Router();
 
@@ -21,6 +22,7 @@ apiRouter.use('/healthz', healthRoutes); // alias k8s
 const v1 = Router();
 v1.use('/auth', authRoutes);
 v1.use('/notificacoes', notificacaoRoutes);
+v1.use('/notas', notaRoutes);
 v1.use('/templates', templateRoutes);
 
 apiRouter.use('/api/v1', v1);
