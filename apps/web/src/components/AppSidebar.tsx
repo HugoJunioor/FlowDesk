@@ -223,6 +223,29 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
           )}
           {isMaster && (
             <NavLink
+              to="/demandas-v2"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                location.pathname === "/demandas-v2"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              }`}
+              title="Demandas via nova API (BETA)"
+            >
+              {location.pathname === "/demandas-v2" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-warning rounded-r-full" />
+              )}
+              <MessageSquare size={16} className={location.pathname === "/demandas-v2" ? "text-warning" : ""} />
+              {!collapsed && (
+                <span className="flex items-center gap-1.5">
+                  Demandas
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-warning/10 text-warning border border-warning/30">v2</span>
+                </span>
+              )}
+            </NavLink>
+          )}
+          {isMaster && (
+            <NavLink
               to="/notificacoes-v2"
               onClick={() => setMobileOpen(false)}
               className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
