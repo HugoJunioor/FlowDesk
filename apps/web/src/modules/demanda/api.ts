@@ -4,7 +4,7 @@
 import { apiClient } from '@/lib/api/client';
 import { unwrap, unwrapPaginated } from '@/lib/api/response-mapper';
 import type {
-  CreateInfraInput, Demanda, DemandaPaginated, DemandaQuery,
+  AddReplyInput, CreateInfraInput, Demanda, DemandaPaginated, DemandaQuery, ThreadReply,
 } from './types';
 
 export const demandaApi = {
@@ -44,5 +44,17 @@ export const demandaApi = {
 
   async remove(id: string): Promise<void> {
     await apiClient.delete(`/demandas/${id}`);
+  },
+
+  // ===== Thread replies =====
+
+  async listReplies(id: string): Promise<ThreadReply[]> {
+    const res = await apiClient.get(`/demandas/${id}/replies`);
+    return unwrap<ThreadReply[]>(res);
+  },
+
+  async addReply(id: string, input: AddReplyInput): Promise<ThreadReply> {
+    const res = await apiClient.post(`/demandas/${id}/replies`, input);
+    return unwrap<ThreadReply>(res);
   },
 };

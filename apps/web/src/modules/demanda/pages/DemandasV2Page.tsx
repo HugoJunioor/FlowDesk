@@ -18,6 +18,7 @@ import {
   useDemandas, useAtenderDemanda, useConcluirDemanda,
   type Demanda, type DemandaQuery, type DemandPriority, type DemandStatus, type DemandOrigin,
 } from '@/modules/demanda';
+import DemandaDetalheSheet from '@/modules/demanda/components/DemandaDetalheSheet';
 import { toApiError } from '@/lib/api/client';
 
 const PRIORIDADE_LABEL: Record<DemandPriority, string> = {
@@ -54,6 +55,7 @@ function formatDate(iso: string): string {
 const DemandasV2Page = () => {
   const [query, setQuery] = useState<DemandaQuery>({ pagina: 1, limite: 50 });
   const [busca, setBusca] = useState('');
+  const [selected, setSelected] = useState<Demanda | null>(null);
 
   const { data, isLoading, isFetching, error, refetch } = useDemandas(query);
   const atender = useAtenderDemanda();
@@ -167,6 +169,7 @@ const DemandasV2Page = () => {
                 demanda={d}
                 onAtender={() => void atender.mutateAsync(d.id)}
                 onConcluir={() => void concluir.mutateAsync(d.id)}
+                onClick={() => setSelected(d)}
                 pendingAction={atender.isPending || concluir.isPending}
               />
             ))}
@@ -202,6 +205,12 @@ const DemandasV2Page = () => {
           Versão legacy em <code>/demandas</code>.
         </p>
       </div>
+
+      <DemandaDetalheSheet
+        demanda={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+      />
     </AppLayout>
   );
 };
@@ -210,10 +219,11 @@ interface DemandaCardProps {
   demanda: Demanda;
   onAtender: () => void;
   onConcluir: () => void;
+  onClick: () => void;
   pendingAction: boolean;
 }
 
-function DemandaCard({ demanda, onAtender, onConcluir, pendingAction }: DemandaCardProps) {
+function DemandaCard({ demanda, onAtender, onConcluir, onClick, pendingAction }: DemandaCardProps) {
   const overdue = demanda.dueDate
     && demanda.status !== 'concluida'
     && new Date(demanda.dueDate) < new Date();
@@ -224,7 +234,10 @@ function DemandaCard({ demanda, onAtender, onConcluir, pendingAction }: DemandaC
     : Clock;
 
   return (
-    <Card>
+    <Card
+      className="cursor-pointer hover:bg-muted/40 transition-colors"
+      onClick={onClick}
+    >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <Badge variant="secondary" className={`text-[10px] border ${PRIORIDADE_CLS[demanda.prioridade]} shrink-0`}>
@@ -274,7 +287,7 @@ function DemandaCard({ demanda, onAtender, onConcluir, pendingAction }: DemandaC
               <Button
                 size="sm"
                 variant="outline"
-                onClick={onAtender}
+                onClick={(e) => { e.stopPropagation(); onAtender(); }}
                 disabled={pendingAction}
                 className="h-7 text-xs"
               >
@@ -284,7 +297,7 @@ function DemandaCard({ demanda, onAtender, onConcluir, pendingAction }: DemandaC
             {demanda.status !== 'concluida' && demanda.status !== 'expirada' && (
               <Button
                 size="sm"
-                onClick={onConcluir}
+                onClick={(e) => { e.stopPropagation(); onConcluir(); }}
                 disabled={pendingAction}
                 className="h-7 text-xs"
               >
