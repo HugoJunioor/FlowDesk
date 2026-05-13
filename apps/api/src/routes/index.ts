@@ -11,6 +11,7 @@ import { templateRoutes } from '@modules/_template/_template.routes';
 import { authRoutes } from '@modules/auth/auth.routes';
 import { notificacaoRoutes } from '@modules/notificacao/notificacao.routes';
 import { notaRoutes } from '@modules/nota/nota.routes';
+import { demandaRoutes } from '@modules/demanda/demanda.routes';
 
 export const apiRouter = Router();
 
@@ -23,6 +24,7 @@ const v1 = Router();
 v1.use('/auth', authRoutes);
 v1.use('/notificacoes', notificacaoRoutes);
 v1.use('/notas', notaRoutes);
+v1.use('/demandas', demandaRoutes);
 v1.use('/templates', templateRoutes);
 
 apiRouter.use('/api/v1', v1);
