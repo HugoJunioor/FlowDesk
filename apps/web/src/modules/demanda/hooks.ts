@@ -4,12 +4,13 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { demandaApi } from './api';
 import type {
-  CreateInfraInput, Demanda, DemandaPaginated, DemandaQuery,
+  AddReplyInput, CreateInfraInput, Demanda, DemandaPaginated, DemandaQuery, ThreadReply,
 } from './types';
 
 const QK = {
   list: (q: DemandaQuery) => ['demandas', 'list', q] as const,
   one: (id: string) => ['demandas', 'one', id] as const,
+  replies: (id: string) => ['demandas', id, 'replies'] as const,
 };
 
 export function useDemandas(query: DemandaQuery, opts: { enabled?: boolean } = {}) {
@@ -67,5 +68,29 @@ export function useRemoveDemanda() {
   return useMutation<void, Error, string>({
     mutationFn: (id) => demandaApi.remove(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['demandas'] }),
+  });
+}
+
+// ===== Thread replies =====
+
+export function useThreadReplies(id: string | undefined) {
+  return useQuery<ThreadReply[], Error>({
+    queryKey: id ? QK.replies(id) : ['demandas', 'undefined', 'replies'],
+    queryFn: () => demandaApi.listReplies(id as string),
+    enabled: !!id,
+    retry: 1,
+  });
+}
+
+export function useAddReply(demandaId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<ThreadReply, Error, AddReplyInput>({
+    mutationFn: (input) => demandaApi.addReply(demandaId as string, input),
+    onSuccess: () => {
+      if (demandaId) {
+        void qc.invalidateQueries({ queryKey: QK.replies(demandaId) });
+        void qc.invalidateQueries({ queryKey: QK.one(demandaId) });
+      }
+    },
   });
 }
