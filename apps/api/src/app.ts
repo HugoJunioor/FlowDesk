@@ -28,6 +28,7 @@ import { env } from '@config/env';
 import { logger } from '@shared/logging/logger';
 import { requestId } from '@shared/middlewares/request-id.middleware';
 import { errorHandler } from '@shared/middlewares/error-handler.middleware';
+import { auditMiddleware } from '@shared/audit/audit.middleware';
 import { apiRouter } from './routes';
 
 export function createApp(): Express {
@@ -99,10 +100,13 @@ export function createApp(): Express {
     }),
   );
 
-  // 10. Routes
+  // 10. Audit log de mutations (apos auth pra ter req.user, antes das routes)
+  app.use(auditMiddleware);
+
+  // 11. Routes
   app.use(apiRouter);
 
-  // 11. 404 — qualquer rota não tratada
+  // 12. 404 — qualquer rota não tratada
   app.use((req, res) => {
     res.status(404).json({
       erro: true,
@@ -112,7 +116,7 @@ export function createApp(): Express {
     });
   });
 
-  // 12. Error handler global (SEMPRE por ultimo)
+  // 13. Error handler global (SEMPRE por ultimo)
   app.use(errorHandler);
 
   return app;
