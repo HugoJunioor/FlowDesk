@@ -4,11 +4,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "src/**"
+      - "apps/web/src/**"
+      - "apps/web/package.json"
+      - "apps/web/vite.config.ts"
+      - "apps/web/tsconfig*.json"
       - "package.json"
       - "package-lock.json"
-      - "vite.config.ts"
-      - "tsconfig*.json"
 
 permissions:
   contents: read
@@ -31,7 +32,7 @@ jobs:
           install-script: "npm ci --legacy-peer-deps"
           build-script: "build"
           # Glob dos arquivos finais (Vite gera com hash em dist/assets/)
-          pattern: "dist/**/*.{js,css,html}"
+          pattern: "apps/web/dist/**/*.{js,css,html}"
           # Ignora source maps e arquivos de manifest pra nao poluir
           exclude: "{**/*.map,**/manifest.json}"
           # Limite de aumento sem comentar (1KB)
