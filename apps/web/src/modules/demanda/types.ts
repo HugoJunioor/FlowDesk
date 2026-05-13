@@ -67,3 +67,21 @@ export interface CreateInfraInput {
   dueDate?: string;
   tags?: string[];
 }
+
+export interface ThreadReply {
+  id: string;
+  demandaId: string;
+  autor: string;
+  texto: string;
+  timestampMsg: string;
+  ehMembroEquipe: boolean;
+  temCheckReaction: boolean;
+  temLoadingReaction: boolean;
+  arquivos: unknown[] | null;
+  criadoEm: string;
+}
+
+export interface AddReplyInput {
+  texto: string;
+  ehMembroEquipe?: boolean;
+}
