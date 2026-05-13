@@ -35,6 +35,11 @@ const envSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   SENTRY_ENVIRONMENT: z.string().optional(),
+
+  // Cron de SLA reminders. Em prod recomendado true; em dev pode ficar false.
+  SLA_CRON_ENABLED: z.coerce.boolean().default(false),
+  /** Intervalo em segundos entre runs do cron */
+  SLA_CRON_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
 });
 
 const parsed = envSchema.safeParse(process.env);
