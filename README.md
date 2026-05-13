@@ -167,6 +167,7 @@ Da raiz do monorepo (delegam via npm workspaces):
 | `npm run lint` | ESLint em todos os workspaces |
 | `npm run typecheck` | TypeScript em todos os workspaces |
 | `npm test` | Vitest (web) + Jest (api) |
+| `npm run test:e2e -w @flowdesk/web` | Playwright E2E (build + preview + chromium) |
 | `npm run validate` | Lint + typecheck + test (pré-push) |
 
 Scripts do **frontend** (`apps/web/`):
