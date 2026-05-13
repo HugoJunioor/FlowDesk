@@ -8,6 +8,7 @@ import {
   X,
   Workflow,
   MessageSquare,
+  Keyboard,
   Users,
   ShieldCheck,
   UserCircle,
