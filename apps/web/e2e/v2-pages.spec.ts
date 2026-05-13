@@ -26,9 +26,7 @@ test.describe('Telas v2 — render', () => {
     await page.goto('/auditoria');
     await expect(page.getByRole('heading', { name: /Auditoria/i })).toBeVisible({ timeout: 10_000 });
     // Pelo menos um dos botoes ou o input de filtro renderiza
-    await expect(
-      page.getByPlaceholder(/Recurso/i).or(page.getByRole('button', { name: /Filtrar/i }))
-    ).toBeVisible();
+    await expect(page.getByPlaceholder(/Recurso/i)).toBeVisible();
   });
 
   test('NotasV2Page carrega', async ({ page }) => {
