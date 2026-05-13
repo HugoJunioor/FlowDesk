@@ -15,6 +15,7 @@ import {
   Wrench,
   StickyNote,
   ScrollText,
+  Activity,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -220,6 +221,28 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 </span>
               </div>
             </div>
+          )}
+          {isMaster && (
+            <NavLink
+              to="/status"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                location.pathname === "/status"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              }`}
+              title="Health check da API"
+            >
+              {location.pathname === "/status" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-warning rounded-r-full" />
+              )}
+              <Activity size={16} className={location.pathname === "/status" ? "text-warning" : ""} />
+              {!collapsed && (
+                <span className="flex items-center gap-1.5">
+                  Status da API
+                </span>
+              )}
+            </NavLink>
           )}
           {isMaster && (
             <NavLink
