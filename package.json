@@ -25,7 +25,8 @@
     "build-storybook": "npm run build-storybook -w @flowdesk/web",
     "preflight": "npm run preflight -w @flowdesk/web",
     "preview": "npm run preview -w @flowdesk/web",
-    "prepare": "husky"
+    "prepare": "husky",
+    "backup": "node scripts/backup.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
