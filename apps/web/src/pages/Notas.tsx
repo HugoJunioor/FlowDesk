@@ -75,10 +75,12 @@ const Notas = () => {
       const r = await apiClient.notes.list(email);
       setNotes(r.notes || []);
     } catch (e) {
-      if (!opts.silent) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isAuth = /unauthorized|401/i.test(msg);
+      if (!opts.silent && !isAuth) {
         toast({
           title: "Erro ao carregar notas",
-          description: e instanceof Error ? e.message : String(e),
+          description: msg,
           variant: "destructive",
         });
       }
