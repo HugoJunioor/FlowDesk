@@ -7,6 +7,7 @@
  */
 import type { Request, Response, NextFunction, CookieOptions } from 'express';
 import { env } from '@config/env';
+import { auditService } from '@shared/audit/audit.service';
 import { authService } from './auth.service';
 import type { ChangePasswordInput, LoginInput } from './auth.dto';
 
@@ -33,6 +34,14 @@ export const authController = {
       });
       const maxAge = result.refreshExpiresAt.getTime() - Date.now();
       res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions(maxAge));
+      // Audit: login bem-sucedido. Senha NUNCA gravada (sanitize automatico).
+      auditService.log({
+        req,
+        usuarioEmail: result.auth.usuario.email,
+        recurso: 'auth',
+        recursoId: result.auth.usuario.id,
+        acao: 'login',
+      });
       res.json({ sucesso: true, dados: result.auth });
     } catch (err) {
       next(err);
@@ -59,6 +68,14 @@ export const authController = {
       const cookie = (req.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE];
       await authService.logout(cookie);
       res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+      if (req.user) {
+        auditService.log({
+          req,
+          recurso: 'auth',
+          recursoId: req.user.id,
+          acao: 'logout',
+        });
+      }
       res.json({ sucesso: true, dados: { mensagem: 'Logout efetuado' } });
     } catch (err) {
       next(err);
@@ -89,6 +106,13 @@ export const authController = {
       await authService.changePassword(req.user.id, input);
       // Limpa o refresh atual — usuario precisa re-logar nesse device tambem
       res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+      auditService.log({
+        req,
+        recurso: 'auth',
+        recursoId: req.user.id,
+        acao: 'change_password',
+        // Sem payload — senha eh sensivel e a service nao expoe valores
+      });
       res.json({ sucesso: true, dados: { mensagem: 'Senha alterada com sucesso. Faça login novamente.' } });
     } catch (err) {
       next(err);
