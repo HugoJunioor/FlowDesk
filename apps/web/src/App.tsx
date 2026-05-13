@@ -25,6 +25,7 @@ const ChannelRouting = lazy(() => import("./pages/ChannelRouting.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
 const Login = lazy(() => import("./pages/Login.tsx"));
 const LoginV2Page = lazy(() => import("./modules/auth/pages/LoginV2Page.tsx"));
+const AuditoriaPage = lazy(() => import("./modules/auditoria/pages/AuditoriaPage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Defaults sensatos pro React Query no padrao Just:
@@ -100,6 +101,9 @@ const AppRoutes = () => {
         )}
         {currentUser?.role === "master" && (
           <Route path="/grupos-demandas" element={<ChannelRouting />} />
+        )}
+        {currentUser?.role === "master" && (
+          <Route path="/auditoria" element={<AuditoriaPage />} />
         )}
         <Route path="*" element={<NotFound />} />
       </Routes>
