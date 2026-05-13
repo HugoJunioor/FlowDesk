@@ -27,14 +27,6 @@
     "preview": "npm run preview -w @flowdesk/web",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "apps/web/**/*.{ts,tsx,js,jsx,cjs,mjs}": [
-      "eslint --fix --max-warnings=999"
-    ],
-    "apps/api/**/*.ts": [
-      "eslint --fix --max-warnings=999"
-    ]
-  },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
