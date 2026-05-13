@@ -5,12 +5,14 @@ import { Router } from 'express';
 import { validate } from '@shared/middlewares/validation.middleware';
 import { authenticate } from '@modules/auth/auth.middleware';
 import { demandaController } from './demanda.controller';
+import { threadController } from './thread.controller';
 import {
   createInfraSchema,
   idParamSchema,
   listDemandaQuerySchema,
   updateDemandaSchema,
 } from './demanda.dto';
+import { addReplySchema, updateClosureSchema } from './thread.dto';
 
 export const demandaRoutes = Router();
 
@@ -45,3 +47,22 @@ demandaRoutes.post(
 );
 
 demandaRoutes.delete('/:id', validate({ params: idParamSchema }), demandaController.remove);
+
+// ===== Thread replies (Slack demands) =====
+demandaRoutes.get(
+  '/:id/replies',
+  validate({ params: idParamSchema }),
+  threadController.list,
+);
+demandaRoutes.post(
+  '/:id/replies',
+  validate({ params: idParamSchema, body: addReplySchema }),
+  threadController.add,
+);
+
+// ===== Closure (fechamento) =====
+demandaRoutes.patch(
+  '/:id/closure',
+  validate({ params: idParamSchema, body: updateClosureSchema }),
+  threadController.updateClosure,
+);
