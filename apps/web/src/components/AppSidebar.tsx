@@ -210,6 +210,64 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
             </NavLink>
           )}
 
+          {/* Master-only: secao BETA - telas v2 consumindo a nova API */}
+          {isMaster && !collapsed && (
+            <div className="pt-3 mt-2 border-t border-sidebar-border/40">
+              <div className="px-3 mb-1 text-[10px] uppercase tracking-wider text-sidebar-muted/70 flex items-center gap-1.5">
+                Beta v2
+                <span className="text-[8px] px-1 py-0.5 rounded bg-warning/10 text-warning border border-warning/30 font-medium">
+                  master
+                </span>
+              </div>
+            </div>
+          )}
+          {isMaster && (
+            <NavLink
+              to="/notificacoes-v2"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                location.pathname === "/notificacoes-v2"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              }`}
+              title="Notificacoes via nova API (BETA)"
+            >
+              {location.pathname === "/notificacoes-v2" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-warning rounded-r-full" />
+              )}
+              <MessageSquare size={16} className={location.pathname === "/notificacoes-v2" ? "text-warning" : ""} />
+              {!collapsed && (
+                <span className="flex items-center gap-1.5">
+                  Notificacoes
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-warning/10 text-warning border border-warning/30">v2</span>
+                </span>
+              )}
+            </NavLink>
+          )}
+          {isMaster && (
+            <NavLink
+              to="/notas-v2"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                location.pathname === "/notas-v2"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+              }`}
+              title="Notas via nova API (BETA)"
+            >
+              {location.pathname === "/notas-v2" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-warning rounded-r-full" />
+              )}
+              <StickyNote size={16} className={location.pathname === "/notas-v2" ? "text-warning" : ""} />
+              {!collapsed && (
+                <span className="flex items-center gap-1.5">
+                  Notas
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-warning/10 text-warning border border-warning/30">v2</span>
+                </span>
+              )}
+            </NavLink>
+          )}
+
           {/* Master-only: Grupos de Demandas (roteamento de canais) */}
           {isMaster && (
             <NavLink
