@@ -29,6 +29,7 @@ const AuditoriaPage = lazy(() => import("./modules/auditoria/pages/AuditoriaPage
 const NotasV2Page = lazy(() => import("./modules/nota/pages/NotasV2Page.tsx"));
 const NotificacoesV2Page = lazy(() => import("./modules/notificacao/pages/NotificacoesV2Page.tsx"));
 const ConfiguracoesV2Page = lazy(() => import("./modules/configuracoes/pages/ConfiguracoesV2Page.tsx"));
+const DemandasV2Page = lazy(() => import("./modules/demanda/pages/DemandasV2Page.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Defaults sensatos pro React Query no padrao Just:
@@ -97,6 +98,7 @@ const AppRoutes = () => {
         <Route path="/notas-v2" element={<NotasV2Page />} />
         <Route path="/notificacoes-v2" element={<NotificacoesV2Page />} />
         <Route path="/configuracoes-v2" element={<ConfiguracoesV2Page />} />
+        <Route path="/demandas-v2" element={<DemandasV2Page />} />
         <Route path="/configuracoes" element={<Configuracoes />} />
         <Route path="/perfil" element={<Profile />} />
         {currentUser?.role === "master" && (
