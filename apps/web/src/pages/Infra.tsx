@@ -146,11 +146,14 @@ const Infra = () => {
       setDemands(next);
       lastSnapshotRef.current = new Map(next.map((d) => [d.id, d]));
     } catch (e) {
-      // Erros silenciosos durante polling pra nao floodar o user
-      if (!opts.silent) {
+      // Erros silenciosos durante polling pra nao floodar o user.
+      // 401 tambem fica silencioso — usuario legacy sem token da nova API.
+      const msg = e instanceof Error ? e.message : String(e);
+      const isAuth = /unauthorized|401/i.test(msg);
+      if (!opts.silent && !isAuth) {
         toast({
           title: "Erro ao carregar demandas",
-          description: e instanceof Error ? e.message : String(e),
+          description: msg,
           variant: "destructive",
         });
       }
