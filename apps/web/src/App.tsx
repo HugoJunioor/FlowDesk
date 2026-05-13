@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -6,21 +7,25 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Index from "./pages/Index.tsx";
-import Demandas from "./pages/Demandas.tsx";
-import DemandasSql from "./pages/DemandasSql.tsx";
-import Infra from "./pages/Infra.tsx";
-import Notificacoes from "./pages/Notificacoes.tsx";
-import Notas from "./pages/Notas.tsx";
-import Configuracoes from "./pages/Configuracoes.tsx";
-import UserManagement from "./pages/UserManagement.tsx";
-import GroupsManagement from "./pages/GroupsManagement.tsx";
-import ChannelRouting from "./pages/ChannelRouting.tsx";
-import Profile from "./pages/Profile.tsx";
-import Login from "./pages/Login.tsx";
-import LoginV2Page from "./modules/auth/pages/LoginV2Page.tsx";
-import NotFound from "./pages/NotFound.tsx";
 import { DemoBanner } from "./components/DemoBanner.tsx";
+
+// Code splitting por rota — cada page entra como chunk próprio.
+// Bundle inicial fica enxuto (Index + dependencies do shell);
+// resto carrega só quando o user navegar pra rota.
+const Index = lazy(() => import("./pages/Index.tsx"));
+const Demandas = lazy(() => import("./pages/Demandas.tsx"));
+const DemandasSql = lazy(() => import("./pages/DemandasSql.tsx"));
+const Infra = lazy(() => import("./pages/Infra.tsx"));
+const Notificacoes = lazy(() => import("./pages/Notificacoes.tsx"));
+const Notas = lazy(() => import("./pages/Notas.tsx"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes.tsx"));
+const UserManagement = lazy(() => import("./pages/UserManagement.tsx"));
+const GroupsManagement = lazy(() => import("./pages/GroupsManagement.tsx"));
+const ChannelRouting = lazy(() => import("./pages/ChannelRouting.tsx"));
+const Profile = lazy(() => import("./pages/Profile.tsx"));
+const Login = lazy(() => import("./pages/Login.tsx"));
+const LoginV2Page = lazy(() => import("./modules/auth/pages/LoginV2Page.tsx"));
+const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Defaults sensatos pro React Query no padrao Just:
 // - staleTime 30s: caches "fresh" por meio minuto (UI nao refetch a cada mount)
@@ -40,54 +45,65 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Spinner mostrado enquanto chunk lazy não carrega (sub-100ms na maioria) */
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+  </div>
+);
+
 const AppRoutes = () => {
   const { isAuthenticated, mustChangePassword, currentUser, initialized } = useAuth();
 
   // Wait for localStorage init
   if (!initialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   // /login-v2 publica — acessivel mesmo sem auth legacy (testa novo stack)
   if (window.location.pathname === '/login-v2') {
     return (
-      <Routes>
-        <Route path="/login-v2" element={<LoginV2Page />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login-v2" element={<LoginV2Page />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   // Not logged in or must change password → Login page handles both flows
   if (!isAuthenticated || mustChangePassword) {
-    return <Login />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Login />
+      </Suspense>
+    );
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/login-v2" element={<LoginV2Page />} />
-      <Route path="/demandas" element={<Demandas />} />
-      <Route path="/demandas-sql" element={<DemandasSql />} />
-      <Route path="/infra" element={<Infra />} />
-      <Route path="/notificacoes" element={<Notificacoes />} />
-      <Route path="/notas" element={<Notas />} />
-      <Route path="/configuracoes" element={<Configuracoes />} />
-      <Route path="/perfil" element={<Profile />} />
-      {currentUser?.role === "master" && (
-        <Route path="/usuarios" element={<UserManagement />} />
-      )}
-      {currentUser?.role === "master" && (
-        <Route path="/grupos" element={<GroupsManagement />} />
-      )}
-      {currentUser?.role === "master" && (
-        <Route path="/grupos-demandas" element={<ChannelRouting />} />
-      )}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/login-v2" element={<LoginV2Page />} />
+        <Route path="/demandas" element={<Demandas />} />
+        <Route path="/demandas-sql" element={<DemandasSql />} />
+        <Route path="/infra" element={<Infra />} />
+        <Route path="/notificacoes" element={<Notificacoes />} />
+        <Route path="/notas" element={<Notas />} />
+        <Route path="/configuracoes" element={<Configuracoes />} />
+        <Route path="/perfil" element={<Profile />} />
+        {currentUser?.role === "master" && (
+          <Route path="/usuarios" element={<UserManagement />} />
+        )}
+        {currentUser?.role === "master" && (
+          <Route path="/grupos" element={<GroupsManagement />} />
+        )}
+        {currentUser?.role === "master" && (
+          <Route path="/grupos-demandas" element={<ChannelRouting />} />
+        )}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 };
 
