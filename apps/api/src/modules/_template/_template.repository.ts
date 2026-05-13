@@ -1,65 +1,121 @@
 /**
- * Repositório do módulo Template — acesso ao banco.
+ * Repositório do módulo Template — acesso ao Postgres via pg.Pool.
  *
- * Regras:
+ * Regras (padrão Just):
  *   - Sempre queries parametrizadas ($1, $2, ...). NUNCA string concat.
- *   - Retorna entidades planas; composição/agregação é do service.
+ *   - Use helpers de @shared/database/query-builder pra INSERT/UPDATE.
+ *   - Retorna entidades planas (sem agregação) — composição é do service.
  *   - Sem regra de negócio aqui.
  *
- * ⚠️  Placeholder em memória — substitua por pg.Pool quando Fase 2
- *     entregar o schema.
+ * Este módulo é exemplo funcional do padrão — copie pra criar outros.
  */
-import { randomUUID } from 'node:crypto';
-import type { CreateTemplateInput, ListTemplateQuery, Template, UpdateTemplateInput } from './_template.dto';
+import { pool } from '@config/database';
+import { buildInsert, buildUpdate, paginate, sanitizeSearch } from '@shared/database/query-builder';
+import type {
+  CreateTemplateInput,
+  ListTemplateQuery,
+  Template,
+  UpdateTemplateInput,
+} from './_template.dto';
 
-// Stub em memória — desaparece quando ligarmos no Postgres.
-const memory = new Map<string, Template>();
+interface TemplateRow {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  criado_em: Date;
+  atualizado_em: Date;
+  excluido_em: Date | null;
+}
+
+function rowToEntity(row: TemplateRow): Template {
+  return {
+    id: row.id,
+    nome: row.nome,
+    descricao: row.descricao,
+    criadoEm: row.criado_em,
+    atualizadoEm: row.atualizado_em,
+  };
+}
 
 export const templateRepository = {
   async list(query: ListTemplateQuery): Promise<{ rows: Template[]; total: number }> {
-    let all = Array.from(memory.values());
+    const { limit, offset } = paginate(query.pagina, query.limite);
+    const values: unknown[] = [];
+    let where = 'excluido_em IS NULL';
     if (query.busca) {
-      const q = query.busca.toLowerCase();
-      all = all.filter((t) => t.nome.toLowerCase().includes(q));
+      values.push(sanitizeSearch(query.busca));
+      where += ` AND nome ILIKE $${values.length}`;
     }
-    const offset = (query.pagina - 1) * query.limite;
+
+    const countRes = await pool.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total FROM tb_template WHERE ${where}`,
+      values,
+    );
+    const total = Number(countRes.rows[0]?.total ?? 0);
+
+    values.push(limit);
+    values.push(offset);
+    const listRes = await pool.query<TemplateRow>(
+      `SELECT id, nome, descricao, criado_em, atualizado_em, excluido_em
+       FROM tb_template
+       WHERE ${where}
+       ORDER BY criado_em DESC
+       LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values,
+    );
+
     return {
-      rows: all.slice(offset, offset + query.limite),
-      total: all.length,
+      rows: listRes.rows.map(rowToEntity),
+      total,
     };
   },
 
   async findById(id: string): Promise<Template | null> {
-    return memory.get(id) ?? null;
+    const res = await pool.query<TemplateRow>(
+      `SELECT id, nome, descricao, criado_em, atualizado_em, excluido_em
+       FROM tb_template
+       WHERE id = $1 AND excluido_em IS NULL`,
+      [id],
+    );
+    const row = res.rows[0];
+    return row ? rowToEntity(row) : null;
   },
 
   async create(input: CreateTemplateInput): Promise<Template> {
-    const now = new Date();
-    const t: Template = {
-      id: randomUUID(),
-      nome: input.nome,
-      descricao: input.descricao ?? null,
-      criadoEm: now,
-      atualizadoEm: now,
-    };
-    memory.set(t.id, t);
-    return t;
+    const { sql, values } = buildInsert(
+      'tb_template',
+      { nome: input.nome, descricao: input.descricao ?? null },
+      ['id', 'nome', 'descricao', 'criado_em', 'atualizado_em', 'excluido_em'],
+    );
+    const res = await pool.query<TemplateRow>(sql, values);
+    const row = res.rows[0];
+    if (!row) throw new Error('INSERT em tb_template não retornou linha');
+    return rowToEntity(row);
   },
 
   async update(id: string, input: UpdateTemplateInput): Promise<Template | null> {
-    const current = memory.get(id);
-    if (!current) return null;
-    const updated: Template = {
-      ...current,
-      ...input,
-      descricao: input.descricao ?? current.descricao,
-      atualizadoEm: new Date(),
-    };
-    memory.set(id, updated);
-    return updated;
+    const { sql, values } = buildUpdate(
+      'tb_template',
+      {
+        ...(input.nome !== undefined && { nome: input.nome }),
+        ...(input.descricao !== undefined && { descricao: input.descricao }),
+        atualizado_em: new Date(),
+      },
+      { id },
+      ['id', 'nome', 'descricao', 'criado_em', 'atualizado_em', 'excluido_em'],
+    );
+    const res = await pool.query<TemplateRow>(sql, values);
+    const row = res.rows[0];
+    return row ? rowToEntity(row) : null;
   },
 
   async remove(id: string): Promise<boolean> {
-    return memory.delete(id);
+    // Soft delete: marca excluido_em mantendo histórico
+    const res = await pool.query(
+      `UPDATE tb_template SET excluido_em = NOW()
+       WHERE id = $1 AND excluido_em IS NULL`,
+      [id],
+    );
+    return (res.rowCount ?? 0) > 0;
   },
 };

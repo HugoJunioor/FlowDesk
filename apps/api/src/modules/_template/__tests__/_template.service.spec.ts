@@ -1,34 +1,93 @@
 /**
- * Testes do service do _template. Smoke tests pra garantir que o
- * template compila e os fluxos basicos funcionam — quando alguem copiar
- * pra criar um modulo novo, ja sabe o formato esperado dos testes.
+ * Testes unitários do service do _template.
+ *
+ * Mocka o repository — não toca em banco real. Pra testes de integração
+ * com Postgres (mais lentos, exigem DB up), criar __tests__/integration/.
  */
 import { templateService } from '../_template.service';
+import { templateRepository } from '../_template.repository';
 import { NotFoundError } from '@shared/domain/errors';
 
+jest.mock('../_template.repository');
+
+const repoMock = templateRepository as jest.Mocked<typeof templateRepository>;
+
 describe('templateService', () => {
-  it('create + findById retorna o template criado', async () => {
-    const created = await templateService.create({ nome: 'teste-1' });
-    expect(created.id).toBeDefined();
-    expect(created.nome).toBe('teste-1');
-    const found = await templateService.findById(created.id);
-    expect(found.id).toBe(created.id);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('findById lança NotFoundError para id inexistente', async () => {
-    await expect(
-      templateService.findById('00000000-0000-4000-8000-000000000000'),
-    ).rejects.toThrow(NotFoundError);
+  it('create chama o repository e retorna a entidade', async () => {
+    const fakeCreated = {
+      id: 'uuid-1',
+      nome: 'teste',
+      descricao: null,
+      criadoEm: new Date('2026-05-12T10:00:00Z'),
+      atualizadoEm: new Date('2026-05-12T10:00:00Z'),
+    };
+    repoMock.create.mockResolvedValue(fakeCreated);
+
+    const result = await templateService.create({ nome: 'teste' });
+
+    expect(repoMock.create).toHaveBeenCalledWith({ nome: 'teste' });
+    expect(result).toEqual(fakeCreated);
+  });
+
+  it('findById retorna entidade quando existe', async () => {
+    const fake = {
+      id: 'uuid-2',
+      nome: 'X',
+      descricao: 'Y',
+      criadoEm: new Date(),
+      atualizadoEm: new Date(),
+    };
+    repoMock.findById.mockResolvedValue(fake);
+
+    const result = await templateService.findById('uuid-2');
+
+    expect(repoMock.findById).toHaveBeenCalledWith('uuid-2');
+    expect(result).toEqual(fake);
+  });
+
+  it('findById lança NotFoundError quando repo retorna null', async () => {
+    repoMock.findById.mockResolvedValue(null);
+
+    await expect(templateService.findById('inexistente')).rejects.toThrow(NotFoundError);
   });
 
   it('list pagina corretamente', async () => {
-    for (let i = 0; i < 5; i++) {
-      await templateService.create({ nome: `paginated-${i}` });
-    }
-    const res = await templateService.list({ pagina: 1, limite: 2 });
-    expect(res.dados.length).toBeLessThanOrEqual(2);
-    expect(res.pagina).toBe(1);
-    expect(res.limite).toBe(2);
-    expect(res.totalPaginas).toBeGreaterThanOrEqual(1);
+    repoMock.list.mockResolvedValue({
+      rows: [
+        {
+          id: '1', nome: 'a', descricao: null,
+          criadoEm: new Date(), atualizadoEm: new Date(),
+        },
+        {
+          id: '2', nome: 'b', descricao: null,
+          criadoEm: new Date(), atualizadoEm: new Date(),
+        },
+      ],
+      total: 5,
+    });
+
+    const result = await templateService.list({ pagina: 1, limite: 2 });
+
+    expect(result.dados.length).toBe(2);
+    expect(result.total).toBe(5);
+    expect(result.pagina).toBe(1);
+    expect(result.limite).toBe(2);
+    expect(result.totalPaginas).toBe(3);
+  });
+
+  it('update lança NotFoundError se repository retorna null', async () => {
+    repoMock.update.mockResolvedValue(null);
+
+    await expect(templateService.update('inexistente', { nome: 'x' })).rejects.toThrow(NotFoundError);
+  });
+
+  it('remove lança NotFoundError se nada foi removido', async () => {
+    repoMock.remove.mockResolvedValue(false);
+
+    await expect(templateService.remove('inexistente')).rejects.toThrow(NotFoundError);
   });
 });
