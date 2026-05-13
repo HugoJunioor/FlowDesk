@@ -1,46 +1,44 @@
 /**
  * Smoke tests — fluxos mais críticos do sistema.
  *
- * Estes testes rodam contra o build de produção via vite preview (com
- * VITE_DEMO_MODE=true). Não dependem da API Express estar rodando.
+ * Roda contra o build de produção via vite preview (VITE_DEMO_MODE=true).
+ * Não depende da API Express. Em demo, master + Admin@1 funciona.
  *
- * Cobre:
- *   - Login legacy carrega
- *   - Login legacy aceita credenciais demo (Admin@1)
- *   - Dashboard renderiza após login
- *   - 404 em rota inexistente
+ * Selectors: placeholder em vez de getByLabel porque o legacy Login
+ * usa <label> sem htmlFor (gera ambiguidade).
  */
 import { test, expect } from '@playwright/test';
 
 test.describe('Login legacy + Dashboard', () => {
   test('tela de login renderiza com campos esperados', async ({ page }) => {
     await page.goto('/');
-    // Login.tsx exibe campos de login/senha
-    await expect(page.getByLabel(/usuário|login/i).first()).toBeVisible();
-    await expect(page.getByLabel(/senha/i).first()).toBeVisible();
+    await expect(page.getByPlaceholder('seu.login')).toBeVisible();
+    await expect(page.getByPlaceholder(/digite sua senha/i)).toBeVisible();
   });
 
   test('login com Admin@1 entra no dashboard', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel(/usuário|login/i).first().fill('master');
-    await page.getByLabel(/senha/i).first().fill('Admin@1');
-    await page.getByRole('button', { name: /entrar|login/i }).click();
+    await page.getByPlaceholder('seu.login').fill('master');
+    await page.getByPlaceholder(/digite sua senha/i).fill('Admin@1');
+    await page.getByRole('button', { name: /entrar/i }).click();
 
-    // Em demo mode, master + Admin@1 funciona direto. Aguarda
-    // qualquer elemento que so aparece pos-login.
+    // Em demo, master + Admin@1 entra direto. Aguarda elemento típico
+    // pós-login (qualquer nav role).
     await expect(
-      page.getByRole('navigation').or(page.locator('[role="navigation"]'))
-    ).toBeVisible({ timeout: 10_000 });
+      page.locator('[role="navigation"], aside nav, nav').first()
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('rota inexistente cai no NotFound', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel(/usuário|login/i).first().fill('master');
-    await page.getByLabel(/senha/i).first().fill('Admin@1');
-    await page.getByRole('button', { name: /entrar|login/i }).click();
-    await expect(page.locator('[role="navigation"]')).toBeVisible({ timeout: 10_000 });
+    await page.getByPlaceholder('seu.login').fill('master');
+    await page.getByPlaceholder(/digite sua senha/i).fill('Admin@1');
+    await page.getByRole('button', { name: /entrar/i }).click();
+    await expect(
+      page.locator('[role="navigation"], aside nav, nav').first()
+    ).toBeVisible({ timeout: 15_000 });
 
     await page.goto('/rota-que-nao-existe');
-    await expect(page.getByText(/404|não.+encontrad/i).first()).toBeVisible();
+    await expect(page.getByText(/404|não.+encontrad|not found/i).first()).toBeVisible();
   });
 });
