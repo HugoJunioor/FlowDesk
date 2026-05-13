@@ -124,6 +124,26 @@ Detalhes técnicos em [`src/adapters/README.md`](./src/adapters/README.md).
   no primeiro acesso
 - 🔗 **Estado compartilhado** entre dispositivos via VPN/rede mesh
 
+### Pós-migração padrão Just (v2)
+
+Telas v2 acessíveis via sidebar BETA pra master, consumindo a API REST
+(`apps/api/`):
+
+- `/login-v2` — login JWT + HttpOnly cookie
+- `/demandas-v2` — lista com filtros + detalhe lateral com thread replies
+- `/notas-v2` — CRUD + checklist via React Query
+- `/notificacoes-v2` — inbox com polling 30s + mark all read
+- `/configuracoes-v2` — preferências de notificação
+- `/auditoria` — trilha de auditoria com filtros + export CSV (LGPD)
+
+API:
+- 7 módulos: `auth`, `notificacao`, `nota`, `demanda` + thread, `sla`,
+  `auditoria`, `health`
+- JWT HS256 (15min) + refresh HttpOnly cookie (7d) + rotação
+- Audit log middleware automático em mutations
+- SLA cron server-side (5min)
+- Sentry opt-in via `SENTRY_DSN`
+
 ## Stack
 
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui

@@ -596,35 +596,57 @@ Detalhe LGPD em [LGPD.md](./LGPD.md).
 
 ## 13. Limitações conhecidas
 
-1. **Bundle inicial 1.3MB gzipped** — code splitting por rota resolveria;
-   não crítico em LAN de 1Gbps.
-2. **Backup só local** — RUNBOOK orienta cron pra outro servidor;
+1. **Backup só local** — RUNBOOK orienta cron pra outro servidor;
    responsabilidade do operador.
-3. **Sem soft-delete** — operações destrutivas (deletar usuário,
-   demanda) são definitivas. Backups são a única recuperação.
-4. **Single instance** — sem failover. Se o servidor cai, sistema fora
+2. **Sem soft-delete em algumas entidades** — operações destrutivas
+   (deletar usuário, demanda) são definitivas. Backups são a única
+   recuperação. (Nota: tb_demanda, tb_nota, tb_usuario já tem soft
+   delete via `excluido_em`.)
+3. **Single instance** — sem failover. Se o servidor cai, sistema fora
    até reiniciar (~30s com systemd restart).
-5. **Audit log limitado** — só mudanças de demanda têm autor +
-   timestamp. Login/logout, edição de usuários, mudança de permissões
-   não têm audit trail dedicado.
-6. **SLA reminders só com aba aberta** (ADR-005).
-7. **Notificações cross-device** dependem de polling — não há push
-   instantâneo entre dispositivos do mesmo usuário.
+4. **AuthContext legacy ainda em uso** — frontend tem dois sistemas em
+   paralelo (`/login` legacy localStorage + `/login-v2` JWT cookie).
+   Migração total prevista pra próxima fase.
+5. **Notificações cross-device** dependem de polling de 30s — não há
+   push instantâneo entre dispositivos.
 
 ---
 
-## 14. Próximos passos sugeridos
+## 14. Pós-migração — estado atual
 
-Em ordem de impacto se a escala crescer (não bloqueador hoje):
+A migração pro padrão Just terminou (1A-9 + extensões). O sistema
+agora tem:
 
-1. **Code splitting por rota** (`React.lazy`) — 1h de trabalho
-2. **Cron server-side de SLA reminder** + integração Resend para e-mail
-3. **Audit log centralizado** em `data/audit.log` append-only (JSON Lines)
-4. **Sentry** para captura de erros em produção (PR C do roadmap)
-5. **Migração para SQLite local** se passar de 50 usuários (mantém
-   simplicidade, ganha queries e transações)
-6. **WebSocket/SSE** para realtime se passar de 100 usuários
-7. **Postgres + servidor dedicado** se virar SaaS multi-tenant
+### Backend (`apps/api/`)
+- Express + Postgres + Knex (migrations versionadas)
+- JWT HS256 + HttpOnly refresh cookie + rotação
+- 7 módulos no padrão: `auth`, `notificacao`, `nota`, `demanda` (+ thread),
+  `sla`, `auditoria`, `health` + `_template`
+- Pino structured logs + Sentry opt-in + Audit middleware automático
+- SLA cron server-side (substitui polling do frontend)
+- E2E + unit tests (85+ no api)
+
+### Frontend (`apps/web/`)
+- Monorepo workspace
+- Stack legacy (em `pages/`) coexistindo com stack v2 (em `modules/`)
+- 5 módulos no padrão Just: `auth`, `auditoria`, `nota`, `notificacao`,
+  `demanda` + `configuracoes` (consome notificacao)
+- 6 telas v2 funcionais (sidebar BETA master-only):
+  `/login-v2`, `/auditoria`, `/notas-v2`, `/notificacoes-v2`,
+  `/configuracoes-v2`, `/demandas-v2` (+ DemandaDetalheSheet com
+  threadReplies)
+- axios + React Query + Sentry + code splitting por rota
+- 18 specs E2E Playwright (smoke + login-v2 + v2-pages)
+
+### Próximas evoluções recomendadas
+1. **Wiring do AuthContext** — substituir AuthContext legacy pelo
+   `useMe` do módulo auth. Risco médio (qualquer regressão quebra
+   login). Sugiro fazer em paralelo a `/login-v2` como toggle.
+2. **Migrar páginas legacy** uma a uma pra modules. Padrão já
+   estabelecido. Cada página = 1 PR pequeno.
+3. **Audit log retention** (cron de purge >90 dias)
+4. **WebSocket/SSE** se passar de 100 usuários simultâneos
+5. **Postgres + servidor dedicado** se virar SaaS multi-tenant
 
 ---
 
