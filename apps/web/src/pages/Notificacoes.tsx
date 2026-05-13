@@ -98,11 +98,15 @@ const Notificacoes = () => {
       const r = await apiClient.notifications.list(email);
       setItems(r.notifications || []);
     } catch (e) {
-      toast({
-        title: "Erro ao carregar notificações",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
+      const msg = e instanceof Error ? e.message : String(e);
+      const isAuth = /unauthorized|401/i.test(msg);
+      if (!isAuth) {
+        toast({
+          title: "Erro ao carregar notificações",
+          description: msg,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
