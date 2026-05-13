@@ -12,9 +12,48 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  ScrollText, Loader2, ChevronDown, ChevronUp, RefreshCw, Filter, X,
+  ScrollText, Loader2, ChevronDown, ChevronUp, RefreshCw, Filter, X, Download,
 } from 'lucide-react';
-import { useAuditoriaList, type AuditoriaQuery } from '@/modules/auditoria';
+import { useAuditoriaList, auditoriaApi, type AuditoriaQuery, type AuditoriaEntry } from '@/modules/auditoria';
+
+/** Converte string pra formato seguro de CSV: escapa aspas + envolve com aspas. */
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = typeof value === 'string' ? value : JSON.stringify(value);
+  // Sempre envolve com aspas; escape de aspas duplicando-as
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function toCsv(entries: AuditoriaEntry[]): string {
+  const header = [
+    'criado_em', 'usuario_email', 'recurso', 'recurso_id', 'acao',
+    'ip', 'user_agent', 'request_id', 'payload_antes', 'payload_depois',
+  ].join(',');
+  const rows = entries.map((e) => [
+    csvCell(e.criadoEm),
+    csvCell(e.usuarioEmail ?? ''),
+    csvCell(e.recurso),
+    csvCell(e.recursoId ?? ''),
+    csvCell(e.acao),
+    csvCell(e.ip ?? ''),
+    csvCell(e.userAgent ?? ''),
+    csvCell(e.requestId ?? ''),
+    csvCell(e.payloadAntes),
+    csvCell(e.payloadDepois),
+  ].join(','));
+  return [header, ...rows].join('\n');
+}
+
+function downloadCsv(content: string, filename: string): void {
+  // BOM UTF-8 pra Excel abrir com acentuacao correta
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -38,9 +77,37 @@ const AuditoriaPage = () => {
   const [query, setQuery] = useState<AuditoriaQuery>({ pagina: 1, limite: 50 });
   const [filtroRecurso, setFiltroRecurso] = useState('');
   const [filtroAcao, setFiltroAcao] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, error, refetch } = useAuditoriaList(query);
+
+  const handleExportCsv = async (): Promise<void> => {
+    setExporting(true);
+    try {
+      // Pega ate 5000 registros respeitando os filtros atuais
+      const allBatches: AuditoriaEntry[] = [];
+      let pagina = 1;
+      while (pagina <= 50) { // cap de 50 paginas * 100 = 5000 registros
+        const batch = await auditoriaApi.list({
+          ...query,
+          pagina,
+          limite: 100,
+        });
+        allBatches.push(...batch.dados);
+        if (batch.dados.length < 100 || pagina >= batch.totalPaginas) break;
+        pagina++;
+      }
+      const csv = toCsv(allBatches);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      downloadCsv(csv, `flowdesk-auditoria-${stamp}.csv`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('export csv falhou', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const applyFilters = (): void => {
     setQuery({
@@ -70,16 +137,31 @@ const AuditoriaPage = () => {
               Trilha de operações (master only) · {data?.total ?? 0} registros
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-            className="gap-2"
-          >
-            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleExportCsv()}
+              disabled={exporting || !data || data.dados.length === 0}
+              className="gap-2"
+              title="Exporta ate 5000 registros respeitando os filtros atuais"
+            >
+              {exporting
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Download size={14} />}
+              Exportar CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              className="gap-2"
+            >
+              <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
         {/* Filtros */}
