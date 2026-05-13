@@ -28,6 +28,7 @@ import {
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
+import SLAByClientChart from "@/components/dashboard/SLAByClientChart";
 
 type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
@@ -543,6 +544,9 @@ const Dashboard = () => {
           ))}
         </div>
 
+
+        {/* SLA por Cliente — Ultimos 30 dias (janela fixa, independente do filtro global) */}
+        <SLAByClientChart />
 
         {/* Charts row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
