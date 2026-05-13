@@ -35,7 +35,6 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  /* eslint-disable no-console */
   console.error('❌ Variáveis de ambiente inválidas:');
   for (const issue of parsed.error.issues) {
     console.error(`  - ${issue.path.join('.')}: ${issue.message}`);

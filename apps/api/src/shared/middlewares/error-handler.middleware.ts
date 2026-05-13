@@ -8,14 +8,13 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { DomainError, ValidationError } from '@shared/domain/errors';
+import { DomainError } from '@shared/domain/errors';
 import { logger } from '@shared/logging/logger';
 
 export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void {
   const requestId = req.id;

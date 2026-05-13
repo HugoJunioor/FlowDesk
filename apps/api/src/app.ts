@@ -67,7 +67,10 @@ export function createApp(): Express {
   // 8. Log estruturado por request, com X-Request-ID
   app.use(
     pinoHttp({
-      logger,
+      // Cast pra contornar diferencas de generics entre pino e pino-http
+      // (irrelevante em runtime).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger: logger as any,
       genReqId: (req) => (req as { id?: string }).id || 'unknown',
       customLogLevel: (_req, res, err) => {
         if (err || res.statusCode >= 500) return 'error';
