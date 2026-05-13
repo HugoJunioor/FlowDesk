@@ -18,10 +18,27 @@ import GroupsManagement from "./pages/GroupsManagement.tsx";
 import ChannelRouting from "./pages/ChannelRouting.tsx";
 import Profile from "./pages/Profile.tsx";
 import Login from "./pages/Login.tsx";
+import LoginV2Page from "./modules/auth/pages/LoginV2Page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { DemoBanner } from "./components/DemoBanner.tsx";
 
-const queryClient = new QueryClient();
+// Defaults sensatos pro React Query no padrao Just:
+// - staleTime 30s: caches "fresh" por meio minuto (UI nao refetch a cada mount)
+// - refetchOnWindowFocus false: evita refetch ao trocar de aba (ruido)
+// - retry 1: tenta 1 vez extra antes de mostrar erro
+// - 401 vem do interceptor do apiClient (refresh automatico)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 const AppRoutes = () => {
   const { isAuthenticated, mustChangePassword, currentUser, initialized } = useAuth();
@@ -35,6 +52,15 @@ const AppRoutes = () => {
     );
   }
 
+  // /login-v2 publica — acessivel mesmo sem auth legacy (testa novo stack)
+  if (window.location.pathname === '/login-v2') {
+    return (
+      <Routes>
+        <Route path="/login-v2" element={<LoginV2Page />} />
+      </Routes>
+    );
+  }
+
   // Not logged in or must change password → Login page handles both flows
   if (!isAuthenticated || mustChangePassword) {
     return <Login />;
@@ -43,6 +69,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/login-v2" element={<LoginV2Page />} />
       <Route path="/demandas" element={<Demandas />} />
       <Route path="/demandas-sql" element={<DemandasSql />} />
       <Route path="/infra" element={<Infra />} />
