@@ -10,6 +10,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { DomainError } from '@shared/domain/errors';
 import { logger } from '@shared/logging/logger';
+import { captureWithContext } from '@shared/observability/sentry';
 
 export function errorHandler(
   err: unknown,
@@ -58,6 +59,8 @@ export function errorHandler(
     },
     'Erro não tratado',
   );
+  // Captura no Sentry se DSN estiver configurada (no-op caso contrario)
+  captureWithContext(err, req);
 
   res.status(500).json({
     erro: true,
