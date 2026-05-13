@@ -13,6 +13,7 @@ import { createApp } from './app';
 import { env } from '@config/env';
 import { logger } from '@shared/logging/logger';
 import { closePool } from '@config/database';
+import { startSlaCron, stopSlaCron } from '@modules/sla/sla.cron';
 
 async function main(): Promise<void> {
   const app = createApp();
@@ -22,10 +23,13 @@ async function main(): Promise<void> {
       { port: env.PORT, env: env.NODE_ENV },
       `🚀 FlowDesk API rodando em http://localhost:${env.PORT}`,
     );
+    // Cron de SLA reminders (no-op se SLA_CRON_ENABLED=false)
+    startSlaCron();
   });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Recebido sinal de desligamento, encerrando...');
+    stopSlaCron();
     server.close(async () => {
       try {
         await closePool();
