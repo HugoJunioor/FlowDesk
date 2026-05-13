@@ -158,23 +158,62 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 7. Restauração de dados (após aprovação do supervisor)
 
-Quando o supervisor aprovar, restaure os dados reais:
+A partir da Fase 9 (migração para Postgres), o fluxo é:
+
+### 7.1 Pre-condição: Postgres + migrations
 
 ```bash
-sudo systemctl stop flowdesk
+# No servidor (ou docker compose em dev)
 sudo -iu flowdesk
+cd /opt/flowdesk/app/apps/api
 
-# Dados estruturados (notifications, infra demands, notes, etc.)
-cp /caminho/do/backup/data/*.json /opt/flowdesk/app/data/
+# Aplica schema (idempotente — só roda o que falta)
+npm run migrate
 
-# Demandas reais do Slack (gitignored, vem por backup)
-cp /caminho/do/backup/src/data/realDemands.ts /opt/flowdesk/app/src/data/
+# Cria grupos padrão + master user
+npm run seed
+# Anote a senha master do log!
+```
 
-cd /opt/flowdesk/app
-npm run build
+### 7.2 Importar dados legados (JSON → Postgres)
 
-exit
-sudo systemctl start flowdesk
+Se você tem dados em `apps/web/data/*.json` (gerados pelo Vite plugin
+antigo), pode importá-los pro Postgres:
+
+```bash
+sudo -iu flowdesk
+cd /opt/flowdesk/app/apps/api
+
+# Dry-run primeiro: conta quantos registros seriam importados
+npm run import:json -- --dry-run
+
+# Importa de verdade (idempotente: pula registros que já existem por id)
+npm run import:json
+
+# Ou só uma fonte específica:
+npm run import:json -- --only=notas
+npm run import:json -- --only=notificacoes
+npm run import:json -- --only=preferencias
+npm run import:json -- --only=infra
+```
+
+O script lê:
+- `apps/web/data/notes.json` → `tb_nota` + `tb_item_nota`
+- `apps/web/data/notifications.json` → `tb_notificacao`
+- `apps/web/data/notificationPreferences.json` → `tb_preferencia_notificacao`
+- `apps/web/data/infraDemands.json` → `tb_demanda` (origem=internal)
+
+Demandas Slack (`apps/web/src/data/realDemands.ts`) ainda são carregadas
+diretamente pelo frontend via `import.meta.glob` enquanto a Fase 8+
+estiver em andamento. Quando o frontend migrar 100% pra nova API, o
+sync direto pro Postgres vai substituir esse arquivo.
+
+### 7.3 Validar
+
+```bash
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM tb_nota;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM tb_notificacao;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM tb_demanda;"
 ```
 
 ## 8. Verificação pós-deploy
