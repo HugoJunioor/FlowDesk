@@ -150,7 +150,7 @@ Exportação JSON disponível via UI (relatórios BI exportam XLSX/JSON).
 | Rate limit | 10 req/min em `/auth/*` por IP |
 | Lockout | 15min após 5 tentativas falhas |
 | Backup | Diário, retenção 30 dias |
-| Audit log | Toda alteração de demanda registra autor + timestamp |
+| Audit log | Middleware automático em todas mutations (POST/PUT/PATCH/DELETE) registra em `tb_auditoria`: usuário, recurso, ação, IP, user-agent, request_id, timestamp. Eventos críticos (login, logout, change_password) registrados explicitamente pelo controller. Payload sanitizado (senha/token sempre [REDACTED]) |
 | Logs estruturados | JSON Lines com rotação |
 | Acesso ao servidor | SSH com chave, usuário sem sudo |
 
