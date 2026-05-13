@@ -14,6 +14,7 @@ import {
   Hash,
   Wrench,
   StickyNote,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -187,6 +188,25 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               )}
               <ShieldCheck size={20} className={location.pathname === "/grupos" ? "text-sidebar-primary" : ""} />
               {!collapsed && <span>{t("nav.groups")}</span>}
+            </NavLink>
+          )}
+
+          {/* Master-only: Auditoria (trilha LGPD) */}
+          {isMaster && (
+            <NavLink
+              to="/auditoria"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                location.pathname === "/auditoria"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              {location.pathname === "/auditoria" && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
+              )}
+              <ScrollText size={20} className={location.pathname === "/auditoria" ? "text-sidebar-primary" : ""} />
+              {!collapsed && <span>Auditoria</span>}
             </NavLink>
           )}
 
