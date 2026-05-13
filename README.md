@@ -154,22 +154,31 @@ cp .env.example .env
 
 ## Comandos disponíveis
 
+Da raiz do monorepo (delegam via npm workspaces):
+
 | Comando | Descrição |
 |---------|-----------|
-| `npm run dev` | Servidor de desenvolvimento (porta 8080) |
-| `npm run dev:all` | Dev + sync automático em paralelo (recomendado) |
-| `npm run dev:vpn` | Dev + sync + lista IPs (rede mesh/VPN) |
-| `npm run build` | Build de produção |
-| `npm run preview` | Servir o build localmente |
-| `npm run share` | Sync + build + preview + watcher |
-| `npm run sync` | Sincronizar canais cliente-* manualmente |
-| `npm run sync:sql` | Sincronizar canal de demandas técnicas |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript sem emitir |
-| `npm test` | Vitest run |
-| `npm run test:watch` | Vitest watch mode |
-| `npm run test:coverage` | Tests + coverage report |
+| `npm run dev` | Frontend web (porta 8080) |
+| `npm run dev:web` | Idem |
+| `npm run dev:api` | API Express (porta 4000, requer Postgres) |
+| `npm run build` | Build de todos os workspaces |
+| `npm run build:web` | Só frontend |
+| `npm run build:api` | Só API |
+| `npm run lint` | ESLint em todos os workspaces |
+| `npm run typecheck` | TypeScript em todos os workspaces |
+| `npm test` | Vitest (web) + Jest (api) |
 | `npm run validate` | Lint + typecheck + test (pré-push) |
+
+Scripts do **frontend** (`apps/web/`):
+- `dev:all` — dev + sync automático em paralelo
+- `share` — sync + build + preview + watcher
+- `sync` / `sync:sql` — sync de canais Slack
+
+Scripts da **API** (`apps/api/`):
+- `migrate` / `seed` — Knex
+- `import:json` — JSON → Postgres (migração inicial)
+
+Banco local: `docker compose up -d` na raiz.
 
 ## Acesso inicial
 
@@ -182,22 +191,34 @@ O sistema vai exigir troca de senha imediata.
 
 ## Estrutura do projeto
 
-```
-src/
-├── pages/         Telas (Dashboard, Demandas, SQL, Usuários, Grupos...)
-├── components/    Componentes reutilizáveis
-├── contexts/      Auth, Theme, Language
-├── hooks/         Hooks customizados (usePermissions, etc)
-├── lib/           Lógica de negócio (SLA, sync, i18n, storage)
-├── data/          Dados sincronizados (gitignored)
-├── types/         Tipos TypeScript
-└── config/        Temas e branding
+Monorepo npm workspaces (`apps/*`):
 
-scripts/
-├── syncSlack.cjs       Sync dos canais cliente-*
-├── syncSqlChannel.cjs  Sync do canal técnico
-├── stateSync.mjs       Plugin Vite para estado compartilhado
-└── ...
+```
+flowdesk/
+├── apps/
+│   ├── web/                  Frontend React + Vite (legacy + nova UI v2)
+│   │   ├── src/
+│   │   │   ├── pages/        Telas legacy (Dashboard, Demandas, Notas, Infra…)
+│   │   │   ├── modules/      Novas features no padrão Just (auth, …)
+│   │   │   ├── lib/          api/, observability/, businessHours, etc
+│   │   │   ├── components/   shadcn/ui + componentes da app
+│   │   │   └── contexts/     Auth, Theme, Language
+│   │   └── scripts/          syncSlack, syncSqlChannel, stateSync (plugin)
+│   └── api/                  Backend Express + Postgres (padrão Just)
+│       ├── src/
+│       │   ├── config/       env (Zod fail-fast), database (pg Pool)
+│       │   ├── shared/       domain/errors, middlewares, audit, logging
+│       │   ├── modules/      auth, notificacao, nota, demanda, sla, auditoria
+│       │   ├── database/     migrations, seeds, import-from-json
+│       │   └── routes/       composição /api/v1
+│       └── Dockerfile        Multi-stage com user não-root
+├── docs/
+│   ├── ARCHITECTURE.md       Visão técnica + ADRs
+│   ├── DEPLOY.md             Setup on-prem step-by-step
+│   ├── RUNBOOK.md            Operação do dia a dia
+│   └── LGPD.md               Compliance + audit trail
+├── docker-compose.yml        Postgres 16 pra dev
+└── package.json              workspaces + scripts root
 ```
 
 ## Configuração do Slack
