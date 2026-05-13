@@ -4,6 +4,11 @@
  * Roda o Express criado em app.ts, captura SIGTERM/SIGINT pra shutdown
  * limpo (drena conexoes do pool antes de morrer).
  */
+// Sentry precisa ser inicializado ANTES de qualquer import que possa
+// gerar erros — por isso fica antes de createApp.
+import { initSentry } from '@shared/observability/sentry';
+initSentry();
+
 import { createApp } from './app';
 import { env } from '@config/env';
 import { logger } from '@shared/logging/logger';
