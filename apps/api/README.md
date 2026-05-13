@@ -28,13 +28,20 @@ API sobe em `http://localhost:4000`.
 
 ### Postgres em Docker (dev)
 
+Da raiz do monorepo, basta:
+
 ```bash
-docker run -d --name flowdesk-pg \
-  -e POSTGRES_USER=flowdesk \
-  -e POSTGRES_PASSWORD=flowdesk \
-  -e POSTGRES_DB=flowdesk \
-  -p 5432:5432 \
-  postgres:16-alpine
+docker compose up -d
+```
+
+Sobe Postgres 16 com volume persistente. Conexão default já funciona com
+`DATABASE_URL=postgresql://flowdesk:flowdesk@localhost:5432/flowdesk`.
+
+Comandos úteis:
+```bash
+docker compose logs -f db     # logs do banco
+docker compose down            # para o postgres
+docker compose down -v         # para + apaga volume (CUIDADO!)
 ```
 
 ## Estrutura

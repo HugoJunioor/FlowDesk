@@ -5,6 +5,7 @@ module.exports = {
   rootDir: '.',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.spec.ts', '**/*.spec.ts'],
+  setupFiles: ['<rootDir>/src/test/setup.ts'],
   moduleNameMapper: {
     '^@config/(.*)$': '<rootDir>/src/config/$1',
     '^@shared/(.*)$': '<rootDir>/src/shared/$1',
