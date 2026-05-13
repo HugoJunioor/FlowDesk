@@ -17,7 +17,6 @@ import {
   StickyNote,
   ScrollText,
   Activity,
-  Keyboard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
