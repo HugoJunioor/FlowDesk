@@ -33,9 +33,14 @@ src/data/realDemands.ts
 src/data/historicalDemands.ts
 src/data/historicalDemands.json
 src/data/sqlDemands.ts
+apps/web/src/data/realDemands.ts
+apps/web/src/data/historicalDemands.ts
+apps/web/src/data/historicalDemands.json
+apps/web/src/data/sqlDemands.ts
 
 # Shared state (users, overrides, groups — local only)
 /data/
+/apps/web/data/
 
 # Arquivos locais de trabalho (rascunhos, respostas, tickets)
 /.claude/
@@ -55,6 +60,8 @@ src/data/sqlDemands.ts
 # Local branding (company-specific)
 src/config/branding.local.ts
 public/just-logo.*
+apps/web/src/config/branding.local.ts
+apps/web/public/just-logo.*
 .env.bak*
 coverage
 storybook-static/

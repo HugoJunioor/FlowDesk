@@ -4,8 +4,8 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "src/**"
-      - ".storybook/**"
+      - "apps/web/src/**"
+      - "apps/web/.storybook/**"
       - "package-lock.json"
 
 permissions:

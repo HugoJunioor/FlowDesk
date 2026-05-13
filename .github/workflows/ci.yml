@@ -34,7 +34,7 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "npm"
       - run: npm ci --legacy-peer-deps
-      - run: npx tsc --noEmit
+      - run: npm run typecheck
 
   build:
     name: Build
@@ -68,7 +68,7 @@ jobs:
         if: always()
         with:
           name: coverage-report
-          path: coverage/
+          path: apps/web/coverage/
           retention-days: 14
       # Push pro Codecov pra badge no README + diff de cobertura por PR.
       # Tokenless funciona em repo publico; pra privado precisa configurar
@@ -76,7 +76,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         if: always()
         with:
-          files: ./coverage/coverage-final.json
+          files: ./apps/web/coverage/coverage-final.json
           flags: unittests
           fail_ci_if_error: false
         env:
