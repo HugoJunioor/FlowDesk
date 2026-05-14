@@ -69,13 +69,11 @@ test.describe('Telas v2 — render', () => {
 });
 
 test.describe('Sidebar BETA', () => {
-  test('master ve secao BETA com links v2', async ({ page }) => {
+  test('master ve menu padrao (BETA removido)', async ({ page }) => {
     await loginAsMaster(page);
-    // Os links v2 ficam no sidebar como master
-    await expect(page.getByText(/Auditoria/i).first()).toBeVisible();
-    // Ao menos um link v2 (alguns labels podem ser truncados se collapsed)
+    // Auditoria/v2 sairam do sidebar — sobra o menu padrao
     await expect(
-      page.getByText(/Notas|Demandas|Notificações|Configurações/i).first()
+      page.getByText(/Notas|Demandas|Dashboard/i).first()
     ).toBeVisible();
   });
 });
