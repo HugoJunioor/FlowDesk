@@ -15,6 +15,7 @@ import {
   ScrollText, Loader2, ChevronDown, ChevronUp, RefreshCw, Filter, X, Download,
 } from 'lucide-react';
 import { useAuditoriaList, auditoriaApi, type AuditoriaQuery, type AuditoriaEntry } from '@/modules/auditoria';
+import { diffObjects, formatDiffValue, type DiffEntry } from '@/modules/auditoria/utils/diffObjects';
 
 /** Converte string pra formato seguro de CSV: escapa aspas + envolve com aspas. */
 function csvCell(value: unknown): string {
@@ -72,6 +73,98 @@ function acaoBadgeClass(acao: string): string {
   if (acao === 'update') return 'bg-primary/10 text-primary border-primary/30';
   return 'bg-muted text-muted-foreground border-border';
 }
+
+// --- Diff visual ---
+
+function diffEntryColor(op: DiffEntry['op']): string {
+  if (op === 'add') return 'text-success';
+  if (op === 'remove') return 'text-destructive';
+  return 'text-foreground';
+}
+
+function diffEntryPrefix(op: DiffEntry['op']): string {
+  if (op === 'add') return '+';
+  if (op === 'remove') return '-';
+  return '~';
+}
+
+interface PayloadDiffProps {
+  before: unknown;
+  after: unknown;
+}
+
+const PayloadDiff = ({ before, after }: PayloadDiffProps) => {
+  const [showRaw, setShowRaw] = useState(false);
+  const diffs = diffObjects(before, after);
+
+  return (
+    <div className="bg-muted/40 rounded p-2 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-foreground font-semibold">Alteracoes</span>
+        <button
+          type="button"
+          onClick={() => setShowRaw((v) => !v)}
+          className="text-[9px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+        >
+          {showRaw ? 'Ver diff' : 'Ver JSON bruto'}
+        </button>
+      </div>
+
+      {showRaw ? (
+        <div className="grid grid-cols-2 gap-2">
+          {before != null && (
+            <div>
+              <div className="text-[9px] text-muted-foreground mb-0.5">antes</div>
+              <pre className="text-[10px] overflow-x-auto">{JSON.stringify(before, null, 2)}</pre>
+            </div>
+          )}
+          {after != null && (
+            <div>
+              <div className="text-[9px] text-muted-foreground mb-0.5">depois</div>
+              <pre className="text-[10px] overflow-x-auto">{JSON.stringify(after, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      ) : diffs.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">Sem alteracoes detectadas.</p>
+      ) : (
+        <div className="space-y-0.5">
+          {diffs.map((d) => (
+            <div key={d.key} className={`flex items-baseline gap-1.5 ${diffEntryColor(d.op)}`}>
+              <span className="shrink-0 w-3 text-center select-none opacity-60">
+                {diffEntryPrefix(d.op)}
+              </span>
+              <span className="font-semibold shrink-0">{d.key}:</span>
+              {d.op === 'change' && (
+                <>
+                  <span className="line-through text-muted-foreground">
+                    {formatDiffValue(d.before)}
+                  </span>
+                  <span className="text-muted-foreground mx-0.5">→</span>
+                  <span>{formatDiffValue(d.after)}</span>
+                </>
+              )}
+              {d.op === 'add' && (
+                <span>
+                  {formatDiffValue(d.after)}
+                  {' '}
+                  <span className="opacity-50">(novo)</span>
+                </span>
+              )}
+              {d.op === 'remove' && (
+                <span className="line-through opacity-60">
+                  {formatDiffValue(d.before)}
+                  {' '}
+                  <span className="opacity-50 no-underline">(removido)</span>
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AuditoriaPage = () => {
   const [query, setQuery] = useState<AuditoriaQuery>({ pagina: 1, limite: 50 });
@@ -224,6 +317,7 @@ const AuditoriaPage = () => {
               return (
                 <Card key={entry.id} className="overflow-hidden">
                   <button
+                    type="button"
                     onClick={() => setExpandedId(expanded ? null : entry.id)}
                     className="w-full text-left p-3 hover:bg-muted/40 transition-colors"
                   >
@@ -260,21 +354,11 @@ const AuditoriaPage = () => {
                           <strong className="text-foreground">User-Agent:</strong> {entry.userAgent ?? '—'}
                         </div>
                       </div>
-                      {entry.payloadAntes != null && (
-                        <details className="bg-muted/40 rounded p-2">
-                          <summary className="cursor-pointer text-foreground">payload_antes</summary>
-                          <pre className="mt-1 text-[10px] overflow-x-auto">
-                            {JSON.stringify(entry.payloadAntes, null, 2)}
-                          </pre>
-                        </details>
-                      )}
-                      {entry.payloadDepois != null && (
-                        <details className="bg-muted/40 rounded p-2">
-                          <summary className="cursor-pointer text-foreground">payload_depois</summary>
-                          <pre className="mt-1 text-[10px] overflow-x-auto">
-                            {JSON.stringify(entry.payloadDepois, null, 2)}
-                          </pre>
-                        </details>
+                      {(entry.payloadAntes != null || entry.payloadDepois != null) && (
+                        <PayloadDiff
+                          before={entry.payloadAntes}
+                          after={entry.payloadDepois}
+                        />
                       )}
                     </div>
                   )}
