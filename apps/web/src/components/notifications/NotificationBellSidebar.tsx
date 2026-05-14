@@ -5,6 +5,11 @@
  * com visual de nav-item — alinha com os outros links do sidebar.
  *
  * Adapta ao estado collapsed (so icone + badge) ou aberto (icone + label).
+ *
+ * Polling: para automaticamente em 401 (usePollingWithBackoff) e
+ * resume em visibilitychange ou click do usuario.
+ * Notificacoes desktop: via useDesktopNotifications, dispara push
+ * pras novas desde a ultima carga (nao exibe na primeira — anti-spam).
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +28,8 @@ import { showBrowserNotification, getPermission } from "@/lib/browserNotificatio
 import { runSlaReminderCheck } from "@/lib/slaReminderEngine";
 import { NotificationPreferences, DEFAULT_PREFERENCES } from "@/types/notification";
 import { getProcessedDemands } from "@/data/demandsLoader";
+import { usePollingWithBackoff } from "@/hooks/usePollingWithBackoff";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -67,12 +74,14 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
   // nao devem virar push agora). Inicia false, vira true apos 1a list.
   const initializedRef = useRef(false);
   // Cache da preferencia push do user (atualizada via prefs api).
-  // Default true se prefs nao salvas (usuario decide quando ligar/desligar).
   const pushEnabledRef = useRef(false);
   // Preferencias completas pro engine de lembretes SLA
   const prefsRef = useRef<NotificationPreferences | null>(null);
 
   const email = currentUser?.email || "";
+
+  // Hook de notificacoes desktop (throttle + permissao)
+  const { notify: notifyDesktop } = useDesktopNotifications();
 
   // Carrega preferencias do user (push enabled + SLA reminders)
   useEffect(() => {
@@ -91,7 +100,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
       });
   }, [email]);
 
-  const reload = useCallback(async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!email) return;
     setLoading(true);
 
@@ -99,7 +108,6 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
     // notificacoes criadas ja apareçam no proximo fetch.
     if (currentUser && prefsRef.current) {
       try {
-        // Busca demandas Infra + lista Slack importada estaticamente
         const infraRes = await apiClient.infra.list().catch(() => ({ demands: [] }));
         const allDemands = [...(infraRes.demands || []), ...getProcessedDemands()];
         await runSlaReminderCheck({
@@ -128,47 +136,57 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
       seenIdsRef.current = newSet;
       initializedRef.current = true;
 
-      // Dispara push do navegador pras novas (se push habilitado + permitido)
-      if (pushEnabledRef.current && getPermission() === "granted" && newOnes.length > 0) {
+      // Dispara push do navegador pras novas.
+      // Prioridade: useDesktopNotifications (throttle por categoria).
+      // Fallback: showBrowserNotification direto (prefs legadas da API).
+      if (newOnes.length > 0) {
         for (const n of newOnes) {
           const base = n.source === "infra" ? "/infra" : "/demandas";
-          showBrowserNotification({
+          const url = `${base}?openId=${encodeURIComponent(n.demandId)}`;
+
+          const sentViaHook = notifyDesktop({
+            category: n.event,
             title: n.title,
             body: n.message,
             tag: n.id,
-            url: `${base}?openId=${encodeURIComponent(n.demandId)}`,
+            url,
           });
+
+          // Fallback legado: pushEnabledRef (prefs da API)
+          if (!sentViaHook && pushEnabledRef.current && getPermission() === "granted") {
+            showBrowserNotification({ title: n.title, body: n.message, tag: n.id, url });
+          }
         }
       }
 
       setItems(fetched);
-    } catch {
-      /* silencia */
     } finally {
       setLoading(false);
     }
-  }, [email, currentUser]);
+  }, [email, currentUser, notifyDesktop]);
 
-  useEffect(() => {
-    if (!email) return;
-    void reload();
-    const id = setInterval(reload, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [email, reload]);
+  const { runNow } = usePollingWithBackoff(fetchNotifications, POLL_INTERVAL_MS, {
+    enabled: !!email,
+  });
 
+  // Carga inicial
   useEffect(() => {
-    if (open) void reload();
-  }, [open, reload]);
+    if (email) void fetchNotifications();
+  }, [email, fetchNotifications]);
+
+  // Recarrega ao abrir o popover
+  useEffect(() => {
+    if (open) runNow();
+  }, [open, runNow]);
 
   const unreadCount = items.filter((n) => !n.read).length;
 
   const handleClick = async (n: NotificationItem) => {
     setOpen(false);
     if (!n.read) {
-      void apiClient.notifications.markRead(n.id, true).then(reload);
+      void apiClient.notifications.markRead(n.id, true).then(fetchNotifications);
     }
     onClick?.();
-    // Navega direto pra demanda especifica via ?openId=
     const base = n.source === "infra" ? "/infra" : "/demandas";
     navigate(`${base}?openId=${encodeURIComponent(n.demandId)}`);
   };
@@ -176,7 +194,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
   const handleMarkAllRead = async () => {
     if (!email) return;
     await apiClient.notifications.markAllRead(email);
-    void reload();
+    void fetchNotifications();
   };
 
   if (!email) return null;

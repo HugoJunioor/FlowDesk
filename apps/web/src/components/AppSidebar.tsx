@@ -24,6 +24,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { branding } from "@/config/brandingLoader";
 import type { ModuleId } from "@/types/permissions";
 import NotificationBellSidebar from "./notifications/NotificationBellSidebar";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
+import { BellRing } from "lucide-react";
 
 const navItems: {
   to: string;
@@ -50,6 +52,13 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
   const { t } = useLanguage();
   const isMaster = currentUser?.role === "master";
   const visibleNavItems = navItems.filter((item) => canSee(item.module));
+
+  const {
+    permission: desktopPermission,
+    enabled: desktopEnabled,
+    setEnabled: setDesktopEnabled,
+    requestPermission: requestDesktopPermission,
+  } = useDesktopNotifications();
 
   const initials = username
     ? username.slice(0, 2).toUpperCase()
@@ -247,6 +256,25 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
         <div className="p-2 border-t border-sidebar-border space-y-1">
           {/* Notificacoes — acima de Configuracoes */}
           <NotificationBellSidebar collapsed={collapsed} onClick={() => setMobileOpen(false)} />
+
+          {/* Botao "Ativar notificacoes" — so aparece quando nao bloqueado e nao habilitado */}
+          {desktopPermission !== "denied" && desktopPermission !== "unsupported" && !desktopEnabled && (
+            <button
+              onClick={async () => {
+                if (desktopPermission === "default") {
+                  const result = await requestDesktopPermission();
+                  if (result === "granted") setDesktopEnabled(true);
+                } else if (desktopPermission === "granted") {
+                  setDesktopEnabled(true);
+                }
+              }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
+              title="Ativar notificações do navegador"
+            >
+              <BellRing size={20} />
+              {!collapsed && <span className="text-left">Ativar notificações</span>}
+            </button>
+          )}
           <NavLink
             to="/configuracoes"
             onClick={() => setMobileOpen(false)}

@@ -4,8 +4,8 @@
  * Mostra badge com contagem de nao lidas. Click abre dropdown com
  * ultimas 10 notificacoes. Botao "Ver todas" leva a /notificacoes.
  *
- * Polling: 30s pra detectar novas. Pra evitar trafico em demo, so
- * roda se user logado e nao em demo mode.
+ * Polling: 30s pra detectar novas. Para automaticamente em 401 e
+ * resume quando o user interage ou a janela ganha foco.
  */
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
 import { NotificationItem, NotificationEvent } from "@/types/notification";
+import { usePollingWithBackoff } from "@/hooks/usePollingWithBackoff";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -51,30 +52,30 @@ const NotificationBell = () => {
 
   const email = currentUser?.email || "";
 
-  const reload = useCallback(async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!email) return;
     setLoading(true);
     try {
       const r = await apiClient.notifications.list(email);
       setItems(r.notifications || []);
-    } catch {
-      /* silencia — sino nao deve quebrar */
     } finally {
       setLoading(false);
     }
   }, [email]);
 
+  const { runNow } = usePollingWithBackoff(fetchNotifications, POLL_INTERVAL_MS, {
+    enabled: !!email,
+  });
+
+  // Carga inicial
   useEffect(() => {
-    if (!email) return;
-    void reload();
-    const id = setInterval(reload, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [email, reload]);
+    if (email) void fetchNotifications();
+  }, [email, fetchNotifications]);
 
   // Recarrega ao abrir o popover (refresh imediato)
   useEffect(() => {
-    if (open) void reload();
-  }, [open, reload]);
+    if (open) runNow();
+  }, [open, runNow]);
 
   const unreadCount = items.filter((n) => !n.read).length;
 
@@ -82,7 +83,7 @@ const NotificationBell = () => {
     setOpen(false);
     // Marca lida em background
     if (!n.read) {
-      void apiClient.notifications.markRead(n.id, true).then(reload);
+      void apiClient.notifications.markRead(n.id, true).then(fetchNotifications);
     }
     // Navega pro modulo correspondente
     if (n.source === "infra") {
@@ -95,7 +96,7 @@ const NotificationBell = () => {
   const handleMarkAllRead = async () => {
     if (!email) return;
     await apiClient.notifications.markAllRead(email);
-    void reload();
+    void fetchNotifications();
   };
 
   if (!email) return null;
