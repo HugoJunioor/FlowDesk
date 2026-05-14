@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Menu, Workflow } from "lucide-react";
 import AppSidebar from "./AppSidebar";
+import DesktopNotifications from "./notifications/DesktopNotifications";
 import { branding } from "@/config/brandingLoader";
 
 interface AppLayoutProps {
@@ -43,6 +44,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      {/* Componente invisivel — ponto de montagem pra DesktopNotifications */}
+      <DesktopNotifications />
       <AppSidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
