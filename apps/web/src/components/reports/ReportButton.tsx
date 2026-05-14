@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { FileDown, FileSpreadsheet, Loader2, Printer } from "lucide-react";
+import { FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SlackDemand } from "@/types/demand";
 import { generateInteractiveReport } from "@/lib/reportGenerator";
 import { exportToExcel } from "@/lib/excelExporter";
-import { printReportAsPDF } from "@/lib/exportReportPDF";
 
 interface ReportButtonProps {
   demands: SlackDemand[];
@@ -18,7 +17,6 @@ interface ReportButtonProps {
 const ReportButton = ({ demands, filters, source, variant = "outline", size = "sm" }: ReportButtonProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [isPrintingPDF, setIsPrintingPDF] = useState(false);
 
   const handleExportBI = async () => {
     setIsGenerating(true);
@@ -88,43 +86,8 @@ const ReportButton = ({ demands, filters, source, variant = "outline", size = "s
     }
   };
 
-  const handleExportPDF = () => {
-    if (demands.length === 0) return;
-    setIsPrintingPDF(true);
-    try {
-      printReportAsPDF();
-      toast.success("Diálogo de impressão aberto", {
-        description: "Escolha 'Salvar como PDF' na impressora",
-      });
-    } catch (e) {
-      toast.error("Erro ao abrir PDF", {
-        description: e instanceof Error ? e.message : String(e),
-      });
-    } finally {
-      // window.print() é síncrono; reseta estado logo após
-      setTimeout(() => setIsPrintingPDF(false), 500);
-    }
-  };
-
   return (
     <div className="flex gap-1">
-      <Button
-        variant={variant}
-        size={size}
-        onClick={handleExportPDF}
-        disabled={isPrintingPDF || demands.length === 0}
-        className="gap-1 fd-no-print"
-        title="Exportar PDF"
-      >
-        {isPrintingPDF ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <Printer size={14} />
-        )}
-        <span className="hidden sm:inline ml-1">
-          {isPrintingPDF ? "" : "PDF"}
-        </span>
-      </Button>
       <Button
         variant={variant}
         size={size}

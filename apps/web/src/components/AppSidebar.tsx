@@ -8,7 +8,6 @@ import {
   X,
   Workflow,
   MessageSquare,
-  Keyboard,
   Users,
   ShieldCheck,
   UserCircle,
@@ -283,15 +282,6 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
             <Settings size={20} />
             {!collapsed && <span>{t("nav.settings")}</span>}
           </NavLink>
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new Event('shortcuts:open-help'))}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
-            title="Atalhos de teclado (?)"
-          >
-            <Keyboard size={20} />
-            {!collapsed && <span className="text-[11px]">Atalhos (?)</span>}
-          </button>
           <button
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-destructive transition-colors w-full"
