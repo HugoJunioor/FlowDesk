@@ -158,7 +158,6 @@ const Dashboard = () => {
   const [presentationMode, setPresentationMode] = useState(false);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { trigger: triggerSync, isPending: isSyncing } = useSyncTrigger();
 
   const enterPresentation = useCallback(() => {
     setPresentationMode(true);
