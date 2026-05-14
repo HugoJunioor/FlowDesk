@@ -26,6 +26,7 @@ import DemandByPriority from "@/components/demandas/DemandByPriority";
 import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
+import AdvancedFilters from "@/components/demandas/AdvancedFilters";
 import ReportButton from "@/components/reports/ReportButton";
 
 // === LOCAL PERSISTENCE ===
@@ -422,6 +423,12 @@ const Demandas = () => {
             <p className="text-muted-foreground text-sm text-center sm:text-left">Acompanhe as demandas recebidas via Slack</p>
           </div>
           <div className="flex items-center gap-2">
+            <AdvancedFilters
+              filters={filters}
+              onChange={setFilters}
+              assignees={assignees}
+              clients={clients}
+            />
             <ReportButton
               demands={sorted}
               source="demandas"
