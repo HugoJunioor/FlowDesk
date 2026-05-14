@@ -319,6 +319,20 @@ export const apiClient = {
       ),
   },
 
+  // === Sync manual ===
+  sync: {
+    /**
+     * Dispara sync Slack manualmente (POST /sync/trigger).
+     * Só funciona em dev/preview (script Node local).
+     * Em prod retorna 501 com mensagem explicativa.
+     */
+    trigger: () =>
+      request<{ ok: boolean; stdout?: string; stderr?: string }>("/sync/trigger", {
+        method: "POST",
+        demoFallback: { ok: true, stdout: "[demo] sync simulado" },
+      }),
+  },
+
   // Bloco de notas pessoal
   notes: {
     list: (email: string) =>

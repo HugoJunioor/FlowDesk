@@ -1211,7 +1211,8 @@ function handler(req, res, next) {
   // Rate limit (antes de qualquer rota com I/O)
   if (req.url?.startsWith("/auth/") || req.url?.startsWith("/slack/") ||
       req.url?.startsWith("/infra/") || req.url?.startsWith("/notifications") ||
-      req.url?.startsWith("/notes") || req.url?.startsWith("/__state")) {
+      req.url?.startsWith("/notes") || req.url?.startsWith("/__state") ||
+      req.url?.startsWith("/sync/")) {
     const rl = checkRateLimit(req);
     if (!rl.ok) {
       setCors(req, res);
@@ -1318,6 +1319,51 @@ function handler(req, res, next) {
   if (req.url === "/__health") {
     res.setHeader("Content-Type", "application/json");
     return res.end(JSON.stringify({ ok: true, ts: Date.now() }));
+  }
+
+  // POST /sync/trigger — dispara sync Slack manualmente.
+  // Em dev/preview: executa apps/web/scripts/syncSlack.cjs via spawn.
+  // Em prod (Vercel/serverless): retorna 501 — script Node nao roda nesses ambientes.
+  if (req.url === "/sync/trigger") {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      return res.end(JSON.stringify({ error: "Use POST" }));
+    }
+    if (!isAuthenticated(req)) return reject401(res);
+
+    // Detecta ambiente serverless (Vercel, AWS Lambda, etc.) pelo env var padrao
+    const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+    if (isServerless) {
+      res.statusCode = 501;
+      res.setHeader("Content-Type", "application/json");
+      return res.end(JSON.stringify({
+        error: "Sync manual nao disponivel em ambiente serverless. Execute syncSlack.cjs localmente.",
+        hint: "node apps/web/scripts/syncSlack.cjs",
+      }));
+    }
+
+    const syncScript = path.join(__dirname, "syncSlack.cjs");
+    if (!fs.existsSync(syncScript)) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      return res.end(JSON.stringify({ error: `Script nao encontrado: ${syncScript}` }));
+    }
+
+    log("info", "sync_trigger_started", { url: req.url });
+    const root = path.join(__dirname, "..");
+    return runScript("node", [syncScript], root).then((result) => {
+      res.setHeader("Content-Type", "application/json");
+      res.statusCode = result.ok ? 200 : 500;
+      log(result.ok ? "info" : "error", "sync_trigger_finished", { ok: result.ok, code: result.code });
+      res.end(JSON.stringify({
+        ok: result.ok,
+        stdout: result.stdout?.slice(-2000) || "",
+        stderr: result.stderr?.slice(-1000) || "",
+      }));
+    });
   }
 
   // Endpoint de sync sob demanda do canal SQL
