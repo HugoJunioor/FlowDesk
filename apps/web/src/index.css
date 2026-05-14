@@ -1282,3 +1282,30 @@
     filter: saturate(2.5) brightness(1.2);
   }
 }
+
+/* ── Modo Apresentacao ── */
+.presentation-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  background: hsl(var(--background));
+  padding: 2rem;
+}
+
+/* Esconde sidebar e mobile header enquanto em apresentacao */
+.presentation-mode ~ * aside,
+.presentation-mode ~ * nav,
+body:has(.presentation-mode) aside,
+body:has(.presentation-mode) nav,
+body:has(.presentation-mode) .lg\\:ml-60,
+body:has(.presentation-mode) .lg\\:ml-16 {
+  display: none !important;
+}
+
+/* Quando em fullscreen o proprio AppLayout fica invisivel — presentation-mode eh full */
+:fullscreen .presentation-mode,
+:-webkit-full-screen .presentation-mode {
+  position: relative;
+  inset: unset;
+}
