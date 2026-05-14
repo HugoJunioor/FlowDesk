@@ -8,8 +8,6 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DemoBanner } from "./components/DemoBanner.tsx";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import ShortcutsHelpModal from "@/components/ShortcutsHelpModal";
 
 // Code splitting por rota — cada page entra como chunk próprio.
 // Bundle inicial fica enxuto (Index + dependencies do shell);
@@ -125,12 +123,6 @@ const AppRoutes = () => {
   );
 };
 
-/** Wrapper interno ao BrowserRouter — necessario para useNavigate funcionar. */
-const KeyboardShortcutsProvider = () => {
-  const { helpOpen, setHelpOpen } = useKeyboardShortcuts();
-  return <ShortcutsHelpModal open={helpOpen} onOpenChange={setHelpOpen} />;
-};
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -141,7 +133,6 @@ const App = () => (
           <AuthProvider>
             <BrowserRouter>
               <DemoBanner />
-              <KeyboardShortcutsProvider />
               <AppRoutes />
             </BrowserRouter>
           </AuthProvider>
