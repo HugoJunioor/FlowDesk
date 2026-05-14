@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import {
   AlertTriangle, CheckCircle2, Clock, Inbox, Building2,
-  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check,
+  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check, RefreshCw,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } from "recharts";
@@ -29,6 +29,7 @@ import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 import SLAByClientChart from "@/components/dashboard/SLAByClientChart";
+import { useSyncTrigger } from "@/hooks/useSyncTrigger";
 
 type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
@@ -134,6 +135,7 @@ const CustomSlaTooltip = ({ active, payload, label }: any) => {
 const MONTH_NAMES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 const Dashboard = () => {
+  const { trigger: triggerSync, isPending: isSyncing } = useSyncTrigger();
   const [period, setPeriod] = useState<Period>("mensal");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [client, setClient] = useState("");
@@ -398,6 +400,19 @@ const Dashboard = () => {
                 }}
               />
               <SyncStatusIndicator />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => triggerSync()}
+                disabled={isSyncing}
+                className="gap-1 fd-no-print"
+                title="Sincronizar agora"
+              >
+                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                <span className="hidden sm:inline ml-1">
+                  {isSyncing ? "Sincronizando..." : "Sync"}
+                </span>
+              </Button>
             </div>
           </div>
 
