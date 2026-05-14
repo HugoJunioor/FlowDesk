@@ -285,3 +285,5 @@ são gerados localmente e estão excluídos do Git via `.gitignore`.
 
 [MIT](LICENSE) — código livre pra estudo, fork, adaptação. Os dados sincronizados
 da operação real (demandas, usuários, históricos) ficam fora do repo via `.gitignore`.
+
+Consulte o [CHANGELOG](CHANGELOG.md) para o histórico completo de versões e mudanças.

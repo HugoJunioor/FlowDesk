@@ -7,11 +7,26 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 ## [Unreleased]
 
 ### Adicionado
+- Drawer de filtros avancados em Demandas (cliente, prioridade, periodo,
+  responsavel, status) com badge de contagem de filtros ativos
 - Camada de adapters multi-canal (`src/adapters/`) com contrato
   `DemandAdapter` e stub de Microsoft Teams
 - Modo demo (`VITE_DEMO_MODE`) com banner de credenciais visíveis
 - `.npmrc` com `legacy-peer-deps=true` (compatibilidade Vercel)
 - `vercel.json` com SPA rewrites + headers de segurança
+- GET `/health/detailed` com checks de DB, disco e memória
+- Rate limit por IP no login + endpoint LGPD right-to-be-forgotten
+- Script de backup com `pg_dump` + zip de `web/data`
+- StatusPage com health check da API (master only)
+- Export CSV na AuditoriaPage (LGPD-friendly)
+- `DemandaDetalheSheet` com thread replies e form de reply
+- Onboarding wizard e telas v2 (Notas, Notificacoes, Configuracoes,
+  Auditoria, Demandas) consumindo API REST
+- CI Playwright E2E (chromium, paths gate, cache de browsers)
+- Modulo Infra com quadros KPI por status e filtros SQL/Deploy
+- Bloco de notas pessoal (Kanban + Lista)
+- Lembretes SLA via engine no polling do sino
+- Inbox de eventos/notificacoes (sino + pagina + storage)
 
 ### Alterado
 - README expandido com diagrama Mermaid de arquitetura, seção
@@ -19,11 +34,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 - Meta de SLA padrão de 90% para 80%
 - Demandas sem prioridade explícita ("conciliação", "remessa SITEF",
   etc) viram P3 automaticamente
+- Sidebar sem secao BETA v2 (telas promovidas para main)
 
 ### Corrigido
 - Variáveis `slaResOk` / `slaResBreach` indefinidas no
   `reportGenerator.ts` (relatório BI quebrado)
 - Toast de erro no `ReportButton` (antes silenciava falhas)
+- Toast Unauthorized silenciado em Infra/Notas/Notificacoes
+- Conta so interacoes da equipe no badge "sem interacao" (ignora
+  cobranças do cliente)
 
 ### Segurança
 - PBKDF2 (150k iterações + salt) substituindo SHA-256
