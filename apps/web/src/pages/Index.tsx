@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,10 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress";
 import {
   AlertTriangle, CheckCircle2, Clock, Inbox, Building2,
-  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check, Maximize2, Minimize2, RefreshCw,
+  Users, BarChart3, CalendarDays, TrendingUp, Timer, MessageCircle, Filter, ShieldAlert, Zap, ExternalLink, Copy, Check,
 } from "lucide-react";
-import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
-import { useOnboardingStatus } from "@/hooks/useOnboardingStatus";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } from "recharts";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
@@ -31,7 +29,6 @@ import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import ReportButton from "@/components/reports/ReportButton";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 import SLAByClientChart from "@/components/dashboard/SLAByClientChart";
-import { useSyncTrigger } from "@/hooks/useSyncTrigger";
 
 type Period = "hoje" | "semanal" | "mensal" | "anual" | "personalizado";
 type PieFilter = "all" | "p1" | "p2" | "p3";
@@ -152,45 +149,6 @@ const Dashboard = () => {
 
   // Recalcula sempre que overrides mudarem (mesmo em outras telas/abas)
   const [refreshTick, setRefreshTick] = useState(0);
-
-  // Modo apresentacao
-  const [presentationMode, setPresentationMode] = useState(false);
-  const dashboardRef = useRef<HTMLDivElement>(null);
-  const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { trigger: triggerSync, isPending: isSyncing } = useSyncTrigger();
-
-  const enterPresentation = useCallback(() => {
-    setPresentationMode(true);
-    dashboardRef.current?.requestFullscreen?.().catch(() => {});
-    autoRefreshRef.current = setInterval(() => {
-      setRefreshTick((t) => t + 1);
-    }, 30_000);
-  }, []);
-
-  const exitPresentation = useCallback(() => {
-    setPresentationMode(false);
-    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-    if (autoRefreshRef.current !== null) {
-      clearInterval(autoRefreshRef.current);
-      autoRefreshRef.current = null;
-    }
-  }, []);
-
-  // Sai do modo se o usuario apertar Esc (fullscreen nativo ja faz isso, mas sync estado React)
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      if (!document.fullscreenElement && presentationMode) exitPresentation();
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, [presentationMode, exitPresentation]);
-
-  // Limpa interval ao desmontar
-  useEffect(() => {
-    return () => {
-      if (autoRefreshRef.current !== null) clearInterval(autoRefreshRef.current);
-    };
-  }, []);
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === "fd_demand_overrides") setRefreshTick((t) => t + 1);
@@ -204,10 +162,6 @@ const Dashboard = () => {
     };
   }, []);
   const allDemands = useMemo(() => getProcessedDemands(), [refreshTick]);
-
-  // Onboarding
-  const { shouldShow: showOnboarding, currentStep: onboardingStep, setCurrentStep: setOnboardingStep, dismiss: dismissOnboarding } =
-    useOnboardingStatus(allDemands.length);
 
   const clients = useMemo(() => {
     const set = new Set<string>();
@@ -422,30 +376,7 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      <div
-        ref={dashboardRef}
-        className={`space-y-6 dashboard${presentationMode ? " presentation-mode" : ""}`}
-      >
-        {/* Botao flutuante sair apresentacao */}
-        {presentationMode && (
-          <button
-            onClick={exitPresentation}
-            className="fixed top-4 right-4 z-50 flex items-center gap-1.5 bg-background/90 border border-border rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg hover:bg-muted transition-colors"
-          >
-            <Minimize2 size={13} />
-            Sair
-          </button>
-        )}
-
-        {/* Onboarding wizard — zero state */}
-        {showOnboarding && (
-          <OnboardingWizard
-            currentStep={onboardingStep}
-            onStepChange={setOnboardingStep}
-            onDismiss={dismissOnboarding}
-          />
-        )}
-
+      <div className="space-y-6">
         {/* Header + global filters */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -453,18 +384,6 @@ const Dashboard = () => {
               <p className="text-muted-foreground text-sm text-center sm:text-left">Visao analitica das demandas Slack</p>
             </div>
             <div className="flex items-center gap-2">
-              {!presentationMode && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={enterPresentation}
-                  title="Modo apresentacao (fullscreen, auto-refresh 30s)"
-                >
-                  <Maximize2 size={13} />
-                  Apresentacao
-                </Button>
-              )}
               <ReportButton
                 demands={reportDemands}
                 source="dashboard"
@@ -479,19 +398,6 @@ const Dashboard = () => {
                 }}
               />
               <SyncStatusIndicator />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => triggerSync()}
-                disabled={isSyncing}
-                className="gap-1 fd-no-print"
-                title="Sincronizar agora"
-              >
-                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
-                <span className="hidden sm:inline ml-1">
-                  {isSyncing ? "Sincronizando..." : "Sync"}
-                </span>
-              </Button>
             </div>
           </div>
 
@@ -632,7 +538,7 @@ const Dashboard = () => {
                   </div>
                   <span className="text-[11px] text-muted-foreground">{kpi.title}</span>
                 </div>
-                <p className={`font-bold ${presentationMode ? "text-3xl" : "text-xl"} ${kpi.color}`}>{kpi.value}</p>
+                <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
               </CardContent>
             </Card>
           ))}
@@ -987,28 +893,28 @@ const Dashboard = () => {
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Zap size={20} className="text-info mx-auto mb-2" />
-              <p className={`font-bold text-foreground ${presentationMode ? "text-4xl" : "text-2xl"}`}>{firstResponseData.avg > 0 ? formatBusinessTime(firstResponseData.avg) : "—"}</p>
+              <p className="text-2xl font-bold text-foreground">{firstResponseData.avg > 0 ? formatBusinessTime(firstResponseData.avg) : "—"}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Tempo medio 1a resposta</p>
             </CardContent>
           </Card>
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Users size={20} className="text-primary mx-auto mb-2" />
-              <p className={`font-bold text-foreground ${presentationMode ? "text-4xl" : "text-2xl"}`}>{new Set(filtered.map((d) => d.assignee?.name).filter(Boolean)).size}</p>
+              <p className="text-2xl font-bold text-foreground">{new Set(filtered.map((d) => d.assignee?.name).filter(Boolean)).size}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Responsaveis ativos</p>
             </CardContent>
           </Card>
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Building2 size={20} className="text-warning mx-auto mb-2" />
-              <p className={`font-bold text-foreground ${presentationMode ? "text-4xl" : "text-2xl"}`}>{new Set(filtered.map((d) => extractClientName(d.slackChannel))).size}</p>
+              <p className="text-2xl font-bold text-foreground">{new Set(filtered.map((d) => extractClientName(d.slackChannel))).size}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Clientes atendidos</p>
             </CardContent>
           </Card>
           <Card className="border border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <TrendingUp size={20} className={`mx-auto mb-2 ${concluidas > expiradas ? "text-success" : "text-destructive"}`} />
-              <p className={`font-bold text-foreground ${presentationMode ? "text-4xl" : "text-2xl"}`}>{total > 0 ? Math.round((concluidas / total) * 100) : 0}%</p>
+              <p className="text-2xl font-bold text-foreground">{total > 0 ? Math.round((concluidas / total) * 100) : 0}%</p>
               <p className="text-[11px] text-muted-foreground mt-1">Taxa de conclusao</p>
             </CardContent>
           </Card>
