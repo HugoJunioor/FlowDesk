@@ -304,7 +304,8 @@ flowdesk/
 │   ├── ARCHITECTURE.md       Visão técnica + ADRs
 │   ├── DEPLOY.md             Setup on-prem step-by-step
 │   ├── RUNBOOK.md            Operação do dia a dia
-│   └── LGPD.md               Compliance + audit trail
+│   ├── LGPD.md               Compliance + audit trail
+│   └── screenshots/          Prints das features (README.md lista pendentes)
 ├── docker-compose.yml        Postgres 16 pra dev
 └── package.json              workspaces + scripts root
 ```
