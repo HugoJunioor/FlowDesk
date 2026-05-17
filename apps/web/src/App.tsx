@@ -32,6 +32,7 @@ const ConfiguracoesV2Page = lazy(() => import("./modules/configuracoes/pages/Con
 const DemandasV2Page = lazy(() => import("./modules/demanda/pages/DemandasV2Page.tsx"));
 const StatusPage = lazy(() => import("./modules/status/pages/StatusPage.tsx"));
 const Sobre = lazy(() => import("./pages/Sobre.tsx"));
+const PoliticaCookies = lazy(() => import("./pages/PoliticaCookies.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Defaults sensatos pro React Query no padrao Just:
@@ -65,6 +66,17 @@ const AppRoutes = () => {
   // Wait for localStorage init
   if (!initialized) {
     return <PageLoader />;
+  }
+
+  // /politica-cookies publica — acessivel sem autenticacao
+  if (window.location.pathname === '/politica-cookies') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/politica-cookies" element={<PoliticaCookies />} />
+        </Routes>
+      </Suspense>
+    );
   }
 
   // /login-v2 publica — acessivel mesmo sem auth legacy (testa novo stack)
@@ -119,6 +131,7 @@ const AppRoutes = () => {
           <Route path="/auditoria" element={<AuditoriaPage />} />
         )}
         <Route path="/sobre" element={<Sobre />} />
+        <Route path="/politica-cookies" element={<PoliticaCookies />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

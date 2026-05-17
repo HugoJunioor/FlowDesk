@@ -370,8 +370,15 @@ const Login = () => {
           </Card>
         )}
 
-        <p className="text-xs text-white/50 lg:text-muted-foreground mt-6 text-center">
-          FlowDesk &middot; 2026
+        <p className="text-xs text-white/50 lg:text-muted-foreground mt-6 text-center space-x-2">
+          <span>FlowDesk &middot; 2026</span>
+          <span>&middot;</span>
+          <a
+            href="/politica-cookies"
+            className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+          >
+            Politica de cookies
+          </a>
         </p>
       </div>
     </div>
