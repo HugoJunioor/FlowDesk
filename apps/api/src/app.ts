@@ -56,7 +56,16 @@ export function createApp(): Express {
   app.use(compression());
 
   // 5. Body parsers
-  app.use(express.json({ limit: '10mb' }));
+  // O verify callback preserva o body bruto em req.rawBody — necessario
+  // para validacao de assinatura HMAC da Slack Events API.
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req, _res, buf) => {
+        (req as typeof req & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // 6. Cookies (necessario pro refresh token HttpOnly da Fase 3)

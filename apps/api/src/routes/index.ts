@@ -16,6 +16,7 @@ import { auditoriaRoutes } from '@modules/auditoria/auditoria.routes';
 import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
 import { env } from '@config/env';
 import { docsRoutes } from './docs.routes';
+import { slackRoutes } from '@modules/slack/slack.routes';
 
 export const apiRouter = Router();
 
@@ -32,6 +33,12 @@ v1.use('/demandas', demandaRoutes);
 v1.use('/auditoria', auditoriaRoutes);
 v1.use('/usuarios', usuariosRoutes);
 v1.use('/templates', templateRoutes);
+
+// Slack Events API webhook — habilitar via SLACK_WEBHOOK_ENABLED=true
+// Rota publica (sem JWT), protegida por assinatura HMAC no middleware.
+if (env.SLACK_WEBHOOK_ENABLED) {
+  v1.use('/slack', slackRoutes);
+}
 
 // Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false
 if (env.OPENAPI_ENABLED) {
