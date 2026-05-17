@@ -14,6 +14,8 @@ import { notaRoutes } from '@modules/nota/nota.routes';
 import { demandaRoutes } from '@modules/demanda/demanda.routes';
 import { auditoriaRoutes } from '@modules/auditoria/auditoria.routes';
 import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
+import { env } from '@config/env';
+import { docsRoutes } from './docs.routes';
 
 export const apiRouter = Router();
 
@@ -30,5 +32,10 @@ v1.use('/demandas', demandaRoutes);
 v1.use('/auditoria', auditoriaRoutes);
 v1.use('/usuarios', usuariosRoutes);
 v1.use('/templates', templateRoutes);
+
+// Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false
+if (env.OPENAPI_ENABLED) {
+  v1.use('/docs', docsRoutes);
+}
 
 apiRouter.use('/api/v1', v1);
