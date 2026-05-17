@@ -71,9 +71,43 @@ apps/api/
 └── README.md                # Você está aqui
 ```
 
+## Documentação OpenAPI + Swagger UI
+
+Com a API rodando em dev, acesse:
+
+- **Swagger UI**: `http://localhost:4000/api/v1/docs`
+- **JSON raw**: `http://localhost:4000/api/v1/docs/openapi.json`
+
+Para gerar o arquivo `openapi.json` no disco (util em CI para detectar breaking changes de contrato):
+
+```bash
+npm run openapi:gen -w @flowdesk/api
+# gera apps/api/openapi.json
+```
+
+Em producao, desabilite via env:
+
+```
+OPENAPI_ENABLED=false
+```
+
+Por padrao `OPENAPI_ENABLED=true`. Recomendado desabilitar em prod para nao expor o contrato.
+
+### Modulos documentados
+
+| Modulo | Rotas | Status |
+|--------|-------|--------|
+| auth | login, refresh, logout, /me, change-password | Completo |
+| demanda | list, get, create-infra, update, delete, atender, concluir, replies, closure | Completo |
+| nota | list, get, create, update, delete | Completo |
+| health | /health, /health/detailed | Completo |
+| notificacao | list | Schemas registrados |
+| auditoria | list | Schemas registrados |
+| usuarios | lgpd-delete | Schemas registrados |
+
 ## Scripts
 
-| Comando | Descrição |
+| Comando | Descricao |
 |---|---|
 | `npm run dev` | tsx watch (recarrega ao salvar) |
 | `npm run build` | tsc → dist/ |
@@ -85,6 +119,7 @@ apps/api/
 | `npm run migrate` | knex migrate:latest |
 | `npm run migrate:make <nome>` | cria nova migration ts |
 | `npm run seed` | knex seed:run |
+| `npm run openapi:gen` | gera openapi.json no disco |
 
 ## Como criar um novo módulo
 
