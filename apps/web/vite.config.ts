@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react-swc";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import path from "path";
 import stateSyncPlugin from "./scripts/stateSync.mjs";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json") as { version: string };
 
 // HTTPS auto-assinado em producao habilita Web Crypto (PBKDF2, clipboard, etc)
 // mesmo quando acessado via IP de rede/VPN. Em dev mantem HTTP para HMR rapido.
@@ -53,6 +57,9 @@ export default defineConfig(({ command }) => ({
   },
   // basicSsl gera certificado self-signed na primeira execucao.
   // Aplicado em dev e preview quando VITE_DISABLE_HTTPS != "1".
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [react(), stateSyncPlugin(), ...(enableHttps && command !== "build" ? [basicSsl()] : [])],
   resolve: {
     alias: {
