@@ -22,7 +22,8 @@
     "migrate:make": "knex migrate:make --knexfile knexfile.ts -x ts",
     "seed": "knex seed:run --knexfile knexfile.ts",
     "seed:make": "knex seed:make --knexfile knexfile.ts -x ts",
-    "import:json": "tsx src/database/import-from-json.ts"
+    "import:json": "tsx src/database/import-from-json.ts",
+    "openapi:gen": "tsx --tsconfig tsconfig.scripts.json scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",

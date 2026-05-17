@@ -36,6 +36,9 @@ const envSchema = z.object({
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   SENTRY_ENVIRONMENT: z.string().optional(),
 
+  // OpenAPI / Swagger UI. Default true em dev/staging, false em prod.
+  OPENAPI_ENABLED: z.coerce.boolean().default(true),
+
   // Cron de SLA reminders. Em prod recomendado true; em dev pode ficar false.
   SLA_CRON_ENABLED: z.coerce.boolean().default(false),
   /** Intervalo em segundos entre runs do cron */
