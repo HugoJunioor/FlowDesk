@@ -66,10 +66,60 @@ describe('_internals.isBusinessDay', () => {
   it('false para domingo', () => {
     expect(_internals.isBusinessDay(new Date(2026, 5, 14))).toBe(false);
   });
+  it('false para sabado', () => {
+    expect(_internals.isBusinessDay(new Date(2026, 5, 13))).toBe(false);
+  });
   it('false para feriado fixo (1 jan)', () => {
     expect(_internals.isBusinessDay(new Date(2026, 0, 1))).toBe(false);
   });
+  it('false para Natal (25 dez)', () => {
+    expect(_internals.isBusinessDay(new Date(2026, 11, 25))).toBe(false);
+  });
   it('true para terca normal', () => {
     expect(_internals.isBusinessDay(new Date(2026, 5, 16))).toBe(true);
+  });
+  it('true para segunda normal', () => {
+    // 2026-05-11 = segunda
+    expect(_internals.isBusinessDay(new Date(2026, 4, 11))).toBe(true);
+  });
+});
+
+describe('_internals.isHoliday', () => {
+  it('Tiradentes (21/04) é feriado', () => {
+    expect(_internals.isHoliday(new Date(2026, 3, 21))).toBe(true);
+  });
+  it('Independência (07/09) é feriado', () => {
+    expect(_internals.isHoliday(new Date(2026, 8, 7))).toBe(true);
+  });
+  it('Proclamacao da Republica (15/11) é feriado', () => {
+    expect(_internals.isHoliday(new Date(2026, 10, 15))).toBe(true);
+  });
+  it('data comum nao é feriado', () => {
+    expect(_internals.isHoliday(new Date(2026, 4, 12))).toBe(false);
+  });
+  it('inclui feriados moveis (Pascoa 2026-04-05)', () => {
+    expect(_internals.isHoliday(new Date(2026, 3, 5))).toBe(true);
+  });
+});
+
+describe('getBusinessMinutesBetween — cenarios extras', () => {
+  it('ignora feriado entre dois dias uteis (Tiradentes 21/04/2026, segunda)', () => {
+    // 2026-04-20 = segunda; 21 = terça (feriado); 22 = quarta
+    const from = new Date(2026, 3, 20, 8, 0, 0);
+    const to   = new Date(2026, 3, 22, 8, 0, 0);
+    // Seg 20/04: 600 min; ter 21/04 = feriado = 0; qua 22/04: 0 (ainda 8h)
+    expect(getBusinessMinutesBetween(from, to)).toBe(600);
+  });
+
+  it('retorna 0 dentro de final de semana inteiro', () => {
+    const from = new Date(2026, 4, 16, 8, 0, 0); // sábado
+    const to   = new Date(2026, 4, 17, 18, 0, 0); // domingo
+    expect(getBusinessMinutesBetween(from, to)).toBe(0);
+  });
+
+  it('dois dias uteis completos = 1200 min', () => {
+    const from = new Date(2026, 4, 11, 8, 0, 0);  // segunda 08h
+    const to   = new Date(2026, 4, 12, 18, 0, 0); // terça 18h
+    expect(getBusinessMinutesBetween(from, to)).toBe(1200);
   });
 });
