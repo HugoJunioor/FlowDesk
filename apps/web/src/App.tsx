@@ -31,6 +31,7 @@ const NotificacoesV2Page = lazy(() => import("./modules/notificacao/pages/Notifi
 const ConfiguracoesV2Page = lazy(() => import("./modules/configuracoes/pages/ConfiguracoesV2Page.tsx"));
 const DemandasV2Page = lazy(() => import("./modules/demanda/pages/DemandasV2Page.tsx"));
 const StatusPage = lazy(() => import("./modules/status/pages/StatusPage.tsx"));
+const Sobre = lazy(() => import("./pages/Sobre.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Defaults sensatos pro React Query no padrao Just:
@@ -117,6 +118,7 @@ const AppRoutes = () => {
         {currentUser?.role === "master" && (
           <Route path="/auditoria" element={<AuditoriaPage />} />
         )}
+        <Route path="/sobre" element={<Sobre />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
