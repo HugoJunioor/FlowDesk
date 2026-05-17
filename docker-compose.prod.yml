@@ -1,0 +1,98 @@
+# FlowDesk — stack de producao (on-prem)
+#
+# Tres servicos:
+#   postgres  — banco de dados (volume nomeado, sem bind-mount)
+#   api       — backend Express, porta 4000 interna
+#   web       — nginx servindo o build estatico do Vite, porta 8080 interna
+#
+# O nginx do HOST (reverse proxy publico) e configurado separadamente —
+# veja docs/DEPLOY.md secao 4 para o bloco nginx/flowdesk.conf completo.
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml logs -f api
+#   docker compose -f docker-compose.prod.yml exec api npm run migrate -w @flowdesk/api
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowdesk-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flowdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: flowdesk
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C.UTF-8"
+      TZ: America/Sao_Paulo
+    volumes:
+      - flowdesk_db:/var/lib/postgresql/data
+    # Porta 5432 NAO exposta para o host — acesso apenas interno via rede Docker.
+    # Para administracao pontual: docker compose exec postgres psql -U flowdesk
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowdesk -d flowdesk"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - flowdesk-internal
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: flowdesk-api-prod
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - flowdesk-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: flowdesk-web-prod
+    restart: unless-stopped
+    # O build do frontend (apps/web/dist) deve ser gerado ANTES de subir:
+    #   npm run build -w @flowdesk/web
+    # O volume nomeado web_dist e populado via o comando na secao 3.4 do DEPLOY.md.
+    volumes:
+      - web_dist:/usr/share/nginx/html:ro
+      - ./nginx/web.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:8080:80"
+    networks:
+      - flowdesk-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  flowdesk_db:
+    name: flowdesk_db
+  web_dist:
+    name: flowdesk_web_dist
+
+networks:
+  flowdesk-internal:
+    driver: bridge
