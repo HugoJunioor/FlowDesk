@@ -67,7 +67,6 @@ function setupPoolMocks({
   }>;
   alreadyNotified?: boolean;
 } = {}) {
-  let callCount = 0;
   poolMock.query.mockImplementation(async (sql: string) => {
     const s = sql as string;
     // 1a query: demandas
