@@ -43,6 +43,54 @@ Matriz de 8 módulos × 5 ações por grupo, união automática quando o usuári
 ### Login
 ![Login](docs/screenshots/login.png)
 
+### Onboarding wizard
+Wizard de 3 passos exibido automaticamente ao master quando o dashboard
+está vazio — guia a configuração inicial do workspace (canal Slack, membros
+da equipe, preferências de SLA).
+
+![Onboarding wizard](docs/screenshots/onboarding.png)
+
+### Modo apresentação
+Fullscreen com fontes ampliadas, ideal para TVs de sala de reunião ou
+apresentações para clientes. Ativado via botão no sidebar.
+
+![Modo apresentação](docs/screenshots/presentation-mode.png)
+
+### Filtros avançados de demandas
+Sheet lateral em `/demandas-v2` com filtros combinados: cliente,
+prioridade, período, responsável e status — todos aplicáveis simultaneamente.
+
+![Filtros avançados](docs/screenshots/advanced-filters.png)
+
+### Auditoria com diff visual
+Trilha de auditoria com comparação campo a campo do payload antes/depois
+de cada mutação. Toggle "JSON bruto" exibe o payload completo para
+integrações e debugging.
+
+![Auditoria — diff visual](docs/screenshots/audit-diff.png)
+![Auditoria — JSON bruto](docs/screenshots/audit-diff-json.png)
+
+### Status da API + Healthcheck detailed
+Página `/status` na UI + endpoint `GET /api/v1/health/detailed` com checks
+individuais de banco de dados, uso de disco e memória — resposta estruturada
+com status `ok | degraded | error` por componente.
+
+![API status / healthcheck](docs/screenshots/api-status.png)
+
+### Notificações desktop
+Botão "Ativar notificações" no sidebar solicita permissão de Notification
+API do browser. Uma vez ativado, o usuário recebe push desktop a cada nova
+demanda ou menção, mesmo com o FlowDesk em background.
+
+![Notificações desktop](docs/screenshots/desktop-notifications.png)
+
+### Sync manual
+Botão "Sincronizar agora" no header do dashboard dispara `POST /sync/trigger`
+imediatamente, sem aguardar o ciclo automático de 5 minutos. Indicador visual
+de progresso durante a sincronização.
+
+![Sync manual](docs/screenshots/sync-manual.png)
+
 ## 🌐 Demo ao vivo
 
 **🔗 [flow-desk-e2is.vercel.app](https://flow-desk-e2is.vercel.app)**
@@ -123,6 +171,13 @@ Detalhes técnicos em [`src/adapters/README.md`](./src/adapters/README.md).
 - 🔐 **Autenticação** por usuário com sessão de 8h e troca obrigatória
   no primeiro acesso
 - 🔗 **Estado compartilhado** entre dispositivos via VPN/rede mesh
+- 🧙 **Onboarding wizard** — wizard 3 passos quando master acessa dashboard vazio
+- 📺 **Modo apresentação** — fullscreen com fontes ampliadas, ideal para TV/reunião
+- 🔍 **Filtros avançados de demandas** — sheet lateral com cliente, prioridade, período, responsável e status combinados
+- 🔎 **Auditoria com diff visual** — payload antes/depois campo a campo, com toggle "JSON bruto"
+- 🩺 **Healthcheck detailed** — `GET /api/v1/health/detailed` com checks de DB, disco e memória
+- 🔔 **Notificações desktop** — Notification API do browser ativável pelo sidebar
+- 🔄 **Sync manual** — botão no header do dashboard dispara sincronização imediata via `POST /sync/trigger`
 
 ### Pós-migração padrão Just (v2)
 
@@ -152,6 +207,9 @@ API:
 - **Slack:** @slack/web-api
 - **Excel:** xlsx-js-style
 - **Forms:** react-hook-form + zod
+- **Testes E2E:** Playwright (Chromium)
+- **Backend:** Express + pg Pool (Postgres 16) + Knex
+- **Observabilidade:** prom-client (métricas Prometheus), Sentry opt-in
 
 ## Pré-requisitos
 
@@ -198,8 +256,17 @@ Scripts do **frontend** (`apps/web/`):
 Scripts da **API** (`apps/api/`):
 - `migrate` / `seed` — Knex
 - `import:json` — JSON → Postgres (migração inicial)
+- `backup` — dump do banco local via `pg_dump` para `data/backups/`
 
 Banco local: `docker compose up -d` na raiz.
+
+### Endpoints notáveis da API
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/health` | Health básico (uptime, versão) |
+| `GET` | `/api/v1/health/detailed` | Checks de DB, disco e memória com status por componente |
+| `POST` | `/api/v1/sync/trigger` | Dispara sincronização manual com Slack imediatamente |
 
 ## Acesso inicial
 
