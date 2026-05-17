@@ -108,7 +108,9 @@ const AppRoutes = () => {
         <Route path="/demandas-sql" element={<DemandasSql />} />
         <Route path="/infra" element={<Infra />} />
         <Route path="/notificacoes" element={<Notificacoes />} />
-        <Route path="/notas" element={<Notas />} />
+        {/* /notas agora aponta pro modulo padrao Just (NotasV2Page).
+            Legacy Notas.tsx mantido por 1 release — remover na proxima. */}
+        <Route path="/notas" element={<NotasV2Page />} />
         <Route path="/notas-v2" element={<NotasV2Page />} />
         <Route path="/notificacoes-v2" element={<NotificacoesV2Page />} />
         <Route path="/configuracoes-v2" element={<ConfiguracoesV2Page />} />
