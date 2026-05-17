@@ -143,4 +143,81 @@ describe('demandaService', () => {
       demandaService.remove('id', { nome: 'M', email: 'm@just.com.br', perfil: 'master' }),
     ).resolves.toBeUndefined();
   });
+
+  it('soft delete: id da demanda é preservado (softDelete chamado com id original)', async () => {
+    const d = fake({ id: '00000000-0000-4000-8000-000000000042' });
+    repoMock.findById.mockResolvedValue(d);
+    repoMock.softDelete.mockResolvedValue(true);
+    await demandaService.remove(
+      '00000000-0000-4000-8000-000000000042',
+      { nome: 'M', email: 'm@just.com.br', perfil: 'master' },
+    );
+    expect(repoMock.softDelete).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000042');
+  });
+
+  it('list com filtro de status passa para o repository', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    await demandaService.list({ pagina: 1, limite: 10, status: 'aberta' });
+    expect(repoMock.list).toHaveBeenCalledWith(expect.objectContaining({ status: 'aberta' }));
+  });
+
+  it('list com filtro de busca passa para o repository', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    await demandaService.list({ pagina: 1, limite: 10, busca: 'sql' });
+    expect(repoMock.list).toHaveBeenCalledWith(expect.objectContaining({ busca: 'sql' }));
+  });
+
+  it('list com filtro de responsavel passa para o repository', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    await demandaService.list({ pagina: 1, limite: 10, responsavel: 'Tiago' });
+    expect(repoMock.list).toHaveBeenCalledWith(expect.objectContaining({ responsavel: 'Tiago' }));
+  });
+
+  it('totalPaginas nunca fica abaixo de 1 mesmo sem resultados', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    const result = await demandaService.list({ pagina: 1, limite: 10 });
+    expect(result.totalPaginas).toBe(1);
+  });
+
+  it('update apenas com campos permitidos (nao toca campos nao enviados)', async () => {
+    repoMock.findById.mockResolvedValue(fake());
+    repoMock.update.mockResolvedValue(fake({ titulo: 'atualizado' }));
+    // Enviamos apenas titulo — o service nao deve modificar outros campos
+    await demandaService.update('id', { titulo: 'atualizado' }, actor);
+    expect(repoMock.update).toHaveBeenCalledWith('id', expect.objectContaining({ titulo: 'atualizado' }));
+    // Nao deve ter passado campos que nao estavam no input
+    const callArg = repoMock.update.mock.calls[0]?.[1];
+    expect(callArg).not.toHaveProperty('status');
+    expect(callArg).not.toHaveProperty('solicitanteNome');
+  });
+
+  it('concluir com sucesso via responsavel', async () => {
+    repoMock.findById.mockResolvedValue(fake({ status: 'em_andamento' }));
+    repoMock.update.mockResolvedValue(fake({ status: 'concluida' }));
+    const result = await demandaService.concluir('id', actor);
+    expect(result.status).toBe('concluida');
+    expect(repoMock.update).toHaveBeenCalledWith('id', { status: 'concluida' });
+  });
+
+  it('concluir via reaction (master pode concluir qualquer demanda)', async () => {
+    repoMock.findById.mockResolvedValue(fake({ status: 'em_andamento', responsavelNome: 'Outro' }));
+    repoMock.update.mockResolvedValue(fake({ status: 'concluida' }));
+    const result = await demandaService.concluir(
+      'id',
+      { nome: 'Master', email: 'm@just.com.br', perfil: 'master' },
+    );
+    expect(result.status).toBe('concluida');
+  });
+
+  it('concluir bloqueia user que nao é responsavel', async () => {
+    repoMock.findById.mockResolvedValue(fake({ responsavelNome: 'Outro' }));
+    await expect(demandaService.concluir('id', actor)).rejects.toThrow(ForbiddenError);
+  });
+
+  it('findById retorna demanda quando existe', async () => {
+    const d = fake({ id: '00000000-0000-4000-8000-000000000001' });
+    repoMock.findById.mockResolvedValue(d);
+    const result = await demandaService.findById('00000000-0000-4000-8000-000000000001');
+    expect(result.id).toBe('00000000-0000-4000-8000-000000000001');
+  });
 });

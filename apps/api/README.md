@@ -116,6 +116,41 @@ Por padrao `OPENAPI_ENABLED=true`. Recomendado desabilitar em prod para nao expo
 | `npm run test:coverage` | jest com coverage |
 | `npm run lint` | eslint src/**/*.ts |
 | `npm run typecheck` | tsc --noEmit |
+
+### Rodar testes com cobertura
+
+Da raiz do monorepo:
+
+```bash
+npm test -w @flowdesk/api -- --coverage
+```
+
+Ou dentro de `apps/api/`:
+
+```bash
+npm test -- --coverage
+```
+
+O relatório é exibido no terminal. Para testar um módulo específico:
+
+```bash
+npm test -w @flowdesk/api -- --testPathPattern="auth"
+npm test -w @flowdesk/api -- --testPathPattern="demanda"
+npm test -w @flowdesk/api -- --testPathPattern="sla"
+npm test -w @flowdesk/api -- --testPathPattern="auditoria"
+```
+
+### Estrutura dos testes
+
+```
+src/
+├── __tests__/helpers/
+│   ├── auth.ts          # createAuthenticatedUser({ role }) → { token, user, authHeader }
+│   └── app.ts           # createTestApp() — Express sem openapi (para supertest)
+├── modules/<modulo>/__tests__/
+│   ├── <modulo>.service.spec.ts   # testes unitários com mocks de repository
+│   └── <modulo>.routes.spec.ts    # testes de integração com supertest
+└── shared/
 | `npm run migrate` | knex migrate:latest |
 | `npm run migrate:make <nome>` | cria nova migration ts |
 | `npm run seed` | knex seed:run |

@@ -62,6 +62,48 @@ describe('auditService', () => {
     expect(repoMock.log).toHaveBeenCalled();
   });
 
+  it('sanitiza campos authorization, accessToken e refreshToken', async () => {
+    auditService.log({
+      usuarioEmail: null,
+      recurso: 'auth',
+      acao: 'login',
+      payloadDepois: {
+        authorization: 'Bearer jwt-abc',
+        accessToken: 'jwt-xyz',
+        refreshToken: 'refresh-xyz',
+        usuario: 'hugo',
+      },
+    });
+    await new Promise((r) => setImmediate(r));
+    const call = repoMock.log.mock.calls[0]?.[0];
+    const payload = call!.payloadDepois as Record<string, unknown>;
+    expect(payload.authorization).toBe('[REDACTED]');
+    expect(payload.accessToken).toBe('[REDACTED]');
+    expect(payload.refreshToken).toBe('[REDACTED]');
+    expect(payload.usuario).toBe('hugo');
+  });
+
+  it('sanitiza arrays que contem objetos sensiveis', async () => {
+    auditService.log({
+      usuarioEmail: null,
+      recurso: 'test',
+      acao: 'test',
+      payloadDepois: {
+        items: [
+          { nome: 'x', senha: 'secreta' },
+          { nome: 'y', valor: 42 },
+        ],
+      },
+    });
+    await new Promise((r) => setImmediate(r));
+    const call = repoMock.log.mock.calls[0]?.[0];
+    const payload = call!.payloadDepois as Record<string, unknown>;
+    const items = payload.items as Array<Record<string, unknown>>;
+    expect(items[0]?.senha).toBe('[REDACTED]');
+    expect(items[0]?.nome).toBe('x');
+    expect(items[1]?.valor).toBe(42);
+  });
+
   it('extrai contexto de req quando passado', async () => {
     const fakeReq = {
       ip: '192.168.1.10',

@@ -54,4 +54,50 @@ describe('auditoriaService', () => {
     const result = await auditoriaService.list({ pagina: 1, limite: 10 });
     expect(result.totalPaginas).toBe(1);
   });
+
+  it('pagina e limite sao propagados para a resposta', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    const result = await auditoriaService.list({ pagina: 3, limite: 20 });
+    expect(result.pagina).toBe(3);
+    expect(result.limite).toBe(20);
+  });
+
+  it('count correto quando total não é múltiplo do limite', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 101 });
+    const result = await auditoriaService.list({ pagina: 1, limite: 50 });
+    // ceil(101/50) = 3
+    expect(result.totalPaginas).toBe(3);
+    expect(result.total).toBe(101);
+  });
+
+  it('passa filtro de periodo (from/to) para o repository', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    const from = '2026-01-01T00:00:00.000Z';
+    const to = '2026-01-31T23:59:59.000Z';
+    await auditoriaService.list({ pagina: 1, limite: 50, from, to });
+    expect(repoMock.list).toHaveBeenCalledWith(expect.objectContaining({ from, to }));
+  });
+
+  it('filtro por recurso + acao + usuario propagado ao repository', async () => {
+    repoMock.list.mockResolvedValue({ rows: [], total: 0 });
+    await auditoriaService.list({
+      pagina: 1,
+      limite: 10,
+      recurso: 'demanda',
+      acao: 'update',
+      usuarioEmail: 'hugo@just.com.br',
+    });
+    expect(repoMock.list).toHaveBeenCalledWith(expect.objectContaining({
+      recurso: 'demanda',
+      acao: 'update',
+      usuarioEmail: 'hugo@just.com.br',
+    }));
+  });
+
+  it('resposta inclui dados corretos da entry retornada pelo repo', async () => {
+    const entry = fake({ recurso: 'auth', acao: 'login' });
+    repoMock.list.mockResolvedValue({ rows: [entry], total: 1 });
+    const result = await auditoriaService.list({ pagina: 1, limite: 10 });
+    expect(result.dados[0]).toMatchObject({ recurso: 'auth', acao: 'login' });
+  });
 });
