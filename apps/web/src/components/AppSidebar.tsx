@@ -152,15 +152,15 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
             to="/notas"
             onClick={() => setMobileOpen(false)}
             className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-              location.pathname === "/notas"
+              location.pathname === "/notas" || location.pathname === "/notas-v2"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
             }`}
           >
-            {location.pathname === "/notas" && (
+            {(location.pathname === "/notas" || location.pathname === "/notas-v2") && (
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
             )}
-            <StickyNote size={20} className={location.pathname === "/notas" ? "text-sidebar-primary" : ""} />
+            <StickyNote size={20} className={location.pathname === "/notas" || location.pathname === "/notas-v2" ? "text-sidebar-primary" : ""} />
             {!collapsed && <span>Notas</span>}
           </NavLink>
 

@@ -50,6 +50,11 @@ interface EditorState {
 }
 
 const Notas = () => {
+  // @deprecated — esta pagina usa o stack legacy (stateSync.mjs + data/notes.json).
+  // A rota /notas foi redirecionada para NotasV2Page (modulo padrao Just).
+  // Este componente sera removido na proxima release.
+  console.warn('[DEPRECATED] Notas legacy: este componente sera removido na proxima release. Use NotasV2Page (/notas).');
+
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const email = currentUser?.email || "";
