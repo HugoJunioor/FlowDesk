@@ -145,9 +145,14 @@ export const apiClient = {
         demoFallback: { ok: true },
       }),
     channelMembers: (channel: string) =>
-      request<{ channel: string; members: SlackChannelMember[] }>(
+      request<{
+        channel: string;
+        members: SlackChannelMember[];
+        source?: "channel" | "workspace";
+        diagnostics?: string[];
+      }>(
         `/slack/channel-members?channel=${encodeURIComponent(channel)}`,
-        { demoFallback: { channel, members: [] } }
+        { demoFallback: { channel, members: [], source: "channel" as const } }
       ),
     threadReplies: (permalink: string) =>
       request<{
