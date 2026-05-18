@@ -57,6 +57,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [channelMembers, setChannelMembers] = useState<SlackChannelMember[]>([]);
+  const [membersSource, setMembersSource] = useState<"channel" | "workspace">("channel");
   const [membersLoading, setMembersLoading] = useState(false);
   // Indica se o user logado tem token Slack OAuth — UI mostra discreto
   // entre toolbar e textarea pra deixar claro como sera postado
@@ -103,16 +104,16 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
       .then((res) => {
         if (!cancelled) {
           setChannelMembers(res.members);
-          if (res.members.length === 0) {
+          setMembersSource(res.source ?? "channel");
+          if (res.diagnostics?.length) {
             console.warn(
-              `[composer] /slack/channel-members retornou 0 membros para "${demand.slackChannel}". ` +
-              "Causas possiveis: bot fora do canal (/invite @justflow), " +
-              "escopos faltando (users:read + channels:read/groups:read), " +
-              "ou nome do canal nao casa."
+              `[composer] channel-members diagnostico para "${demand.slackChannel}":`,
+              res.diagnostics,
             );
-          } else {
-            console.debug(`[composer] ${res.members.length} membros do canal "${demand.slackChannel}"`);
           }
+          console.debug(
+            `[composer] ${res.members.length} usuarios (${res.source ?? "channel"}) para "${demand.slackChannel}"`,
+          );
         }
       })
       .catch((err) => {
@@ -593,12 +594,19 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                 <AtSign size={10} /> Mencionar
                 {membersLoading ? (
                   <span className="ml-auto opacity-70 normal-case">buscando...</span>
-                ) : channelMembers.length > 0 ? (
+                ) : channelMembers.length > 0 && membersSource === "channel" ? (
                   <span className="ml-auto opacity-70 normal-case">{channelMembers.length} no canal</span>
+                ) : channelMembers.length > 0 && membersSource === "workspace" ? (
+                  <span
+                    className="ml-auto opacity-70 normal-case"
+                    title="Bot nao acessou membros deste canal; mostrando todos do workspace. Mention ainda notifica."
+                  >
+                    {channelMembers.length} no workspace
+                  </span>
                 ) : (
                   <span
                     className="ml-auto opacity-70 normal-case text-warning"
-                    title="Bot nao retornou membros do canal. Mention nao vai notificar no Slack. Convide @justflow no canal ou confira escopos users:read/channels:read."
+                    title="Bot nao retornou nem membros do canal nem do workspace. Confira escopos users:read e channels:read no app Slack."
                   >
                     só thread (sem notificar)
                   </span>
