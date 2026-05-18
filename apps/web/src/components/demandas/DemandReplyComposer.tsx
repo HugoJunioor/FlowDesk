@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { apiClient, ApiError, type SlackChannelMember } from "@/lib/apiClient";
+import { getCaretCoordinates } from "@/lib/caretCoordinates";
 import EmojiPicker from "./EmojiPicker";
 import { useAuth } from "@/contexts/AuthContext";
 import type { SlackDemand } from "@/types/demand";
@@ -68,23 +69,21 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   // Mantido como ref pra nao causar re-render. Persiste enquanto o composer estiver montado.
   const mentionMapRef = useRef<Map<string, string>>(new Map());
 
-  // Atualiza posicao do dropdown quando rola/redimensiona (mantem ancorado ao textarea).
-  // Posiciona ACIMA do textarea se houver espaco; caso contrario abaixo.
+  // Atualiza posicao do dropdown quando rola/redimensiona.
+  // Posiciona ABAIXO do caret (cursor); se nao couber, ACIMA do caret.
   useEffect(() => {
     if (!mentionAnchor) return;
     const updatePos = () => {
       const ta = textareaRef.current;
       if (!ta) return;
-      const rect = ta.getBoundingClientRect();
-      const dropdownMaxHeight = 288; // max-h-72 = 18rem = 288px
-      const spaceAbove = rect.top;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      // Prefere acima quando ha pelo menos 200px ou mais espaco que abaixo
-      const placeAbove = spaceAbove > 200 || spaceAbove > spaceBelow;
-      const top = placeAbove
-        ? Math.max(8, rect.top - Math.min(dropdownMaxHeight, spaceAbove - 8) - 4)
-        : rect.bottom + 4;
-      setMentionAnchor({ top, left: rect.left });
+      const caret = getCaretCoordinates(ta, mentionCursorRef.current);
+      const dropdownMaxHeight = 288;
+      const spaceBelow = window.innerHeight - (caret.top + caret.height);
+      const placeBelow = spaceBelow > 200;
+      const top = placeBelow
+        ? caret.top + caret.height + 4
+        : Math.max(8, caret.top - Math.min(dropdownMaxHeight, caret.top - 8) - 4);
+      setMentionAnchor({ top, left: caret.left });
     };
     window.addEventListener("scroll", updatePos, true); // capture: pega scroll de qualquer ancestral
     window.addEventListener("resize", updatePos);
@@ -101,8 +100,28 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     let cancelled = false;
     setMembersLoading(true);
     apiClient.slack.channelMembers(demand.slackChannel)
-      .then((res) => { if (!cancelled) setChannelMembers(res.members); })
-      .catch((err) => { console.warn("[composer] channel-members fetch falhou:", err); })
+      .then((res) => {
+        if (!cancelled) {
+          setChannelMembers(res.members);
+          if (res.members.length === 0) {
+            console.warn(
+              `[composer] /slack/channel-members retornou 0 membros para "${demand.slackChannel}". ` +
+              "Causas possiveis: bot fora do canal (/invite @justflow), " +
+              "escopos faltando (users:read + channels:read/groups:read), " +
+              "ou nome do canal nao casa."
+            );
+          } else {
+            console.debug(`[composer] ${res.members.length} membros do canal "${demand.slackChannel}"`);
+          }
+        }
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[composer] /slack/channel-members FALHOU para "${demand.slackChannel}": ${msg}`,
+          err
+        );
+      })
       .finally(() => { if (!cancelled) setMembersLoading(false); });
     return () => { cancelled = true; };
   }, [demand.slackChannel]);
@@ -519,15 +538,14 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
               setMentionFilter(m[1]);
               setMentionSelectedIdx(0); // reset selecao a cada novo filtro
               mentionCursorRef.current = cursor;
-              const rect = ta.getBoundingClientRect();
+              const caret = getCaretCoordinates(ta, cursor);
               const dropdownMaxHeight = 288;
-              const spaceAbove = rect.top;
-              const spaceBelow = window.innerHeight - rect.bottom;
-              const placeAbove = spaceAbove > 200 || spaceAbove > spaceBelow;
-              const top = placeAbove
-                ? Math.max(8, rect.top - Math.min(dropdownMaxHeight, spaceAbove - 8) - 4)
-                : rect.bottom + 4;
-              setMentionAnchor({ top, left: rect.left });
+              const spaceBelow = window.innerHeight - (caret.top + caret.height);
+              const placeBelow = spaceBelow > 200;
+              const top = placeBelow
+                ? caret.top + caret.height + 4
+                : Math.max(8, caret.top - Math.min(dropdownMaxHeight, caret.top - 8) - 4);
+              setMentionAnchor({ top, left: caret.left });
             } else {
               setMentionFilter(null);
               setMentionAnchor(null);
