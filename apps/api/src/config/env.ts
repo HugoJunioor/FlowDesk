@@ -43,6 +43,12 @@ const envSchema = z.object({
   SLA_CRON_ENABLED: z.coerce.boolean().default(false),
   /** Intervalo em segundos entre runs do cron */
   SLA_CRON_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  // Slack Events API webhook.
+  // SLACK_WEBHOOK_ENABLED=true ativa a rota /api/v1/slack/events.
+  // SLACK_SIGNING_SECRET e obrigatorio quando SLACK_WEBHOOK_ENABLED=true em producao.
+  SLACK_WEBHOOK_ENABLED: z.coerce.boolean().default(false),
+  SLACK_SIGNING_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
