@@ -19,7 +19,18 @@ const __dirname = path.dirname(__filename);
 
 // Carrega .env do root do projeto pra dentro de process.env.
 // Vite so expoe VITE_* pro client; plugin Node precisa de dotenv explicito.
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
+// override:true garante que .env sobrescreva variaveis persistentes da sessao.
+// Tenta primeiro apps/web/.env, depois raiz do monorepo.
+const envPaths = [
+  path.join(__dirname, "..", ".env"),
+  path.join(__dirname, "..", "..", "..", ".env"),
+];
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p, override: true });
+    break;
+  }
+}
 
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
 const TOKEN_FILE = path.join(__dirname, "..", "data", "auth-token");

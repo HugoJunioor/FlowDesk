@@ -11,7 +11,7 @@
  *
  * Uso: node scripts/syncSqlChannel.cjs
  */
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const { WebClient } = require('@slack/web-api');
 const fs = require('fs');
 const path = require('path');
