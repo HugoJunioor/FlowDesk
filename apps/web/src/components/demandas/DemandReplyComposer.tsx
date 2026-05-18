@@ -68,14 +68,23 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   // Mantido como ref pra nao causar re-render. Persiste enquanto o composer estiver montado.
   const mentionMapRef = useRef<Map<string, string>>(new Map());
 
-  // Atualiza posicao do dropdown quando rola/redimensiona (mantem ancorado ao textarea)
+  // Atualiza posicao do dropdown quando rola/redimensiona (mantem ancorado ao textarea).
+  // Posiciona ACIMA do textarea se houver espaco; caso contrario abaixo.
   useEffect(() => {
     if (!mentionAnchor) return;
     const updatePos = () => {
       const ta = textareaRef.current;
       if (!ta) return;
       const rect = ta.getBoundingClientRect();
-      setMentionAnchor({ top: rect.bottom + 4, left: rect.left });
+      const dropdownMaxHeight = 288; // max-h-72 = 18rem = 288px
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // Prefere acima quando ha pelo menos 200px ou mais espaco que abaixo
+      const placeAbove = spaceAbove > 200 || spaceAbove > spaceBelow;
+      const top = placeAbove
+        ? Math.max(8, rect.top - Math.min(dropdownMaxHeight, spaceAbove - 8) - 4)
+        : rect.bottom + 4;
+      setMentionAnchor({ top, left: rect.left });
     };
     window.addEventListener("scroll", updatePos, true); // capture: pega scroll de qualquer ancestral
     window.addEventListener("resize", updatePos);
@@ -260,17 +269,26 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     e.target.value = ""; // permite selecionar o mesmo arquivo de novo
   };
 
-  // Converte @Nome (visual) em <@SLACK_ID> (formato Slack) usando o mentionMap.
+  // Converte @Nome (visual) em <@SLACK_ID> (formato Slack).
+  // Combina o mentionMap (preenchido ao selecionar do dropdown) com lookup
+  // automatico em mentionablePeople pra cobrir @Nome digitado sem clicar.
   // Ordena por tamanho desc pra evitar match parcial (ex: "Ana" antes de "Ana Maria").
   const expandMentions = (raw: string): string => {
-    const entries = Array.from(mentionMapRef.current.entries())
+    const map = new Map(mentionMapRef.current);
+    // Fallback: adiciona TODOS os membros do canal com slackId
+    // (permite digitar @NomeCompleto e o sistema mapeia)
+    mentionablePeople.forEach((p) => {
+      if (p.slackId && !map.has(p.name)) {
+        map.set(p.name, p.slackId);
+      }
+    });
+    const entries = Array.from(map.entries())
       .sort((a, b) => b[0].length - a[0].length);
     let out = raw;
     for (const [name, id] of entries) {
       // Escapa metacaracteres regex no nome
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      // \B@ pra permitir mention no inicio de uma palavra precedida por espaco/inicio,
-      // e (?!\w) pra nao casar @AnaMaria quando o map so tem "Ana"
+      // (?!\w) pra nao casar @AnaMaria quando o map so tem "Ana"
       const re = new RegExp(`@${escaped}(?!\\w)`, "g");
       out = out.replace(re, `<@${id}>`);
     }
@@ -502,10 +520,14 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
               setMentionSelectedIdx(0); // reset selecao a cada novo filtro
               mentionCursorRef.current = cursor;
               const rect = ta.getBoundingClientRect();
-              setMentionAnchor({
-                top: rect.bottom + 4,
-                left: rect.left,
-              });
+              const dropdownMaxHeight = 288;
+              const spaceAbove = rect.top;
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const placeAbove = spaceAbove > 200 || spaceAbove > spaceBelow;
+              const top = placeAbove
+                ? Math.max(8, rect.top - Math.min(dropdownMaxHeight, spaceAbove - 8) - 4)
+                : rect.bottom + 4;
+              setMentionAnchor({ top, left: rect.left });
             } else {
               setMentionFilter(null);
               setMentionAnchor(null);
@@ -556,7 +578,12 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                 ) : channelMembers.length > 0 ? (
                   <span className="ml-auto opacity-70 normal-case">{channelMembers.length} no canal</span>
                 ) : (
-                  <span className="ml-auto opacity-70 normal-case">só thread</span>
+                  <span
+                    className="ml-auto opacity-70 normal-case text-warning"
+                    title="Bot nao retornou membros do canal. Mention nao vai notificar no Slack. Convide @justflow no canal ou confira escopos users:read/channels:read."
+                  >
+                    só thread (sem notificar)
+                  </span>
                 )}
               </div>
               {filtered.length === 0 ? (
