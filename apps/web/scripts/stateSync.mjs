@@ -622,55 +622,102 @@ async function handleSlack(req, res) {
       return res.end(JSON.stringify({ replies: enriched, count: enriched.length }));
     }
 
-    // GET /slack/channel-members?channel=C123 — lista membros pra mention autocomplete
+    // GET /slack/channel-members?channel=C123 — lista membros pra mention autocomplete.
+    // Estrategia: tenta canal especifico. Se falhar ou vier vazio,
+    // faz fallback pra users.list (workspace inteiro) — assim mention sempre tem opcoes.
     if (req.method === "GET" && url.startsWith("/slack/channel-members")) {
       const u = new URL(url, "http://localhost");
       const channel = u.searchParams.get("channel");
       if (!channel) { res.statusCode = 400; return res.end(JSON.stringify({ error: "channel obrigatorio" })); }
       const cleanCh = channel.replace(/^#/, "");
 
-      // 1) Resolve channel name -> ID se necessario
+      const diagnostics = [];
+      let source = "channel"; // ou "workspace"
       let channelId = cleanCh;
-      if (!cleanCh.match(/^[A-Z0-9]{8,}$/)) {
-        // Nao parece ID, busca pelo nome
-        const list = await slackApi("conversations.list", { types: "public_channel,private_channel", limit: 1000 }, true);
-        const found = list.channels?.find((c) => c.name === cleanCh);
-        if (!found) { res.statusCode = 404; return res.end(JSON.stringify({ error: `Canal #${cleanCh} nao encontrado` })); }
-        channelId = found.id;
-      }
+      let users = [];
 
-      // 2) Busca membros (paginado)
-      const memberIds = [];
-      let cursor;
-      do {
-        const r = await slackApi("conversations.members",
-          { channel: channelId, limit: 200, ...(cursor ? { cursor } : {}) },
-          true);
-        memberIds.push(...(r.members || []));
-        cursor = r.response_metadata?.next_cursor;
-      } while (cursor);
+      try {
+        // 1) Resolve channel name -> ID se necessario
+        if (!cleanCh.match(/^[A-Z0-9]{8,}$/)) {
+          const list = await slackApi("conversations.list", { types: "public_channel,private_channel", limit: 1000 }, true);
+          const found = list.channels?.find((c) => c.name === cleanCh);
+          if (!found) {
+            diagnostics.push(`Canal "${cleanCh}" nao encontrado em conversations.list (bot pode nao estar no canal)`);
+            throw new Error("channel_not_found");
+          }
+          channelId = found.id;
+        }
 
-      // 3) Busca info de cada user (paralelo, mas batch limitado pra nao 429)
-      const users = [];
-      const batchSize = 10;
-      for (let i = 0; i < memberIds.length; i += batchSize) {
-        const batch = memberIds.slice(i, i + batchSize);
-        const infos = await Promise.all(batch.map((id) =>
-          slackApi("users.info", { user: id }, true).catch(() => null)
-        ));
-        for (const u of infos) {
-          if (u?.user && !u.user.deleted && !u.user.is_bot) {
-            users.push({
-              id: u.user.id,
-              name: u.user.real_name || u.user.profile?.display_name || u.user.name,
-              email: u.user.profile?.email,
-              avatar: u.user.profile?.image_24,
-            });
+        // 2) Busca membros (paginado)
+        const memberIds = [];
+        let cursor;
+        do {
+          const r = await slackApi("conversations.members",
+            { channel: channelId, limit: 200, ...(cursor ? { cursor } : {}) },
+            true);
+          memberIds.push(...(r.members || []));
+          cursor = r.response_metadata?.next_cursor;
+        } while (cursor);
+
+        if (memberIds.length === 0) {
+          diagnostics.push(`conversations.members retornou 0 IDs (bot pode nao ter users:read)`);
+          throw new Error("no_members");
+        }
+
+        // 3) Busca info de cada user (paralelo, mas batch limitado pra nao 429)
+        const batchSize = 10;
+        for (let i = 0; i < memberIds.length; i += batchSize) {
+          const batch = memberIds.slice(i, i + batchSize);
+          const infos = await Promise.all(batch.map((id) =>
+            slackApi("users.info", { user: id }, true).catch(() => null)
+          ));
+          for (const u of infos) {
+            if (u?.user && !u.user.deleted && !u.user.is_bot) {
+              users.push({
+                id: u.user.id,
+                name: u.user.real_name || u.user.profile?.display_name || u.user.name,
+                email: u.user.profile?.email,
+                avatar: u.user.profile?.image_24,
+              });
+            }
           }
         }
+      } catch (err) {
+        diagnostics.push(`canal: ${err.message || err}`);
       }
+
+      // 4) Fallback: workspace inteiro via users.list
+      if (users.length === 0) {
+        source = "workspace";
+        try {
+          let cursor;
+          do {
+            const r = await slackApi("users.list",
+              { limit: 200, ...(cursor ? { cursor } : {}) },
+              true);
+            for (const m of (r.members || [])) {
+              if (m.deleted || m.is_bot || m.id === "USLACKBOT") continue;
+              users.push({
+                id: m.id,
+                name: m.real_name || m.profile?.display_name || m.name,
+                email: m.profile?.email,
+                avatar: m.profile?.image_24,
+              });
+            }
+            cursor = r.response_metadata?.next_cursor;
+          } while (cursor);
+        } catch (err) {
+          diagnostics.push(`workspace fallback: ${err.message || err}`);
+        }
+      }
+
       users.sort((a, b) => a.name.localeCompare(b.name));
-      return res.end(JSON.stringify({ channel: channelId, members: users }));
+      return res.end(JSON.stringify({
+        channel: channelId,
+        members: users,
+        source,
+        ...(diagnostics.length > 0 ? { diagnostics } : {}),
+      }));
     }
 
     // POST /slack/edit { permalink, replyTimestamp, newText, senderEmail? }
