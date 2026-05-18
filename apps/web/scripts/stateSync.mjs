@@ -21,15 +21,24 @@ const __dirname = path.dirname(__filename);
 // Vite so expoe VITE_* pro client; plugin Node precisa de dotenv explicito.
 // override:true garante que .env sobrescreva variaveis persistentes da sessao.
 // Tenta primeiro apps/web/.env, depois raiz do monorepo.
-const envPaths = [
-  path.join(__dirname, "..", ".env"),
-  path.join(__dirname, "..", "..", "..", ".env"),
-];
-for (const p of envPaths) {
-  if (fs.existsSync(p)) {
-    dotenv.config({ path: p, override: true });
-    break;
+{
+  const envPaths = [
+    path.join(__dirname, "..", ".env"),
+    path.join(__dirname, "..", "..", "..", ".env"),
+  ];
+  let loaded = null;
+  for (const p of envPaths) {
+    if (fs.existsSync(p)) {
+      dotenv.config({ path: p, override: true });
+      loaded = p;
+      break;
+    }
   }
+  const tok = process.env.SLACK_BOT_TOKEN;
+  console.log(
+    `[stateSync] dotenv ${loaded ? "carregado de " + loaded : "NAO encontrou .env (testou: " + envPaths.join(", ") + ")"}; ` +
+    `SLACK_BOT_TOKEN: ${tok ? tok.substring(0, 12) + "...(" + tok.length + " chars)" : "<vazio>"}`
+  );
 }
 
 const STATE_FILE = path.join(__dirname, "..", "data", "shared-state.json");
