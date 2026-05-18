@@ -141,15 +141,24 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
   // da thread (alguns que comentaram podem nao estar no canal). Dedup por nome.
   const mentionablePeople: Array<{ name: string; slackId?: string; email?: string; avatar?: string }> = (() => {
     const byName = new Map<string, { name: string; slackId?: string; email?: string; avatar?: string }>();
+    // Filtra nomes invalidos: vazios, "_", "-", "?", "unknown", "slackbot"
+    const isValidName = (n?: string | null): n is string => {
+      if (!n) return false;
+      const trimmed = n.trim();
+      if (trimmed.length < 2) return false;
+      const lower = trimmed.toLowerCase();
+      return !["_", "-", "?", "n/a", "unknown", "slackbot"].includes(lower);
+    };
     // Primeiro adiciona thread participants (sem slack_id)
     const seen = new Set<string>();
-    if (demand.assignee?.name) seen.add(demand.assignee.name);
-    demand.cc?.forEach((c) => seen.add(c));
-    demand.threadReplies?.forEach((r) => r.author && seen.add(r.author));
-    if (demand.requester?.name) seen.add(demand.requester.name);
+    if (isValidName(demand.assignee?.name)) seen.add(demand.assignee!.name);
+    demand.cc?.forEach((c) => isValidName(c) && seen.add(c));
+    demand.threadReplies?.forEach((r) => isValidName(r.author) && seen.add(r.author));
+    if (isValidName(demand.requester?.name)) seen.add(demand.requester!.name);
     Array.from(seen).forEach((n) => byName.set(n.toLowerCase(), { name: n }));
     // Depois sobrescreve com membros do canal (que tem slack_id)
     channelMembers.forEach((m) => {
+      if (!isValidName(m.name)) return;
       byName.set(m.name.toLowerCase(), {
         name: m.name,
         slackId: m.id,
