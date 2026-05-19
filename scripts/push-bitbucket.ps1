@@ -27,8 +27,12 @@ git pull --ff-only origin main
 
 # 3. Cria/atualiza branch bitbucket-main
 Write-Host "[2/5] Preparando branch bitbucket-main..." -ForegroundColor Cyan
-git branch -D bitbucket-main 2>$null
-git checkout -b bitbucket-main
+$exists = git branch --list bitbucket-main
+if ($exists) {
+  git branch -D bitbucket-main | Out-Null
+  Write-Host "  Branch bitbucket-main antiga removida." -ForegroundColor DarkGray
+}
+git checkout -b bitbucket-main | Out-Null
 
 # 4. Force-add dos arquivos gitignored com branding Just
 Write-Host "[3/5] Adicionando arquivos Just (force)..." -ForegroundColor Cyan
