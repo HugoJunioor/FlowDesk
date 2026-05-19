@@ -173,6 +173,16 @@ export interface ClosureFields {
   };
 }
 
+/** Mensagem do chat interno de uma demanda interna */
+export interface InfraChatMessage {
+  id: string;
+  autor: string;
+  texto: string;
+  timestamp: string;
+  /** Anexos opcionais enviados junto com a mensagem */
+  files?: ClosureAttachment[];
+}
+
 export interface SlackDemand {
   id: string;
   title: string;
@@ -230,10 +240,15 @@ export interface SlackDemand {
    */
   infraExternalLink?: string;
   /**
-   * Anexos da demanda interna (base64 inline, max 5MB cada).
+   * Anexos da demanda interna (base64 inline, max 25MB cada).
    * Reusa estrutura ClosureAttachment ja existente.
    */
   infraAttachments?: ClosureAttachment[];
+  /**
+   * Chat interno da demanda — mensagens trocadas entre solicitante e responsavel
+   * dentro do FlowDesk (separado do Slack).
+   */
+  chat?: InfraChatMessage[];
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;

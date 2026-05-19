@@ -952,6 +952,78 @@ async function handleInfra(req, res) {
     return res.end(JSON.stringify({ ok: true }));
   }
 
+  // GET /infra/demands/:id/chat — lista mensagens do chat interno
+  const chatGetMatch = url.match(/^\/infra\/demands\/([^/]+)\/chat$/);
+  if (req.method === "GET" && chatGetMatch) {
+    const id = decodeURIComponent(chatGetMatch[1]);
+    const demands = readInfraDemands();
+    const demand = demands.find((d) => d.id === id);
+    if (!demand) {
+      res.statusCode = 404;
+      return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+    }
+    return res.end(JSON.stringify({ messages: demand.chat || [] }));
+  }
+
+  // POST /infra/demands/:id/chat — envia mensagem no chat interno
+  const chatPostMatch = url.match(/^\/infra\/demands\/([^/]+)\/chat$/);
+  if (req.method === "POST" && chatPostMatch) {
+    try {
+      const id = decodeURIComponent(chatPostMatch[1]);
+      const { autor, texto, files } = JSON.parse(await readBody(req));
+      if (!autor || !texto || !texto.trim()) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "autor e texto sao obrigatorios" }));
+      }
+      const demands = readInfraDemands();
+      const idx = demands.findIndex((d) => d.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+      }
+      if (!demands[idx].chat) demands[idx].chat = [];
+      const msg = {
+        id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        autor,
+        texto: texto.trim(),
+        timestamp: new Date().toISOString(),
+        ...(Array.isArray(files) && files.length > 0 ? { files } : {}),
+      };
+      demands[idx].chat.push(msg);
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ message: msg }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // POST /infra/demands/:id/attachments — upload de anexos pos-criacao
+  const attPostMatch = url.match(/^\/infra\/demands\/([^/]+)\/attachments$/);
+  if (req.method === "POST" && attPostMatch) {
+    try {
+      const id = decodeURIComponent(attPostMatch[1]);
+      const { attachments: newAtts } = JSON.parse(await readBody(req));
+      if (!Array.isArray(newAtts) || newAtts.length === 0) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "attachments deve ser array nao-vazio" }));
+      }
+      const demands = readInfraDemands();
+      const idx = demands.findIndex((d) => d.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+      }
+      if (!demands[idx].infraAttachments) demands[idx].infraAttachments = [];
+      demands[idx].infraAttachments.push(...newAtts);
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ infraAttachments: demands[idx].infraAttachments }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
   res.statusCode = 404;
   return res.end(JSON.stringify({ error: "Endpoint Infra nao encontrado" }));
 }
