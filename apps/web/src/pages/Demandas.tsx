@@ -258,13 +258,13 @@ const Demandas = () => {
     }));
   }, []);
 
-  // Scope: "mine" mostra apenas demandas do usuario logado (assignee ou cc)
+  // Scope: "mine" mostra apenas demandas onde o usuario eh o RESPONSAVEL atual.
+  // CC nao conta — quem ja foi assignee no passado fica em cc pra sempre
+  // (a partir do header do Slack), entao incluir cc faria a demanda nunca
+  // sair da lista de quem ja a passou pra outro.
   const scopedDemands = useMemo(() => {
     if (scope === "all" || !currentUser) return demands;
-    return demands.filter((d) =>
-      d.assignee?.name === currentUser.name ||
-      d.cc.includes(currentUser.name)
-    );
+    return demands.filter((d) => d.assignee?.name === currentUser.name);
   }, [demands, scope, currentUser]);
 
   // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
