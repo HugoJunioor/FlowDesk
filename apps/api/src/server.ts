@@ -14,6 +14,7 @@ import { env } from '@config/env';
 import { logger } from '@shared/logging/logger';
 import { closePool } from '@config/database';
 import { startSlaCron, stopSlaCron } from '@modules/sla/sla.cron';
+import { startLembreteCron, stopLembreteCron } from '@modules/lembretes/lembrete.cron';
 
 async function main(): Promise<void> {
   const app = createApp();
@@ -25,11 +26,14 @@ async function main(): Promise<void> {
     );
     // Cron de SLA reminders (no-op se SLA_CRON_ENABLED=false)
     startSlaCron();
+    // Cron de lembrete diário por e-mail (no-op se DAILY_REMINDER_ENABLED=false)
+    startLembreteCron();
   });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Recebido sinal de desligamento, encerrando...');
     stopSlaCron();
+    stopLembreteCron();
     server.close(async () => {
       try {
         await closePool();

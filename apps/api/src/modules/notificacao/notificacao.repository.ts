@@ -30,8 +30,9 @@ interface NotificacaoRow {
 interface PreferenciaRow {
   usuario_email: string;
   eventos: Record<string, boolean>;
-  canais: { inbox: boolean; browserPush: boolean; email: boolean };
+  canais: { inbox: boolean; browserPush: boolean; email: boolean; telegram?: boolean };
   sla_reminders: { p1Hours: number; p2Hours: number; p3Hours: number };
+  daily_reminder: boolean;
   atualizado_em: Date;
 }
 
@@ -56,8 +57,14 @@ function rowToPreferencia(row: PreferenciaRow): Preferencia {
   return {
     usuarioEmail: row.usuario_email,
     eventos: row.eventos,
-    canais: row.canais,
+    canais: {
+      inbox: row.canais.inbox ?? true,
+      browserPush: row.canais.browserPush ?? false,
+      email: row.canais.email ?? false,
+      telegram: row.canais.telegram ?? false,
+    },
     slaReminders: row.sla_reminders,
+    dailyReminder: row.daily_reminder ?? true,
   };
 }
 
@@ -147,12 +154,13 @@ export const notificacaoRepository = {
   ): Promise<Preferencia> {
     const res = await pool.query<PreferenciaRow>(
       `INSERT INTO tb_preferencia_notificacao
-         (usuario_email, eventos, canais, sla_reminders, atualizado_em)
-       VALUES ($1, $2, $3, $4, NOW())
+         (usuario_email, eventos, canais, sla_reminders, daily_reminder, atualizado_em)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (usuario_email) DO UPDATE
          SET eventos = EXCLUDED.eventos,
              canais = EXCLUDED.canais,
              sla_reminders = EXCLUDED.sla_reminders,
+             daily_reminder = EXCLUDED.daily_reminder,
              atualizado_em = NOW()
        RETURNING *`,
       [
@@ -160,6 +168,7 @@ export const notificacaoRepository = {
         JSON.stringify(input.eventos),
         JSON.stringify(input.canais),
         JSON.stringify(input.slaReminders),
+        input.dailyReminder ?? true,
       ],
     );
     const row = res.rows[0];
