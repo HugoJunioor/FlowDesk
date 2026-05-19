@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Database, Rocket, Loader2, Copy, Plus, ExternalLink, Paperclip, X, FileText, Headphones } from "lucide-react";
+import { Database, Rocket, Loader2, Copy, Plus, ExternalLink, Paperclip, X, FileText, Headphones, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -25,6 +25,7 @@ import { loadInfraDatabases, addInfraDatabase } from "@/lib/infraDatabases";
 import { addBusinessHours } from "@/lib/businessHours";
 import { PRIORITY_CONFIG } from "@/types/demand";
 import { notifyAssigned } from "@/lib/notificationEvents";
+import { getAllUsers } from "@/lib/authStorage";
 
 interface NewDemandaInternaModalProps {
   open: boolean;
@@ -88,14 +89,6 @@ function formatBytes(b: number): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** Lista de membros do time que podem ser mencionados em Suporte */
-const TEAM_MEMBERS = [
-  "Tiago Silva",
-  "Hugo Cordeiro",
-  "Lucas Mendes",
-  "Ana Paula",
-  "Rodrigo Farias",
-];
 
 const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDemandaInternaModalProps) => {
   const { currentUser } = useAuth();
@@ -127,6 +120,10 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
   const [suporteQuemOlhar, setSuporteQuemOlhar] = useState<string[]>([]);
   const [suporteProximoPasso, setSuporteProximoPasso] = useState("");
   const [suporteInfoAdicionais, setSuporteInfoAdicionais] = useState("");
+  // Lista de usuarios do sistema (para o campo "Quem precisa olhar").
+  // Atualiza sempre que o modal abre — captura novos cadastros sem F5.
+  const [systemUsers, setSystemUsers] = useState<Array<{ name: string; email: string }>>([]);
+  const [suporteUserSearch, setSuporteUserSearch] = useState("");
 
   const autoDueDate = (() => {
     const cfg = PRIORITY_CONFIG[priority];
@@ -164,6 +161,18 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
       setKind(defaultKind);
       resetForm();
       refreshDatabases();
+      // Carrega usuarios cadastrados — re-le toda vez que abre pra capturar
+      // novos cadastros (UserManagement) sem precisar de refresh.
+      try {
+        const users = getAllUsers()
+          .filter((u) => u.active !== false)
+          .map((u) => ({ name: u.name, email: u.email }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setSystemUsers(users);
+      } catch {
+        setSystemUsers([]);
+      }
+      setSuporteUserSearch("");
     }
   }, [open, defaultKind, resetForm, refreshDatabases]);
 
@@ -460,22 +469,103 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Quem precisa olhar</label>
-              <div className="flex flex-wrap gap-2">
-                {TEAM_MEMBERS.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => toggleMember(m)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      suporteQuemOlhar.includes(m)
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
-                    }`}
-                  >
-                    {suporteQuemOlhar.includes(m) ? `@${m}` : m}
-                  </button>
-                ))}
+              <label className="text-sm font-medium">
+                Quem precisa olhar{" "}
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({systemUsers.length} usuários cadastrados)
+                </span>
+              </label>
+
+              {/* Selecionados (aparecem em destaque, removiveis) */}
+              {suporteQuemOlhar.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-md bg-primary/5 border border-primary/20">
+                  {suporteQuemOlhar.map((m) => (
+                    <button
+                      key={`sel-${m}`}
+                      type="button"
+                      onClick={() => toggleMember(m)}
+                      className="text-xs px-2 py-0.5 rounded-full bg-primary text-primary-foreground inline-flex items-center gap-1 hover:bg-primary/90"
+                      title="Remover"
+                    >
+                      @{m} <X size={10} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Caixa de busca + listagem dos usuarios do sistema */}
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                />
+                <Input
+                  value={suporteUserSearch}
+                  onChange={(e) => setSuporteUserSearch(e.target.value)}
+                  placeholder={
+                    systemUsers.length === 0
+                      ? "Nenhum usuário cadastrado — cadastre em Usuários"
+                      : "Buscar usuário pelo nome ou e-mail..."
+                  }
+                  className="pl-7 h-8 text-xs"
+                  disabled={systemUsers.length === 0}
+                />
+              </div>
+
+              <div className="max-h-44 overflow-y-auto rounded-md border bg-muted/20 divide-y divide-border/40">
+                {systemUsers
+                  .filter((u) => {
+                    const q = suporteUserSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      u.name.toLowerCase().includes(q) ||
+                      u.email.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((u) => {
+                    const selected = suporteQuemOlhar.includes(u.name);
+                    return (
+                      <button
+                        key={u.email}
+                        type="button"
+                        onClick={() => toggleMember(u.name)}
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between transition-colors ${
+                          selected
+                            ? "bg-primary/10 text-foreground"
+                            : "hover:bg-muted/60"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
+                              selected
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground/40"
+                            }`}
+                          >
+                            {selected && <span className="text-[10px] leading-none">✓</span>}
+                          </span>
+                          <span className="font-medium">{u.name}</span>
+                        </span>
+                        <span className="text-muted-foreground text-[10px]">{u.email}</span>
+                      </button>
+                    );
+                  })}
+                {systemUsers.length > 0 &&
+                  systemUsers.filter((u) => {
+                    const q = suporteUserSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="px-3 py-3 text-xs text-muted-foreground text-center">
+                      Nenhum usuário com "{suporteUserSearch}"
+                    </div>
+                  )}
+                {systemUsers.length === 0 && (
+                  <div className="px-3 py-3 text-xs text-muted-foreground text-center">
+                    Cadastre usuários em /usuarios pra que apareçam aqui.
+                  </div>
+                )}
               </div>
             </div>
 
