@@ -70,6 +70,8 @@ export interface NotificationPreferences {
     p2Hours: number;  // ex: 2 horas antes
     p3Hours: number;  // ex: 4 horas antes
   };
+  /** Resumo diário por e-mail às 9h (dias úteis) */
+  dailyReminder: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userEmail"> = {
@@ -93,6 +95,7 @@ export const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userEmail"> = {
     p2Hours: 2,
     p3Hours: 4,
   },
+  dailyReminder: true,
 };
 
 export const EVENT_LABELS: Record<NotificationEvent, { label: string; icon: string }> = {
