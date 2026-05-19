@@ -142,7 +142,48 @@ docker run --rm \
   alpine sh -c "cp -r /src/. /dst/"
 ```
 
-### 3.5 Subir os containers
+### 3.5 Pre-flight check
+
+Antes de subir os containers, rode o script de validacao para garantir que todas
+as variaveis obrigatorias estao definidas e que os servicos externos respondem:
+
+```bash
+# Na raiz do repositorio
+node scripts/preflight-check.mjs
+# ou via npm
+npm run preflight
+```
+
+O script verifica:
+- Presenca e validade de todas as variaveis obrigatorias (inclusive comprimento minimo do `JWT_SECRET`)
+- Conectividade com o Postgres (`SELECT 1`)
+- Token do Slack (`auth.test`)
+- Bot do Telegram (se `TELEGRAM_ENABLED=true`)
+- Conexao SMTP (se `SMTP_HOST` definido)
+
+Saida esperada se tudo estiver ok:
+
+```
+=== FlowDesk Pre-flight Check ===
+
+Variaveis obrigatorias
+  v NODE_ENV
+  v DATABASE_URL
+  ...
+
+PostgreSQL
+  v Conexao estabelecida e SELECT 1 respondeu
+
+Slack
+  v Token valido — team: Just, bot: flowdeskbot
+
+Pre-flight OK. Pode subir os containers.
+```
+
+Se qualquer item falhar, o script termina com exit code 1 e lista o que precisa ser corrigido.
+Consulte `docs/PROD_ENV_CHECKLIST.md` para detalhes de cada variavel.
+
+### 3.6 Subir os containers
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d
@@ -151,7 +192,7 @@ docker compose -f docker-compose.prod.yml ps
 
 Saida esperada: todos os servicos `healthy` ou `running`.
 
-### 3.6 Migrate inicial
+### 3.7 Migrate inicial
 
 ```bash
 docker compose -f docker-compose.prod.yml exec api \

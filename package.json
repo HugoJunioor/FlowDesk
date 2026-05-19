@@ -23,7 +23,7 @@
     "validate": "npm run validate --workspaces --if-present",
     "test:coverage": "npm run test:coverage -w @flowdesk/web",
     "build-storybook": "npm run build-storybook -w @flowdesk/web",
-    "preflight": "npm run preflight -w @flowdesk/web",
+    "preflight": "node scripts/preflight-check.mjs",
     "preview": "npm run preview -w @flowdesk/web",
     "prepare": "husky",
     "backup": "node scripts/backup.mjs"

@@ -18,6 +18,7 @@ import { freemem } from 'node:os';
 import rateLimit from 'express-rate-limit';
 import type { PoolClient } from 'pg';
 import { pool } from '@config/database';
+import { env } from '@config/env';
 
 // ---------------------------------------------------------------------------
 // Helpers compartilhados
@@ -167,6 +168,27 @@ healthRoutes.get('/detailed', detailedRateLimit, async (_req, res) => {
         disk: diskResult,
         memory: { ok: memory.ok, usedMb: memory.usedMb, heapMb: memory.heapMb },
       },
+    },
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Router: GET /api/v1/version
+// ---------------------------------------------------------------------------
+
+export const versionRoutes = Router();
+
+// GET / — versão da aplicação, commit e info de runtime.
+// Variáveis BUILD_SHA e BUILD_DATE são injetadas pelo CI no build de produção.
+versionRoutes.get('/', (_req, res) => {
+  res.json({
+    sucesso: true,
+    dados: {
+      version: getVersion(),
+      commit: env.BUILD_SHA ?? 'local',
+      buildDate: env.BUILD_DATE ?? null,
+      nodeVersion: process.version,
+      uptime: Math.floor(process.uptime()),
     },
   });
 });
