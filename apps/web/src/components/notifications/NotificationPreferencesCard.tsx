@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Loader2, Save, Mail, BellRing, Inbox, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Bell, Loader2, Save, Mail, BellRing, Inbox, AlertCircle, CheckCircle2, CalendarClock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -77,6 +77,12 @@ const NotificationPreferencesCard = () => {
   const updateEvent = (event: NotificationEvent, enabled: boolean) => {
     if (!prefs) return;
     setPrefs({ ...prefs, events: { ...prefs.events, [event]: enabled } });
+    setDirty(true);
+  };
+
+  const updateDailyReminder = (enabled: boolean) => {
+    if (!prefs) return;
+    setPrefs({ ...prefs, dailyReminder: enabled });
     setDirty(true);
   };
 
@@ -231,6 +237,22 @@ const NotificationPreferencesCard = () => {
               <Switch
                 checked={prefs.channels.email}
                 onCheckedChange={(v) => updateChannel("email", v)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <CalendarClock size={14} className="text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Resumo diário por e-mail (9h)</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Lista de demandas em aberto toda manhã, dias úteis
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={prefs.dailyReminder ?? true}
+                onCheckedChange={updateDailyReminder}
               />
             </div>
           </div>
