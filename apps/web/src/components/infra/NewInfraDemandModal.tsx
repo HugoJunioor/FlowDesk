@@ -246,6 +246,8 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
+        // SQL e Deploy requerem aprovação antes de serem executados
+        status: (kind === "sql" || kind === "deploy") ? "aguardando_aprovacao" : "aberta",
         infraKind: kind,
         requester: {
           name: currentUser?.name || currentUser?.login || "Anônimo",
