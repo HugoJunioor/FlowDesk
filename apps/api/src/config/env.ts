@@ -43,6 +43,32 @@ const envSchema = z.object({
   SLA_CRON_ENABLED: z.coerce.boolean().default(false),
   /** Intervalo em segundos entre runs do cron */
   SLA_CRON_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  // URL base usada nos links em e-mails / notificacoes externas
+  APP_BASE_URL: z.string().url().default('http://localhost:5173'),
+
+  // Telegram Bot — opt-in. Sem TELEGRAM_ENABLED=true, módulo carrega mas retorna 503.
+  TELEGRAM_ENABLED: z.coerce.boolean().default(false),
+  TELEGRAM_BOT_TOKEN: z.string().default(''),
+  TELEGRAM_BOT_USERNAME: z.string().default('FlowDeskBot'),
+  TELEGRAM_WEBHOOK_SECRET: z.string().default(''),
+}).superRefine((data, ctx) => {
+  if (data.TELEGRAM_ENABLED) {
+    if (!data.TELEGRAM_BOT_TOKEN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TELEGRAM_BOT_TOKEN'],
+        message: 'TELEGRAM_BOT_TOKEN obrigatório quando TELEGRAM_ENABLED=true',
+      });
+    }
+    if (!data.TELEGRAM_WEBHOOK_SECRET || data.TELEGRAM_WEBHOOK_SECRET.length < 16) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TELEGRAM_WEBHOOK_SECRET'],
+        message: 'TELEGRAM_WEBHOOK_SECRET obrigatório (mínimo 16 chars) quando TELEGRAM_ENABLED=true',
+      });
+    }
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);
