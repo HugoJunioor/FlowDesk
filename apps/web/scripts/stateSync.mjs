@@ -840,15 +840,18 @@ async function handleInfra(req, res) {
       const {
         title, description, priority, infraKind, requester, assignee, dueDate, client,
         infraQuery, infraDatabase, infraExternalLink, infraAttachments,
+        infraSuporteContexto, infraSuporteAconteceu, infraSuporteImpactoNivel,
+        infraSuporteImpactoDescricao, infraSuporteQuemOlhar, infraSuporteProximoPasso,
+        infraSuporteInfoAdicionais,
       } = body;
 
       if (!title || !title.trim()) {
         res.statusCode = 400;
         return res.end(JSON.stringify({ error: "title obrigatorio" }));
       }
-      if (!infraKind || !["sql", "deploy"].includes(infraKind)) {
+      if (!infraKind || !["sql", "deploy", "suporte"].includes(infraKind)) {
         res.statusCode = 400;
-        return res.end(JSON.stringify({ error: "infraKind deve ser 'sql' ou 'deploy'" }));
+        return res.end(JSON.stringify({ error: "infraKind deve ser 'sql', 'deploy' ou 'suporte'" }));
       }
 
       const now = new Date().toISOString();
@@ -867,6 +870,14 @@ async function handleInfra(req, res) {
         ...(infraDatabase && infraDatabase.trim() ? { infraDatabase: infraDatabase.trim() } : {}),
         ...(infraExternalLink && infraExternalLink.trim() ? { infraExternalLink: infraExternalLink.trim() } : {}),
         ...(Array.isArray(infraAttachments) && infraAttachments.length > 0 ? { infraAttachments } : {}),
+        // Campos estruturados de Suporte
+        ...(infraSuporteContexto ? { infraSuporteContexto } : {}),
+        ...(infraSuporteAconteceu ? { infraSuporteAconteceu } : {}),
+        ...(infraSuporteImpactoNivel ? { infraSuporteImpactoNivel } : {}),
+        ...(infraSuporteImpactoDescricao ? { infraSuporteImpactoDescricao } : {}),
+        ...(Array.isArray(infraSuporteQuemOlhar) && infraSuporteQuemOlhar.length > 0 ? { infraSuporteQuemOlhar } : {}),
+        ...(infraSuporteProximoPasso ? { infraSuporteProximoPasso } : {}),
+        ...(infraSuporteInfoAdicionais ? { infraSuporteInfoAdicionais } : {}),
         requester: requester || { name: "Desconhecido", avatar: "" },
         assignee: assignee || { name: "Tiago Silva", avatar: "" },
         cc: [],
@@ -876,7 +887,7 @@ async function handleInfra(req, res) {
         hasTask: !!(infraExternalLink && infraExternalLink.trim()),
         taskLink: (infraExternalLink && infraExternalLink.trim()) || "",
         tags: [`infra-${infraKind}`],
-        slackChannel: infraKind === "sql" ? "#infra-sql" : "#infra-deploy",
+        slackChannel: infraKind === "sql" ? "#infra-sql" : infraKind === "suporte" ? "#infra-suporte" : "#infra-deploy",
         slackPermalink: "",
         replies: 0,
         threadReplies: [],
@@ -912,6 +923,9 @@ async function handleInfra(req, res) {
       const allowed = [
         "status", "assignee", "priority", "completedAt", "description", "title", "threadReplies",
         "infraQuery", "infraDatabase", "infraExternalLink", "infraAttachments", "dueDate",
+        "infraSuporteContexto", "infraSuporteAconteceu", "infraSuporteImpactoNivel",
+        "infraSuporteImpactoDescricao", "infraSuporteQuemOlhar", "infraSuporteProximoPasso",
+        "infraSuporteInfoAdicionais",
       ];
       for (const k of allowed) {
         if (updates[k] !== undefined) demands[idx][k] = updates[k];
@@ -936,6 +950,78 @@ async function handleInfra(req, res) {
     const demands = readInfraDemands().filter((d) => d.id !== id);
     writeInfraDemands(demands);
     return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // GET /infra/demands/:id/chat — lista mensagens do chat interno
+  const chatGetMatch = url.match(/^\/infra\/demands\/([^/]+)\/chat$/);
+  if (req.method === "GET" && chatGetMatch) {
+    const id = decodeURIComponent(chatGetMatch[1]);
+    const demands = readInfraDemands();
+    const demand = demands.find((d) => d.id === id);
+    if (!demand) {
+      res.statusCode = 404;
+      return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+    }
+    return res.end(JSON.stringify({ messages: demand.chat || [] }));
+  }
+
+  // POST /infra/demands/:id/chat — envia mensagem no chat interno
+  const chatPostMatch = url.match(/^\/infra\/demands\/([^/]+)\/chat$/);
+  if (req.method === "POST" && chatPostMatch) {
+    try {
+      const id = decodeURIComponent(chatPostMatch[1]);
+      const { autor, texto, files } = JSON.parse(await readBody(req));
+      if (!autor || !texto || !texto.trim()) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "autor e texto sao obrigatorios" }));
+      }
+      const demands = readInfraDemands();
+      const idx = demands.findIndex((d) => d.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+      }
+      if (!demands[idx].chat) demands[idx].chat = [];
+      const msg = {
+        id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        autor,
+        texto: texto.trim(),
+        timestamp: new Date().toISOString(),
+        ...(Array.isArray(files) && files.length > 0 ? { files } : {}),
+      };
+      demands[idx].chat.push(msg);
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ message: msg }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // POST /infra/demands/:id/attachments — upload de anexos pos-criacao
+  const attPostMatch = url.match(/^\/infra\/demands\/([^/]+)\/attachments$/);
+  if (req.method === "POST" && attPostMatch) {
+    try {
+      const id = decodeURIComponent(attPostMatch[1]);
+      const { attachments: newAtts } = JSON.parse(await readBody(req));
+      if (!Array.isArray(newAtts) || newAtts.length === 0) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: "attachments deve ser array nao-vazio" }));
+      }
+      const demands = readInfraDemands();
+      const idx = demands.findIndex((d) => d.id === id);
+      if (idx === -1) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: "demanda nao encontrada" }));
+      }
+      if (!demands[idx].infraAttachments) demands[idx].infraAttachments = [];
+      demands[idx].infraAttachments.push(...newAtts);
+      writeInfraDemands(demands);
+      return res.end(JSON.stringify({ infraAttachments: demands[idx].infraAttachments }));
+    } catch (e) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ error: e.message }));
+    }
   }
 
   res.statusCode = 404;

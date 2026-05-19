@@ -202,12 +202,13 @@ export const apiClient = {
         "/infra/demands",
         { demoFallback: { demands: [] } }
       ),
-    /** Cria uma nova demanda interna (SQL ou Deploy) */
+    /** Cria uma nova demanda interna (SQL, Deploy ou Suporte) */
     create: (body: {
       title: string;
       description?: string;
       priority?: "p1" | "p2" | "p3";
-      infraKind: "sql" | "deploy";
+      status?: import("@/types/demand").DemandStatus;
+      infraKind: "sql" | "deploy" | "suporte";
       requester?: { name: string; avatar: string };
       assignee?: { name: string; avatar: string };
       dueDate?: string | null;
@@ -218,7 +219,7 @@ export const apiClient = {
       infraDatabase?: string;
       /** Link externo da demanda (ex: ClickUp) */
       infraExternalLink?: string;
-      /** Anexos em base64 (max 5MB cada, max 5 arquivos) */
+      /** Anexos em base64 (max 25MB cada, max 5 arquivos) */
       infraAttachments?: Array<{
         id: string;
         name: string;
@@ -227,6 +228,14 @@ export const apiClient = {
         dataUrl: string;
         addedAt: string;
       }>;
+      /** Campos estruturados Suporte */
+      infraSuporteContexto?: string;
+      infraSuporteAconteceu?: string;
+      infraSuporteImpactoNivel?: "baixo" | "medio" | "alto";
+      infraSuporteImpactoDescricao?: string;
+      infraSuporteQuemOlhar?: string[];
+      infraSuporteProximoPasso?: string;
+      infraSuporteInfoAdicionais?: string;
     }) =>
       request<{ demand: import("@/types/demand").SlackDemand }>("/infra/demands", {
         method: "POST",
@@ -237,7 +246,7 @@ export const apiClient = {
             title: body.title,
             description: body.description || "",
             priority: body.priority || "p3",
-            status: "aberta",
+            status: body.status || "aberta",
             source: "internal",
             infraKind: body.infraKind,
           } as unknown as import("@/types/demand").SlackDemand,
@@ -259,6 +268,43 @@ export const apiClient = {
         method: "DELETE",
         demoFallback: { ok: true },
       }),
+    /** Lista mensagens do chat interno da demanda */
+    chatList: (id: string) =>
+      request<{ messages: import("@/types/demand").InfraChatMessage[] }>(
+        `/infra/demands/${encodeURIComponent(id)}/chat`,
+        { demoFallback: { messages: [] } }
+      ),
+    /** Envia mensagem no chat interno */
+    chatSend: (id: string, body: {
+      autor: string;
+      texto: string;
+      files?: Array<{ id: string; name: string; type: string; size: number; dataUrl: string; addedAt: string }>;
+    }) =>
+      request<{ message: import("@/types/demand").InfraChatMessage }>(
+        `/infra/demands/${encodeURIComponent(id)}/chat`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+          demoFallback: {
+            message: {
+              id: `chat_demo_${Date.now()}`,
+              autor: body.autor,
+              texto: body.texto,
+              timestamp: new Date().toISOString(),
+            } as import("@/types/demand").InfraChatMessage,
+          },
+        }
+      ),
+    /** Faz upload de anexos pos-criacao */
+    attachmentsAdd: (id: string, attachments: Array<{ id: string; name: string; type: string; size: number; dataUrl: string; addedAt: string }>) =>
+      request<{ infraAttachments: import("@/types/demand").ClosureAttachment[] }>(
+        `/infra/demands/${encodeURIComponent(id)}/attachments`,
+        {
+          method: "POST",
+          body: JSON.stringify({ attachments }),
+          demoFallback: { infraAttachments: [] },
+        }
+      ),
   },
   // === Notifications (inbox de eventos) ===
   notifications: {

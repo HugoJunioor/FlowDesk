@@ -1,5 +1,5 @@
 export type DemandPriority = "p1" | "p2" | "p3" | "sem_classificacao";
-export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada";
+export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada" | "aguardando_aprovacao" | "reprovada";
 export type DemandType =
   | "Tarefa/Ajuda" | "Problema/Bug" | "Update" | "Remessa"
   | "Sitef" | "Conciliacao"
@@ -173,6 +173,16 @@ export interface ClosureFields {
   };
 }
 
+/** Mensagem do chat interno de uma demanda interna */
+export interface InfraChatMessage {
+  id: string;
+  autor: string;
+  texto: string;
+  timestamp: string;
+  /** Anexos opcionais enviados junto com a mensagem */
+  files?: ClosureAttachment[];
+}
+
 export interface SlackDemand {
   id: string;
   title: string;
@@ -200,9 +210,20 @@ export interface SlackDemand {
   source?: "slack" | "internal";
   /**
    * Sub-tipo de demanda interna (so quando source === "internal"):
-   * "sql" = operacoes SQL  |  "deploy" = deploy/release
+   * "sql" = operacoes SQL  |  "deploy" = deploy/release  |  "suporte" = incidente/suporte
    */
-  infraKind?: "sql" | "deploy";
+  infraKind?: "sql" | "deploy" | "suporte";
+  /**
+   * Campos estruturados do tipo Suporte (so faz sentido pra infraKind === "suporte").
+   * Armazenados separado da description pra facilitar exibicao no sheet.
+   */
+  infraSuporteContexto?: string;
+  infraSuporteAconteceu?: string;
+  infraSuporteImpactoNivel?: "baixo" | "medio" | "alto";
+  infraSuporteImpactoDescricao?: string;
+  infraSuporteQuemOlhar?: string[];
+  infraSuporteProximoPasso?: string;
+  infraSuporteInfoAdicionais?: string;
   /**
    * SQL query a ser executada (so faz sentido pra infraKind === "sql").
    * Texto livre — equipe copia/cola e executa no banco apontado em `database`.
@@ -219,10 +240,15 @@ export interface SlackDemand {
    */
   infraExternalLink?: string;
   /**
-   * Anexos da demanda interna (base64 inline, max 5MB cada).
+   * Anexos da demanda interna (base64 inline, max 25MB cada).
    * Reusa estrutura ClosureAttachment ja existente.
    */
   infraAttachments?: ClosureAttachment[];
+  /**
+   * Chat interno da demanda — mensagens trocadas entre solicitante e responsavel
+   * dentro do FlowDesk (separado do Slack).
+   */
+  chat?: InfraChatMessage[];
   dueDate: string | null;
   completedAt: string | null;
   hasTask: boolean;
