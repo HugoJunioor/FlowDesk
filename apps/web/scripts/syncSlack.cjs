@@ -1,4 +1,5 @@
-require('dotenv').config();
+// override:true garante que .env sobrescreva variaveis persistentes da sessao
+require('dotenv').config({ override: true });
 const { WebClient } = require('@slack/web-api');
 const fs = require('fs');
 const path = require('path');
