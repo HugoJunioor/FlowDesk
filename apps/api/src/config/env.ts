@@ -44,6 +44,16 @@ const envSchema = z.object({
   /** Intervalo em segundos entre runs do cron */
   SLA_CRON_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
 
+  // Lembrete diário por e-mail (cron 9h dias úteis).
+  DAILY_REMINDER_ENABLED: z.coerce.boolean().default(false),
+
+  // SMTP — se algum ausente, entra em dry-run (só loga, não envia).
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('FlowDesk <noreply@flowdesk.local>'),
+
   // URL base usada nos links em e-mails / notificacoes externas
   APP_BASE_URL: z.string().url().default('http://localhost:5173'),
 
