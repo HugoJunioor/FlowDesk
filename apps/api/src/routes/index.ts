@@ -6,7 +6,7 @@
  * clients antigos.
  */
 import { Router } from 'express';
-import { healthRoutes } from '@modules/health/health.routes';
+import { healthRoutes, versionRoutes } from '@modules/health/health.routes';
 import { templateRoutes } from '@modules/_template/_template.routes';
 import { authRoutes } from '@modules/auth/auth.routes';
 import { notificacaoRoutes } from '@modules/notificacao/notificacao.routes';
@@ -36,6 +36,7 @@ v1.use('/usuarios', usuariosRoutes);
 v1.use('/templates', templateRoutes);
 v1.use('/lembretes', lembreteRoutes);
 v1.use('/telegram', telegramRoutes);
+v1.use('/version', versionRoutes);
 
 // Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false
 if (env.OPENAPI_ENABLED) {
