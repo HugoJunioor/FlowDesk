@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,9 +64,20 @@ function saveCustomAssignees(assignees: string[]) {
   localStorage.setItem("fd_custom_assignees", JSON.stringify(assignees));
 }
 
+type DemandScope = "mine" | "all";
+
+function loadScope(): DemandScope {
+  try {
+    const v = localStorage.getItem("flowdesk:demandas:scope");
+    return v === "all" ? "all" : "mine";
+  } catch { return "mine"; }
+}
+
 const Demandas = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { currentUser } = useAuth();
+  const [scope, setScope] = useState<DemandScope>(loadScope);
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
 
   // Revalida quando overrides mudarem em outra aba/dispositivo
@@ -246,9 +258,18 @@ const Demandas = () => {
     }));
   }, []);
 
+  // Scope: "mine" mostra apenas demandas do usuario logado (assignee ou cc)
+  const scopedDemands = useMemo(() => {
+    if (scope === "all" || !currentUser) return demands;
+    return demands.filter((d) =>
+      d.assignee?.name === currentUser.name ||
+      d.cc.includes(currentUser.name)
+    );
+  }, [demands, scope, currentUser]);
+
   // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
   const statsFiltered = useMemo(() => {
-    return demands.filter((d) => {
+    return scopedDemands.filter((d) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
         const match =
@@ -277,12 +298,12 @@ const Demandas = () => {
       }
       return true;
     });
-  }, [filters, demands]);
+  }, [filters, scopedDemands]);
 
   const filtered = useMemo(() => {
     const now = new Date();
 
-    return demands.filter((d) => {
+    return scopedDemands.filter((d) => {
       // Stat filter
       if (filters.statFilter) {
         switch (filters.statFilter) {
@@ -390,7 +411,7 @@ const Demandas = () => {
 
       return true;
     });
-  }, [filters, demands]);
+  }, [filters, scopedDemands]);
 
   // SLA sort: estourados primeiro, depois por menor tempo restante até estouro
   const sorted = useMemo(() => {
@@ -423,6 +444,21 @@ const Demandas = () => {
             <p className="text-muted-foreground text-sm text-center sm:text-left">Acompanhe as demandas recebidas via Slack</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Scope toggle */}
+            <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+              <button
+                onClick={() => { setScope("mine"); localStorage.setItem("flowdesk:demandas:scope", "mine"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Apenas minhas
+              </button>
+              <button
+                onClick={() => { setScope("all"); localStorage.setItem("flowdesk:demandas:scope", "all"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Todas
+              </button>
+            </div>
             <AdvancedFilters
               filters={filters}
               onChange={setFilters}
