@@ -39,6 +39,10 @@ const envSchema = z.object({
   // OpenAPI / Swagger UI. Default true em dev/staging, false em prod.
   OPENAPI_ENABLED: z.coerce.boolean().default(true),
 
+  // Build info — injetado pelo CI (ex: BUILD_SHA=$(git rev-parse --short HEAD)).
+  BUILD_SHA: z.string().optional(),
+  BUILD_DATE: z.string().optional(),
+
   // Cron de SLA reminders. Em prod recomendado true; em dev pode ficar false.
   SLA_CRON_ENABLED: z.coerce.boolean().default(false),
   /** Intervalo em segundos entre runs do cron */
