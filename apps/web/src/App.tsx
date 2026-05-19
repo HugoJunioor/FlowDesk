@@ -18,7 +18,6 @@ const DemandasSql = lazy(() => import("./pages/DemandasSql.tsx"));
 const Infra = lazy(() => import("./pages/Infra.tsx"));
 const DemandasInternas = lazy(() => import("./pages/DemandasInternas.tsx"));
 const Notificacoes = lazy(() => import("./pages/Notificacoes.tsx"));
-const Notas = lazy(() => import("./pages/Notas.tsx"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes.tsx"));
 const UserManagement = lazy(() => import("./pages/UserManagement.tsx"));
 const GroupsManagement = lazy(() => import("./pages/GroupsManagement.tsx"));
@@ -32,7 +31,6 @@ const NotificacoesV2Page = lazy(() => import("./modules/notificacao/pages/Notifi
 const ConfiguracoesV2Page = lazy(() => import("./modules/configuracoes/pages/ConfiguracoesV2Page.tsx"));
 const DemandasV2Page = lazy(() => import("./modules/demanda/pages/DemandasV2Page.tsx"));
 const StatusPage = lazy(() => import("./modules/status/pages/StatusPage.tsx"));
-const Sobre = lazy(() => import("./pages/Sobre.tsx"));
 const PoliticaCookies = lazy(() => import("./pages/PoliticaCookies.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -110,8 +108,6 @@ const AppRoutes = () => {
         <Route path="/infra" element={<Infra />} />
         <Route path="/demandas-internas" element={<DemandasInternas />} />
         <Route path="/notificacoes" element={<Notificacoes />} />
-        {/* /notas agora aponta pro modulo padrao Just (NotasV2Page).
-            Legacy Notas.tsx mantido por 1 release — remover na proxima. */}
         <Route path="/notas" element={<NotasV2Page />} />
         <Route path="/notas-v2" element={<NotasV2Page />} />
         <Route path="/notificacoes-v2" element={<NotificacoesV2Page />} />
@@ -134,7 +130,6 @@ const AppRoutes = () => {
         {currentUser?.role === "master" && (
           <Route path="/auditoria" element={<AuditoriaPage />} />
         )}
-        <Route path="/sobre" element={<Sobre />} />
         <Route path="/politica-cookies" element={<PoliticaCookies />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
