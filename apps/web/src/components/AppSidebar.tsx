@@ -16,7 +16,6 @@ import {
   StickyNote,
   ScrollText,
   Activity,
-  Info,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -282,20 +281,6 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
           >
             <Settings size={20} />
             {!collapsed && <span>{t("nav.settings")}</span>}
-          </NavLink>
-          <NavLink
-            to="/sobre"
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              }`
-            }
-          >
-            <Info size={20} />
-            {!collapsed && <span>Sobre</span>}
           </NavLink>
           <button
             onClick={logout}
