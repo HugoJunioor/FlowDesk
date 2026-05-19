@@ -47,6 +47,13 @@ services:
       - traefik_letsencrypt:/letsencrypt
     networks:
       - flowdesk-public
+    labels:
+      # Middleware de IP whitelist — defesa em profundidade alem do UFW.
+      # Aceita apenas conexoes vindas das VPNs autorizadas (VPN_IPS no .env).
+      # Web e API usam este middleware.
+      - "traefik.http.middlewares.vpn-only.ipallowlist.sourcerange=${VPN_IPS}"
+      # Endpoint /letsencrypt-challenge fica liberado pra ACME funcionar
+      # (Let's Encrypt valida o dominio pela internet publica).
     logging:
       driver: "json-file"
       options:
@@ -114,6 +121,8 @@ services:
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls=true"
       - "traefik.http.routers.api.tls.certresolver=le"
+      # IP whitelist — so VPNs autorizadas. Bloqueia mesmo se UFW cair.
+      - "traefik.http.routers.api.middlewares=vpn-only@docker"
     networks:
       - flowdesk-internal
       - flowdesk-public
@@ -140,6 +149,8 @@ services:
       - "traefik.http.routers.web.tls.certresolver=le"
       - "traefik.http.routers.web.priority=1"
       - "traefik.http.routers.api.priority=10"
+      # IP whitelist — so VPNs autorizadas. Bloqueia mesmo se UFW cair.
+      - "traefik.http.routers.web.middlewares=vpn-only@docker"
     networks:
       - flowdesk-public
     logging:

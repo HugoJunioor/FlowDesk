@@ -65,16 +65,36 @@ echo "[5/6] Preparando diretorios..."
 mkdir -p /opt/flowdesk /var/log/flowdesk /var/backups/flowdesk
 chown -R flowdesk:flowdesk /opt/flowdesk /var/log/flowdesk /var/backups/flowdesk
 
-# 6. Firewall (UFW)
-echo "[6/6] Configurando firewall..."
+# 6. Firewall (UFW) — ACESSO RESTRITO A VPNs
+echo "[6/6] Configurando firewall (VPN-only)..."
+
+# IPs das VPNs autorizadas. Edite aqui se mudar.
+VPN_IPS=(
+  "51.91.156.227"
+  "52.67.76.99"
+)
+
 ufw --force reset >/dev/null
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow OpenSSH
-ufw allow 80/tcp comment 'HTTP'
-ufw allow 443/tcp comment 'HTTPS'
+
+# SSH (22), HTTP (80) e HTTPS (443) APENAS pelas VPNs.
+# HTTP fica liberado tambem nas VPNs pro Let's Encrypt HTTP-challenge
+# funcionar (Traefik redireciona pra HTTPS automaticamente).
+for ip in "${VPN_IPS[@]}"; do
+  ufw allow from "$ip" to any port 22 proto tcp comment "SSH from VPN $ip"
+  ufw allow from "$ip" to any port 80 proto tcp comment "HTTP from VPN $ip"
+  ufw allow from "$ip" to any port 443 proto tcp comment "HTTPS from VPN $ip"
+done
+
+# Let's Encrypt valida o dominio pela INTERNET (HTTP-01 challenge).
+# Pra emitir/renovar o cert, a porta 80 precisa estar acessivel publicamente.
+# Solucao: libera 80 publico mas o Traefik so responde challenge ACME
+# (qualquer outra rota 80 redireciona pra 443 — que so VPN acessa).
+ufw allow 80/tcp comment 'HTTP publico (Let\'s Encrypt challenge + redirect)'
+
 ufw --force enable
-ufw status
+ufw status verbose
 
 echo
 echo "═══ Provisioning concluido ═══"
