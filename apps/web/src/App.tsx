@@ -16,6 +16,7 @@ const Index = lazy(() => import("./pages/Index.tsx"));
 const Demandas = lazy(() => import("./pages/Demandas.tsx"));
 const DemandasSql = lazy(() => import("./pages/DemandasSql.tsx"));
 const Infra = lazy(() => import("./pages/Infra.tsx"));
+const DemandasInternas = lazy(() => import("./pages/DemandasInternas.tsx"));
 const Notificacoes = lazy(() => import("./pages/Notificacoes.tsx"));
 const Notas = lazy(() => import("./pages/Notas.tsx"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes.tsx"));
@@ -107,6 +108,7 @@ const AppRoutes = () => {
         <Route path="/demandas" element={<Demandas />} />
         <Route path="/demandas-sql" element={<DemandasSql />} />
         <Route path="/infra" element={<Infra />} />
+        <Route path="/demandas-internas" element={<DemandasInternas />} />
         <Route path="/notificacoes" element={<Notificacoes />} />
         {/* /notas agora aponta pro modulo padrao Just (NotasV2Page).
             Legacy Notas.tsx mantido por 1 release — remover na proxima. */}
