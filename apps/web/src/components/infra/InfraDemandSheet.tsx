@@ -23,9 +23,11 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { notifyStarted, notifyCompleted, notifyReopened } from "@/lib/notificationEvents";
+import InfraDemandChat from "@/components/infra/InfraDemandChat";
 
 interface InfraDemandSheetProps {
   demand: SlackDemand | null;
@@ -163,6 +165,8 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
             <span className="px-2 py-0.5 rounded text-[10px] font-medium border bg-muted">
               {demand.infraKind === "deploy" ? (
                 <span className="flex items-center gap-1"><Rocket size={10} /> Deploy</span>
+              ) : demand.infraKind === "suporte" ? (
+                <span className="flex items-center gap-1">🎧 Suporte</span>
               ) : (
                 <span className="flex items-center gap-1"><Database size={10} /> SQL</span>
               )}
@@ -236,6 +240,14 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
             )}
           </div>
 
+          {/* Abas Detalhes | Chat */}
+          <Tabs defaultValue="detalhes">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="detalhes" className="space-y-4 mt-3">
           {/* Metadados */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border rounded-md p-3">
             <div className="flex items-center gap-2">
@@ -393,6 +405,12 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
               </div>
             </div>
           )}
+            </TabsContent>
+
+            <TabsContent value="chat" className="mt-3">
+              <InfraDemandChat demandId={demand.id} />
+            </TabsContent>
+          </Tabs>
         </div>
       </SheetContent>
     </Sheet>
