@@ -34,7 +34,7 @@ const navItems: {
 }[] = [
   { to: "/", icon: LayoutDashboard, labelKey: "nav.dashboard", module: "dashboard" },
   { to: "/demandas", icon: MessageSquare, labelKey: "nav.demands", module: "demandas" },
-  { to: "/infra", icon: Wrench, labelKey: "nav.infra", module: "infra" },
+  { to: "/demandas-internas", icon: Wrench, labelKey: "nav.infra", module: "infra" },
 ];
 
 interface AppSidebarProps {
@@ -125,7 +125,8 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1">
           {visibleNavItems.map((item) => {
-            const isActive = location.pathname === item.to;
+            const isActive = location.pathname === item.to ||
+              (item.to === "/demandas-internas" && location.pathname === "/infra");
             return (
               <NavLink
                 key={item.to}
