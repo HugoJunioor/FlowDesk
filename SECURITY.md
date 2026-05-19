@@ -41,8 +41,44 @@ Apos correcao, abro disclosure publico no CHANGELOG mencionando voce
 
 ## Hardening ja em vigor
 
+### Processo e repositorio
+
 - Branch protection na `main` (5 checks required + sem bypass)
 - Secrets scan (gitleaks) em todo PR + push protection do GitHub
 - Dependabot alerts + auto-updates de seguranca
 - Pre-commit hook (lint-staged)
 - CI roda em modo demo (sem dados reais)
+
+### API (Express)
+
+- **Helmet** com Content Security Policy restritiva:
+  - `default-src 'self'` / `script-src 'self'` (dev permite `unsafe-inline`)
+  - `style-src 'self' 'unsafe-inline'` / `img-src 'self' data: https://*.slack-edge.com`
+  - `connect-src 'self'` / `object-src 'none'` / `frame-ancestors 'none'`
+- **HSTS** habilitado em producao — `max-age=31536000; includeSubDomains`
+- **X-Frame-Options: DENY** — previne clickjacking
+- **X-Content-Type-Options: nosniff** — previne MIME sniffing
+- **Referrer-Policy: strict-origin-when-cross-origin**
+- **Permissions-Policy** — camera, microfone e geolocalizacao desabilitados
+- **CORS estrito em producao** — apenas origens em `ALLOWED_ORIGINS` (CSV via env); requests sem Origin bloqueados em prod
+- **Rate limit global** — 100 req/min por IP em `/api/v1`
+- **Rate limit especifico** em `/api/v1/auth/login` (configuravel via `RATE_LIMIT_AUTH`)
+- **HPP** — previne HTTP Parameter Pollution em query strings
+- **Cookie `fd_refresh`** — `HttpOnly`, `Secure` (via `COOKIE_SECURE` env), `SameSite=Strict`, restrito ao path `/api/v1/auth`
+- **Pino redact** — `password`, `passwordHash`, `token`, `secret`, `apiKey`, `refreshToken`, `accessToken`, `authorization` e `cookie` censurados em todos os logs estruturados
+- **Validacao Zod** em todos os inputs de endpoints (fail-fast na borda)
+
+### Infraestrutura (nginx — container web)
+
+- **X-Frame-Options: DENY**
+- **X-Content-Type-Options: nosniff**
+- **Referrer-Policy: strict-origin-when-cross-origin**
+- **Permissions-Policy** — camera, microfone e geolocalizacao desabilitados
+- **HSTS** — `max-age=31536000; includeSubDomains`
+
+### Dados e autenticacao
+
+- Senhas armazenadas com **bcrypt** (custo 12+)
+- Refresh tokens em banco com rotacao e revogacao por sessao
+- Auditoria de todas as mutacoes (quem, quando, o que, payload sanitizado)
+- Variaveis de ambiente validadas em boot via Zod (processo encerra com erro claro se invalidas)
