@@ -1,5 +1,5 @@
 export type DemandPriority = "p1" | "p2" | "p3" | "sem_classificacao";
-export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada";
+export type DemandStatus = "aberta" | "em_andamento" | "concluida" | "expirada" | "aguardando_aprovacao" | "reprovada";
 export type DemandType =
   | "Tarefa/Ajuda" | "Problema/Bug" | "Update" | "Remessa"
   | "Sitef" | "Conciliacao"
@@ -200,9 +200,20 @@ export interface SlackDemand {
   source?: "slack" | "internal";
   /**
    * Sub-tipo de demanda interna (so quando source === "internal"):
-   * "sql" = operacoes SQL  |  "deploy" = deploy/release
+   * "sql" = operacoes SQL  |  "deploy" = deploy/release  |  "suporte" = incidente/suporte
    */
-  infraKind?: "sql" | "deploy";
+  infraKind?: "sql" | "deploy" | "suporte";
+  /**
+   * Campos estruturados do tipo Suporte (so faz sentido pra infraKind === "suporte").
+   * Armazenados separado da description pra facilitar exibicao no sheet.
+   */
+  infraSuporteContexto?: string;
+  infraSuporteAconteceu?: string;
+  infraSuporteImpactoNivel?: "baixo" | "medio" | "alto";
+  infraSuporteImpactoDescricao?: string;
+  infraSuporteQuemOlhar?: string[];
+  infraSuporteProximoPasso?: string;
+  infraSuporteInfoAdicionais?: string;
   /**
    * SQL query a ser executada (so faz sentido pra infraKind === "sql").
    * Texto livre — equipe copia/cola e executa no banco apontado em `database`.

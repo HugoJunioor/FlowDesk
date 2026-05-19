@@ -840,15 +840,18 @@ async function handleInfra(req, res) {
       const {
         title, description, priority, infraKind, requester, assignee, dueDate, client,
         infraQuery, infraDatabase, infraExternalLink, infraAttachments,
+        infraSuporteContexto, infraSuporteAconteceu, infraSuporteImpactoNivel,
+        infraSuporteImpactoDescricao, infraSuporteQuemOlhar, infraSuporteProximoPasso,
+        infraSuporteInfoAdicionais,
       } = body;
 
       if (!title || !title.trim()) {
         res.statusCode = 400;
         return res.end(JSON.stringify({ error: "title obrigatorio" }));
       }
-      if (!infraKind || !["sql", "deploy"].includes(infraKind)) {
+      if (!infraKind || !["sql", "deploy", "suporte"].includes(infraKind)) {
         res.statusCode = 400;
-        return res.end(JSON.stringify({ error: "infraKind deve ser 'sql' ou 'deploy'" }));
+        return res.end(JSON.stringify({ error: "infraKind deve ser 'sql', 'deploy' ou 'suporte'" }));
       }
 
       const now = new Date().toISOString();
@@ -867,6 +870,14 @@ async function handleInfra(req, res) {
         ...(infraDatabase && infraDatabase.trim() ? { infraDatabase: infraDatabase.trim() } : {}),
         ...(infraExternalLink && infraExternalLink.trim() ? { infraExternalLink: infraExternalLink.trim() } : {}),
         ...(Array.isArray(infraAttachments) && infraAttachments.length > 0 ? { infraAttachments } : {}),
+        // Campos estruturados de Suporte
+        ...(infraSuporteContexto ? { infraSuporteContexto } : {}),
+        ...(infraSuporteAconteceu ? { infraSuporteAconteceu } : {}),
+        ...(infraSuporteImpactoNivel ? { infraSuporteImpactoNivel } : {}),
+        ...(infraSuporteImpactoDescricao ? { infraSuporteImpactoDescricao } : {}),
+        ...(Array.isArray(infraSuporteQuemOlhar) && infraSuporteQuemOlhar.length > 0 ? { infraSuporteQuemOlhar } : {}),
+        ...(infraSuporteProximoPasso ? { infraSuporteProximoPasso } : {}),
+        ...(infraSuporteInfoAdicionais ? { infraSuporteInfoAdicionais } : {}),
         requester: requester || { name: "Desconhecido", avatar: "" },
         assignee: assignee || { name: "Tiago Silva", avatar: "" },
         cc: [],
@@ -876,7 +887,7 @@ async function handleInfra(req, res) {
         hasTask: !!(infraExternalLink && infraExternalLink.trim()),
         taskLink: (infraExternalLink && infraExternalLink.trim()) || "",
         tags: [`infra-${infraKind}`],
-        slackChannel: infraKind === "sql" ? "#infra-sql" : "#infra-deploy",
+        slackChannel: infraKind === "sql" ? "#infra-sql" : infraKind === "suporte" ? "#infra-suporte" : "#infra-deploy",
         slackPermalink: "",
         replies: 0,
         threadReplies: [],
@@ -912,6 +923,9 @@ async function handleInfra(req, res) {
       const allowed = [
         "status", "assignee", "priority", "completedAt", "description", "title", "threadReplies",
         "infraQuery", "infraDatabase", "infraExternalLink", "infraAttachments", "dueDate",
+        "infraSuporteContexto", "infraSuporteAconteceu", "infraSuporteImpactoNivel",
+        "infraSuporteImpactoDescricao", "infraSuporteQuemOlhar", "infraSuporteProximoPasso",
+        "infraSuporteInfoAdicionais",
       ];
       for (const k of allowed) {
         if (updates[k] !== undefined) demands[idx][k] = updates[k];
