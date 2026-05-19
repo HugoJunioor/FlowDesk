@@ -1,22 +1,68 @@
-# FlowDesk — stack de producao (on-prem)
+# FlowDesk — stack de producao (on-prem) com Traefik + Let's Encrypt
 #
-# Tres servicos:
-#   postgres  — banco de dados (volume nomeado, sem bind-mount)
-#   api       — backend Express, porta 4000 interna
-#   web       — nginx servindo o build estatico do Vite, porta 8080 interna
+# 4 servicos:
+#   traefik   — reverse proxy + SSL automatico (Let's Encrypt)
+#   postgres  — banco (volume nomeado, sem porta exposta)
+#   api       — backend Express (porta 4000 interna)
+#   web       — frontend Vite servido por nginx alpine (porta 80 interna)
 #
-# O nginx do HOST (reverse proxy publico) e configurado separadamente —
-# veja docs/DEPLOY.md secao 4 para o bloco nginx/flowdesk.conf completo.
+# Roteamento Traefik (no dominio definido em DOMAIN):
+#   /                  -> web
+#   /api/v1/*          -> api
+#   /health, /healthz  -> api
 #
 # Uso:
 #   docker compose -f docker-compose.prod.yml up -d
-#   docker compose -f docker-compose.prod.yml logs -f api
+#   docker compose -f docker-compose.prod.yml logs -f traefik
 #   docker compose -f docker-compose.prod.yml exec api npm run migrate -w @flowdesk/api
 
 services:
+  traefik:
+    image: traefik:v3.2
+    container_name: flowdesk-traefik
+    restart: unless-stopped
+    command:
+      - --log.level=INFO
+      - --accesslog=true
+      - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=flowdesk-public
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      # Descomente em prod estavel; em testes use o staging do Let's Encrypt
+      # para nao bater rate limit:
+      # - --certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - flowdesk-public
+    labels:
+      # Middleware de IP whitelist — defesa em profundidade alem do UFW.
+      # Aceita apenas conexoes vindas das VPNs autorizadas (VPN_IPS no .env).
+      # Web e API usam este middleware.
+      - "traefik.http.middlewares.vpn-only.ipallowlist.sourcerange=${VPN_IPS}"
+      # Endpoint /letsencrypt-challenge fica liberado pra ACME funcionar
+      # (Let's Encrypt valida o dominio pela internet publica).
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
   postgres:
     image: postgres:16-alpine
-    container_name: flowdesk-postgres-prod
+    container_name: flowdesk-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: flowdesk
@@ -26,8 +72,7 @@ services:
       TZ: America/Sao_Paulo
     volumes:
       - flowdesk_db:/var/lib/postgresql/data
-    # Porta 5432 NAO exposta para o host — acesso apenas interno via rede Docker.
-    # Para administracao pontual: docker compose exec postgres psql -U flowdesk
+    # Sem porta exposta — acesso apenas interno via rede Docker.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U flowdesk -d flowdesk"]
       interval: 10s
@@ -36,20 +81,28 @@ services:
       start_period: 30s
     networks:
       - flowdesk-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
 
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: flowdesk-api-prod
+    container_name: flowdesk-api
     restart: unless-stopped
     env_file:
       - ./apps/api/.env
     environment:
       NODE_ENV: production
       PORT: "4000"
-    ports:
-      - "127.0.0.1:4000:4000"
+      TZ: America/Sao_Paulo
+      APP_BASE_URL: "https://${DOMAIN}"
+      ALLOWED_ORIGINS: "https://${DOMAIN}"
+      COOKIE_DOMAIN: "${DOMAIN}"
+      COOKIE_SECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,9 +111,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=flowdesk-public"
+      - "traefik.http.services.api.loadbalancer.server.port=4000"
+      # /api/v1/* + /health + /healthz vao pra api
+      - "traefik.http.routers.api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api/`) || Path(`/health`) || Path(`/healthz`))"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.routers.api.tls.certresolver=le"
+      # IP whitelist — so VPNs autorizadas. Bloqueia mesmo se UFW cair.
+      - "traefik.http.routers.api.middlewares=vpn-only@docker"
     networks:
       - flowdesk-internal
+      - flowdesk-public
     logging:
       driver: "json-file"
       options:
@@ -68,19 +133,26 @@ services:
         max-file: "5"
 
   web:
-    image: nginx:1.27-alpine
-    container_name: flowdesk-web-prod
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: flowdesk-web
     restart: unless-stopped
-    # O build do frontend (apps/web/dist) deve ser gerado ANTES de subir:
-    #   npm run build -w @flowdesk/web
-    # O volume nomeado web_dist e populado via o comando na secao 3.4 do DEPLOY.md.
-    volumes:
-      - web_dist:/usr/share/nginx/html:ro
-      - ./nginx/web.conf:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "127.0.0.1:8080:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=flowdesk-public"
+      - "traefik.http.services.web.loadbalancer.server.port=80"
+      # Tudo que nao for /api/v1, /health ou /healthz vai pro web
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls=true"
+      - "traefik.http.routers.web.tls.certresolver=le"
+      - "traefik.http.routers.web.priority=1"
+      - "traefik.http.routers.api.priority=10"
+      # IP whitelist — so VPNs autorizadas. Bloqueia mesmo se UFW cair.
+      - "traefik.http.routers.web.middlewares=vpn-only@docker"
     networks:
-      - flowdesk-internal
+      - flowdesk-public
     logging:
       driver: "json-file"
       options:
@@ -90,9 +162,15 @@ services:
 volumes:
   flowdesk_db:
     name: flowdesk_db
-  web_dist:
-    name: flowdesk_web_dist
+  traefik_letsencrypt:
+    name: flowdesk_traefik_letsencrypt
 
 networks:
+  # Rede interna privada: postgres + api. Postgres NAO eh acessivel pelo Traefik.
   flowdesk-internal:
+    name: flowdesk-internal
+    driver: bridge
+  # Rede publica: traefik + api + web. Traefik so ve servicos com `traefik.enable=true`.
+  flowdesk-public:
+    name: flowdesk-public
     driver: bridge
