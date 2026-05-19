@@ -17,7 +17,7 @@ function refreshCookieOptions(maxAgeMs: number): CookieOptions {
   return {
     httpOnly: true,
     secure: env.COOKIE_SECURE,
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/api/v1/auth',
     maxAge: maxAgeMs,
     domain: env.COOKIE_DOMAIN || undefined,
