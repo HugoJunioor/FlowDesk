@@ -117,6 +117,24 @@ Por padrao `OPENAPI_ENABLED=true`. Recomendado desabilitar em prod para nao expo
 | `npm run lint` | eslint src/**/*.ts |
 | `npm run typecheck` | tsc --noEmit |
 
+### Cobertura atual
+
+| Modulo | Statements | Branches | Functions | Lines |
+|--------|-----------|----------|-----------|-------|
+| auth | ~75% | ~51% | ~52% | ~75% |
+| demanda | ~47% | ~24% | ~48% | ~50% |
+| health | ~92% | ~75% | 100% | ~94% |
+| lembretes | ~50% | ~51% | ~60% | ~52% |
+| nota | ~91% | ~59% | ~97% | ~96% |
+| notificacao | ~86% | ~71% | 88% | ~87% |
+| sla | ~60% | ~53% | ~55% | ~64% |
+| telegram | ~90% | ~82% | ~86% | ~91% |
+| usuarios | 100% | 100% | 100% | 100% |
+| **Global** | **~51%** | **~41%** | **~57%** | **~52%** |
+
+> Cobertura global fica abaixo por causa de arquivos intencionalmente sem testes:
+> `openapi/*`, `sentry.ts`, `slack/*`, `routes/index.ts`.
+
 ### Rodar testes com cobertura
 
 Da raiz do monorepo:
@@ -136,8 +154,9 @@ O relatório é exibido no terminal. Para testar um módulo específico:
 ```bash
 npm test -w @flowdesk/api -- --testPathPattern="auth"
 npm test -w @flowdesk/api -- --testPathPattern="demanda"
-npm test -w @flowdesk/api -- --testPathPattern="sla"
-npm test -w @flowdesk/api -- --testPathPattern="auditoria"
+npm test -w @flowdesk/api -- --testPathPattern="nota"
+npm test -w @flowdesk/api -- --testPathPattern="telegram"
+npm test -w @flowdesk/api -- --testPathPattern="usuarios"
 ```
 
 ### Estrutura dos testes
@@ -148,8 +167,9 @@ src/
 │   ├── auth.ts          # createAuthenticatedUser({ role }) → { token, user, authHeader }
 │   └── app.ts           # createTestApp() — Express sem openapi (para supertest)
 ├── modules/<modulo>/__tests__/
-│   ├── <modulo>.service.spec.ts   # testes unitários com mocks de repository
-│   └── <modulo>.routes.spec.ts    # testes de integração com supertest
+│   ├── <modulo>.service.spec.ts      # testes unitários com mocks de repository
+│   ├── <modulo>.repository.spec.ts   # testes de repository com pool mockado
+│   └── <modulo>.routes.spec.ts       # testes de integração com supertest
 └── shared/
 | `npm run migrate` | knex migrate:latest |
 | `npm run migrate:make <nome>` | cria nova migration ts |

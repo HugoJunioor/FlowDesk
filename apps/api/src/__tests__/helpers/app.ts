@@ -16,6 +16,10 @@ import { authRoutes } from '@modules/auth/auth.routes';
 import { demandaRoutes } from '@modules/demanda/demanda.routes';
 import { auditoriaRoutes } from '@modules/auditoria/auditoria.routes';
 import { notificacaoRoutes } from '@modules/notificacao/notificacao.routes';
+import { notaRoutes } from '@modules/nota/nota.routes';
+import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
+import { telegramRoutes } from '@modules/telegram/telegram.routes';
+import { healthRoutes } from '@modules/health/health.routes';
 
 export function createTestApp(): Express {
   const app = express();
@@ -31,6 +35,10 @@ export function createTestApp(): Express {
   app.use('/api/v1/demandas', demandaRoutes);
   app.use('/api/v1/auditoria', auditoriaRoutes);
   app.use('/api/v1/notificacoes', notificacaoRoutes);
+  app.use('/api/v1/notas', notaRoutes);
+  app.use('/api/v1/usuarios', usuariosRoutes);
+  app.use('/api/v1/telegram', telegramRoutes);
+  app.use('/health', healthRoutes);
 
   app.use((req, res) => {
     res.status(404).json({ erro: true, mensagem: 'Not found', codigo: 'ROTA_NAO_ENCONTRADA' });
