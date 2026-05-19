@@ -46,11 +46,13 @@ function priorityColor(p: SlackDemand["priority"]) {
 }
 
 function statusBadge(s: SlackDemand["status"]) {
-  const map = {
+  const map: Record<string, { label: string; cls: string; icon: typeof AlertCircle }> = {
     aberta: { label: "Aberta", cls: "bg-warning/10 text-warning border-warning/30", icon: AlertCircle },
     em_andamento: { label: "Em andamento", cls: "bg-info/10 text-info border-info/30", icon: Loader2 },
     concluida: { label: "Concluída", cls: "bg-success/10 text-success border-success/30", icon: CheckCircle2 },
     expirada: { label: "Expirada", cls: "bg-destructive/10 text-destructive border-destructive/30", icon: Clock },
+    aguardando_aprovacao: { label: "Aguardando aprovação", cls: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30", icon: Clock },
+    reprovada: { label: "Reprovada", cls: "bg-destructive/10 text-destructive border-destructive/30", icon: AlertCircle },
   };
   return map[s] ?? map.aberta;
 }
@@ -64,12 +66,22 @@ function formatRelativeDate(iso: string): string {
   return `${dd}/${mm} ${hh}:${min}`;
 }
 
+type InfraScope = "mine" | "all";
+
+function loadInfraScope(): InfraScope {
+  try {
+    const v = localStorage.getItem("flowdesk:demandas:scope");
+    return v === "all" ? "all" : "mine";
+  } catch { return "mine"; }
+}
+
 const Infra = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [demands, setDemands] = useState<SlackDemand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scope, setScope] = useState<InfraScope>(loadInfraScope);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todas");
   const [kindFilter, setKindFilter] = useState<KindFilter>("todos");
   const [modalOpen, setModalOpen] = useState(false);
@@ -171,9 +183,15 @@ const Infra = () => {
     return () => clearInterval(id);
   }, [reload]);
 
+  // Scope: "mine" mostra apenas demandas onde o usuario e responsavel ou requester
+  const scopedDemands = demands.filter((d) => {
+    if (scope === "all" || !currentUser) return true;
+    return d.assignee?.name === currentUser.name || d.requester.name === currentUser.name;
+  });
+
   // Aplica primeiro o filtro de tipo (SQL/Deploy/Todos), depois o de status.
   // Assim os contadores dos quadros refletem a selecao de tipo atual.
-  const byKind = demands.filter((d) => {
+  const byKind = scopedDemands.filter((d) => {
     if (kindFilter === "todos") return true;
     return d.infraKind === kindFilter;
   });
@@ -196,8 +214,8 @@ const Infra = () => {
     em_andamento: byKind.filter(d => d.status === "em_andamento").length,
     em_atraso: byKind.filter(isOverdue).length,
     concluidas: byKind.filter(d => d.status === "concluida").length,
-    sql: demands.filter(d => d.infraKind === "sql").length,
-    deploy: demands.filter(d => d.infraKind === "deploy").length,
+    sql: scopedDemands.filter(d => d.infraKind === "sql").length,
+    deploy: scopedDemands.filter(d => d.infraKind === "deploy").length,
   };
 
   const handleAttend = async (d: SlackDemand) => {
@@ -273,6 +291,21 @@ const Infra = () => {
             <p className="text-sm text-muted-foreground">Demandas internas de Operações SQL e Deploy</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Scope toggle */}
+            <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+              <button
+                onClick={() => { setScope("mine"); localStorage.setItem("flowdesk:demandas:scope", "mine"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Apenas minhas
+              </button>
+              <button
+                onClick={() => { setScope("all"); localStorage.setItem("flowdesk:demandas:scope", "all"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Todas
+              </button>
+            </div>
             <Button onClick={() => openModal("sql")} variant="outline" className="gap-2">
               <Database size={14} /> Nova SQL
             </Button>
