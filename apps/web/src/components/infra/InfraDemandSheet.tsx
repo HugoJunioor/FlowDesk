@@ -5,7 +5,8 @@
  * banco, query, anexos, link, requester, assignee, datas.
  *
  * Permite mudar status (atender/concluir/reabrir) e a prioridade
- * direto do sheet.
+ * direto do sheet. Aprovadores podem aprovar ou reprovar demandas
+ * SQL/Deploy que estejam em aguardando_aprovacao.
  */
 import { useState, useEffect } from "react";
 import {
@@ -19,8 +20,9 @@ import {
 import {
   Database, Rocket, Copy, ExternalLink, Paperclip, Download, Clock,
   CheckCircle2, AlertCircle, Loader2, Trash2, User, UserCircle, Calendar,
-  Pencil, Save, X,
+  Pencil, Save, X, ThumbsUp, ThumbsDown,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,13 +49,24 @@ function formatDateTime(iso: string | null | undefined): string {
 }
 
 function statusVisual(s: SlackDemand["status"]) {
-  const map = {
+  const map: Record<string, { label: string; cls: string; icon: typeof AlertCircle }> = {
     aberta: { label: "Aberta", cls: "bg-warning/10 text-warning border-warning/30", icon: AlertCircle },
     em_andamento: { label: "Em andamento", cls: "bg-info/10 text-info border-info/30", icon: Loader2 },
     concluida: { label: "Concluída", cls: "bg-success/10 text-success border-success/30", icon: CheckCircle2 },
     expirada: { label: "Expirada", cls: "bg-destructive/10 text-destructive border-destructive/30", icon: Clock },
+    aguardando_aprovacao: { label: "Aguardando aprovação", cls: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30", icon: Clock },
+    reprovada: { label: "Reprovada", cls: "bg-destructive/10 text-destructive border-destructive/30", icon: AlertCircle },
   };
   return map[s] ?? map.aberta;
+}
+
+function isApprover(userEmail: string | undefined, userRole: string | undefined): boolean {
+  if (!userEmail) return false;
+  if (userRole === "master") return true;
+  try {
+    const list = JSON.parse(localStorage.getItem("flowdesk:approvers") || "[]") as string[];
+    return list.includes(userEmail);
+  } catch { return false; }
 }
 
 function priorityVisual(p: SlackDemand["priority"]) {
@@ -69,12 +82,16 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
   const [saving, setSaving] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descDraft, setDescDraft] = useState("");
+  const [showReprovacao, setShowReprovacao] = useState(false);
+  const [motivoReprovacao, setMotivoReprovacao] = useState("");
 
   // Reset ao abrir
   useEffect(() => {
     if (open && demand) {
       setEditingDescription(false);
       setDescDraft(demand.description || "");
+      setShowReprovacao(false);
+      setMotivoReprovacao("");
     }
   }, [open, demand]);
 
@@ -82,6 +99,7 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
 
   const sb = statusVisual(demand.status);
   const pv = priorityVisual(demand.priority);
+  const canApprove = isApprover(currentUser?.email, currentUser?.role);
   const isOverdue =
     demand.dueDate &&
     demand.status !== "concluida" &&
@@ -191,7 +209,7 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
                 <Loader2 size={14} className="mr-1.5" /> Atender
               </Button>
             )}
-            {demand.status !== "concluida" && (
+            {demand.status !== "concluida" && demand.status !== "aguardando_aprovacao" && demand.status !== "reprovada" && (
               <Button
                 size="sm"
                 onClick={() => updateDemand({ status: "concluida" })}
@@ -209,6 +227,29 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
               >
                 Reabrir
               </Button>
+            )}
+
+            {/* Botoes de aprovacao — visivel apenas para aprovadores quando aguardando */}
+            {demand.status === "aguardando_aprovacao" && canApprove && (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                  onClick={() => updateDemand({ status: "aberta" })}
+                  disabled={saving}
+                >
+                  <ThumbsUp size={13} /> Aprovar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive/50 text-destructive hover:bg-destructive/10 gap-1.5"
+                  onClick={() => setShowReprovacao((v) => !v)}
+                  disabled={saving}
+                >
+                  <ThumbsDown size={13} /> Reprovar
+                </Button>
+              </>
             )}
 
             {/* Mudar prioridade inline */}
@@ -248,6 +289,47 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
             </TabsList>
 
             <TabsContent value="detalhes" className="space-y-4 mt-3">
+          {/* Formulário de reprovação (inline, aparece ao clicar em Reprovar) */}
+          {showReprovacao && demand.status === "aguardando_aprovacao" && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+              <p className="text-xs font-medium text-destructive">Motivo da reprovação</p>
+              <Input
+                value={motivoReprovacao}
+                onChange={(e) => setMotivoReprovacao(e.target.value)}
+                placeholder="Descreva o motivo..."
+                className="text-xs h-8"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 text-xs"
+                  disabled={saving || !motivoReprovacao.trim()}
+                  onClick={() => {
+                    void updateDemand({
+                      status: "reprovada",
+                      description: demand.description
+                        ? `${demand.description}\n\n[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivoReprovacao.trim()}`
+                        : `[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivoReprovacao.trim()}`,
+                    });
+                    setShowReprovacao(false);
+                    setMotivoReprovacao("");
+                  }}
+                >
+                  Confirmar reprovação
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => { setShowReprovacao(false); setMotivoReprovacao(""); }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Metadados */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs border rounded-md p-3">
             <div className="flex items-center gap-2">
