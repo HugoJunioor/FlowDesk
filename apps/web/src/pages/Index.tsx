@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -136,8 +137,19 @@ const CustomSlaTooltip = ({ active, payload, label }: any) => {
 
 const MONTH_NAMES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
+type DashboardScope = "mine" | "all";
+
+function loadDashboardScope(): DashboardScope {
+  try {
+    const v = localStorage.getItem("flowdesk:demandas:scope");
+    return v === "all" ? "all" : "mine";
+  } catch { return "mine"; }
+}
+
 const Dashboard = () => {
+  const { currentUser } = useAuth();
   const { trigger: triggerSync, isPending: isSyncing } = useSyncTrigger();
+  const [scope, setScope] = useState<DashboardScope>(loadDashboardScope);
   const [period, setPeriod] = useState<Period>("mensal");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [client, setClient] = useState("");
@@ -205,26 +217,34 @@ const Dashboard = () => {
   }, []);
   const allDemands = useMemo(() => getProcessedDemands(), [refreshTick]);
 
+  const scopedAllDemands = useMemo(() => {
+    if (scope === "all" || !currentUser) return allDemands;
+    return allDemands.filter((d) =>
+      d.assignee?.name === currentUser.name ||
+      d.cc.includes(currentUser.name)
+    );
+  }, [allDemands, scope, currentUser]);
+
   // Onboarding
   const { shouldShow: showOnboarding, currentStep: onboardingStep, setCurrentStep: setOnboardingStep, dismiss: dismissOnboarding } =
     useOnboardingStatus(allDemands.length);
 
   const clients = useMemo(() => {
     const set = new Set<string>();
-    allDemands.forEach((d) => {
+    scopedAllDemands.forEach((d) => {
       const c = extractClientName(d.slackChannel);
       if (c !== d.slackChannel) set.add(c);
     });
     return Array.from(set).sort();
-  }, [allDemands]);
+  }, [scopedAllDemands]);
 
   const assignees = useMemo(() => {
     const set = new Set<string>();
-    allDemands.forEach((d) => {
+    scopedAllDemands.forEach((d) => {
       if (d.assignee?.name) set.add(d.assignee.name);
     });
     return Array.from(set).sort();
-  }, [allDemands]);
+  }, [scopedAllDemands]);
 
   const getDateRange = () => {
     const now = new Date();
@@ -243,14 +263,14 @@ const Dashboard = () => {
   // Global filter: period + client
   const filtered = useMemo(() => {
     const range = getDateRange();
-    return allDemands.filter((d) => {
+    return scopedAllDemands.filter((d) => {
       const created = new Date(d.createdAt);
       if (created < range.from || created > range.to) return false;
       if (client && extractClientName(d.slackChannel) !== client) return false;
       if (assignee && d.assignee?.name !== assignee) return false;
       return true;
     });
-  }, [period, client, assignee, customFrom, customTo, selectedYear, allDemands]);
+  }, [period, client, assignee, customFrom, customTo, selectedYear, scopedAllDemands]);
 
   // === METRICS (from global filtered) ===
   const total = filtered.length;
@@ -453,6 +473,21 @@ const Dashboard = () => {
               <p className="text-muted-foreground text-sm text-center sm:text-left">Visao analitica das demandas Slack</p>
             </div>
             <div className="flex items-center gap-2">
+              {/* Scope toggle */}
+              <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+                <button
+                  onClick={() => { setScope("mine"); localStorage.setItem("flowdesk:demandas:scope", "mine"); }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Apenas minhas
+                </button>
+                <button
+                  onClick={() => { setScope("all"); localStorage.setItem("flowdesk:demandas:scope", "all"); }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Todas
+                </button>
+              </div>
               {!presentationMode && (
                 <Button
                   variant="outline"

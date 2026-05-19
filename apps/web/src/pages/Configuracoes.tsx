@@ -1,3 +1,4 @@
+import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,19 +9,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Moon, Sun, Bell, Shield, Palette, Globe, Check } from "lucide-react";
+import { Moon, Sun, Bell, Shield, Palette, Globe, Check, Lock, Users } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { COLOR_THEMES } from "@/config/themes";
 import { AVAILABLE_LANGUAGES } from "@/lib/i18n";
+import { getAllUsers } from "@/lib/authStorage";
 import type { Language } from "@/types/auth";
 import NotificationPreferencesCard from "@/components/notifications/NotificationPreferencesCard";
+import { TelegramConnect } from "@/modules/configuracoes/components/TelegramConnect";
+
+function loadApprovers(): string[] {
+  try {
+    const v = localStorage.getItem("flowdesk:approvers");
+    return v ? JSON.parse(v) : [];
+  } catch { return []; }
+}
+
+function saveApprovers(list: string[]) {
+  localStorage.setItem("flowdesk:approvers", JSON.stringify(list));
+}
 
 const Configuracoes = () => {
   const { mode, colorTheme, toggleMode, setColorTheme } = useTheme();
-  const { username } = useAuth();
+  const { username, currentUser } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const isMaster = currentUser?.role === "master";
+  const allUsers = getAllUsers().filter((u) => u.status === "active");
+  const [approvers, setApprovers] = useState<string[]>(loadApprovers);
+
+  const toggleApprover = (email: string) => {
+    setApprovers((prev) => {
+      const next = prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email];
+      saveApprovers(next);
+      return next;
+    });
+  };
 
   return (
     <AppLayout>
@@ -176,6 +201,103 @@ const Configuracoes = () => {
 
         {/* Notificacoes — card funcional com toggles */}
         <NotificationPreferencesCard />
+
+        {/* Telegram — conexão e preferência de canal */}
+        <TelegramConnect />
+
+        {/* Master-only: Configuração de Operações SQL */}
+        {isMaster ? (
+          <Card className="border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Lock size={18} className="text-primary" />
+                <CardTitle className="text-base font-semibold">Configuração de Operações SQL</CardTitle>
+              </div>
+              <CardDescription>
+                Apenas administradores podem configurar regras SQL/Deploy.
+                Operações SQL e Deploy passam por um aprovador antes de serem executadas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Demandas de tipo SQL e Deploy criadas no módulo Infra entram com status
+                <strong className="text-foreground mx-1">Aguardando Aprovação</strong>
+                e só são liberadas ao destinatário após aprovação de um dos aprovadores abaixo.
+              </p>
+              <div className="rounded-md border p-3 bg-warning/5 border-warning/20 text-xs text-warning flex items-start gap-2">
+                <Lock size={13} className="mt-0.5 shrink-0" />
+                <span>Apenas administradores podem configurar regras SQL/Deploy.</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border border-border shadow-sm opacity-60 pointer-events-none">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-muted">
+                  <Lock size={18} className="text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Configuração de Operações SQL</p>
+                  <p className="text-xs text-muted-foreground">Apenas administradores podem configurar regras SQL/Deploy.</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="mt-3 text-[10px]">Acesso restrito</Badge>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Master-only: Aprovadores de Operações */}
+        {isMaster && (
+          <Card className="border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-primary" />
+                <CardTitle className="text-base font-semibold">Aprovadores de Operações</CardTitle>
+              </div>
+              <CardDescription>
+                Usuários que podem aprovar ou reprovar demandas SQL e Deploy.
+                Por padrão, todos os masters podem aprovar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {allUsers.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum usuário ativo encontrado.</p>
+              )}
+              {allUsers.map((u) => {
+                const isApprover = approvers.includes(u.email) || (approvers.length === 0 && u.role === "master");
+                return (
+                  <div key={u.id} className="flex items-center justify-between gap-3 py-2 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[11px] font-bold">
+                        {u.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{u.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                      </div>
+                      {u.role === "master" && <Badge variant="secondary" className="text-[10px]">master</Badge>}
+                    </div>
+                    <button
+                      onClick={() => toggleApprover(u.email)}
+                      className={`w-8 h-8 rounded-md border flex items-center justify-center transition-colors ${
+                        isApprover
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                      }`}
+                      title={isApprover ? "Remover aprovador" : "Adicionar aprovador"}
+                    >
+                      <Check size={14} strokeWidth={isApprover ? 3 : 1.5} />
+                    </button>
+                  </div>
+                );
+              })}
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Lista salva localmente em <code>flowdesk:approvers</code>.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Em breve — apenas Seguranca agora */}
         <Card className="border border-border shadow-sm opacity-60">
