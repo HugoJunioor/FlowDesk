@@ -14,6 +14,7 @@ import { notaRoutes } from '@modules/nota/nota.routes';
 import { demandaRoutes } from '@modules/demanda/demanda.routes';
 import { auditoriaRoutes } from '@modules/auditoria/auditoria.routes';
 import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
+import { lembreteRoutes } from '@modules/lembretes/lembrete.routes';
 import { telegramRoutes } from '@modules/telegram/telegram.routes';
 import { env } from '@config/env';
 import { docsRoutes } from './docs.routes';
@@ -33,6 +34,7 @@ v1.use('/demandas', demandaRoutes);
 v1.use('/auditoria', auditoriaRoutes);
 v1.use('/usuarios', usuariosRoutes);
 v1.use('/templates', templateRoutes);
+v1.use('/lembretes', lembreteRoutes);
 v1.use('/telegram', telegramRoutes);
 
 // Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false

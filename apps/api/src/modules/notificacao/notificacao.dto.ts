@@ -66,18 +66,21 @@ export const preferenciaSchema = z.object({
     inbox: z.boolean().default(true),
     browserPush: z.boolean().default(false),
     email: z.boolean().default(false),
-  }).default({ inbox: true, browserPush: false, email: false }),
+    telegram: z.boolean().default(true),
+  }).default({ inbox: true, browserPush: false, email: false, telegram: true }),
   slaReminders: z.object({
     p1Hours: z.number().int().nonnegative().default(1),
     p2Hours: z.number().int().nonnegative().default(2),
     p3Hours: z.number().int().nonnegative().default(4),
   }).default({ p1Hours: 1, p2Hours: 2, p3Hours: 4 }),
+  dailyReminder: z.boolean().default(true),
 });
 export type PreferenciaInput = z.infer<typeof preferenciaSchema>;
 
 export interface Preferencia {
   usuarioEmail: string;
   eventos: Record<string, boolean>;
-  canais: { inbox: boolean; browserPush: boolean; email: boolean };
+  canais: { inbox: boolean; browserPush: boolean; email: boolean; telegram: boolean };
   slaReminders: { p1Hours: number; p2Hours: number; p3Hours: number };
+  dailyReminder: boolean;
 }
