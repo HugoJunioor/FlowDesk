@@ -38,13 +38,47 @@ export function createApp(): Express {
   app.use(requestId);
 
   // 2. Security headers
-  app.use(helmet());
+  const isProd = env.NODE_ENV === 'production';
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: isProd ? ["'self'"] : ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https://avatars.slack-edge.com', 'https://*.slack-edge.com'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      hsts: isProd ? { maxAge: 31_536_000, includeSubDomains: true } : false,
+      frameguard: { action: 'deny' },
+      noSniff: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      permittedCrossDomainPolicies: false,
+      crossOriginEmbedderPolicy: false, // compatibilidade com Swagger UI
+    }),
+  );
+  // Permissions-Policy nao coberto pelo helmet — header manual
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
 
-  // 3. CORS
+  // 3. CORS — em prod, somente origens em ALLOWED_ORIGINS (lista CSV via env).
+  //    Em dev, requests sem Origin (ex: curl, Postman, server-side) sao aceitos.
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
+        // Requests sem Origin (curl / SSR / health checks)
+        if (!origin) {
+          if (env.NODE_ENV === 'production') {
+            return callback(new Error('Origin obrigatoria em producao'));
+          }
+          return callback(null, true);
+        }
         if (env.ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
         return callback(new Error(`Origem nao permitida: ${origin}`));
       },
@@ -89,11 +123,13 @@ export function createApp(): Express {
     }),
   );
 
-  // 9. Rate limit geral (mais conservador). Rotas sensiveis tem proprio.
+  // 9. Rate limit global — 100 req/min por IP em todas as rotas /api/v1.
+  //    Rotas sensiveis (ex: /auth/login) tem limite proprio mais restritivo.
   app.use(
+    '/api/v1',
     rateLimit({
       windowMs: 60_000,
-      limit: env.RATE_LIMIT_READ,
+      limit: 100,
       standardHeaders: true,
       legacyHeaders: false,
       message: { erro: true, mensagem: 'Muitas requisicoes', codigo: 'RATE_LIMIT' },
