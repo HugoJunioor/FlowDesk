@@ -219,10 +219,9 @@ const Dashboard = () => {
 
   const scopedAllDemands = useMemo(() => {
     if (scope === "all" || !currentUser) return allDemands;
-    return allDemands.filter((d) =>
-      d.assignee?.name === currentUser.name ||
-      d.cc.includes(currentUser.name)
-    );
+    // Strict: apenas onde sou o responsavel atual (assignee). CC fica
+    // poluido com ex-responsaveis pelo header do Slack original.
+    return allDemands.filter((d) => d.assignee?.name === currentUser.name);
   }, [allDemands, scope, currentUser]);
 
   // Onboarding
