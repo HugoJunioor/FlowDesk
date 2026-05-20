@@ -17,8 +17,8 @@ RUN npm ci --legacy-peer-deps --workspace=@flowdesk/api --include-workspace-root
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# npm workspaces hospedam node_modules so na raiz — apps/api nao tem o seu
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package.json package-lock.json ./
 COPY apps/api ./apps/api
 
@@ -37,11 +37,6 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=build --chown=flowdesk:nodejs /app/apps/api/dist ./dist
 COPY --from=build --chown=flowdesk:nodejs /app/apps/api/package.json ./
 COPY --from=build --chown=flowdesk:nodejs /app/node_modules ./node_modules
-COPY --from=build --chown=flowdesk:nodejs /app/apps/api/node_modules ./node_modules_local
-
-# Merge local node_modules sobrescrevem root (resolve simbolos do workspace)
-RUN cp -rn /app/node_modules_local/* /app/node_modules/ 2>/dev/null || true \
- && rm -rf /app/node_modules_local
 
 USER flowdesk
 
