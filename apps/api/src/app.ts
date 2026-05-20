@@ -69,22 +69,26 @@ export function createApp(): Express {
 
   // 3. CORS — em prod, somente origens em ALLOWED_ORIGINS (lista CSV via env).
   //    Em dev, requests sem Origin (ex: curl, Postman, server-side) sao aceitos.
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        // Requests sem Origin (curl / SSR / health checks)
-        if (!origin) {
-          if (env.NODE_ENV === 'production') {
-            return callback(new Error('Origin obrigatoria em producao'));
-          }
-          return callback(null, true);
+  //    /health, /healthz e /api/v1/version sao infrastructure — sem CORS.
+  const noCorsPaths = ['/health', '/healthz', '/api/v1/version'];
+  const corsMw = cors({
+    origin: (origin, callback) => {
+      // Requests sem Origin (curl / SSR / health checks)
+      if (!origin) {
+        if (env.NODE_ENV === 'production') {
+          return callback(new Error('Origin obrigatoria em producao'));
         }
-        if (env.ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        return callback(new Error(`Origem nao permitida: ${origin}`));
-      },
-      credentials: true,
-    }),
-  );
+        return callback(null, true);
+      }
+      if (env.ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      return callback(new Error(`Origem nao permitida: ${origin}`));
+    },
+    credentials: true,
+  });
+  app.use((req, res, next) => {
+    if (noCorsPaths.includes(req.path)) return next();
+    return corsMw(req, res, next);
+  });
 
   // 4. Compression
   app.use(compression());

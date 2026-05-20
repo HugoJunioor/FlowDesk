@@ -17,7 +17,8 @@ import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
 import { lembreteRoutes } from '@modules/lembretes/lembrete.routes';
 import { telegramRoutes } from '@modules/telegram/telegram.routes';
 import { env } from '@config/env';
-import { docsRoutes } from './docs.routes';
+// docs.routes eh importado LAZY abaixo pra nao puxar @asteasolutions/zod-to-openapi
+// quando OPENAPI_ENABLED=false (carregar o modulo crasha em algumas versoes de Zod).
 
 export const apiRouter = Router();
 
@@ -38,8 +39,11 @@ v1.use('/lembretes', lembreteRoutes);
 v1.use('/telegram', telegramRoutes);
 v1.use('/version', versionRoutes);
 
-// Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false
+// Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false.
+// Import lazy: so carrega quando ENABLED (evita crash de zod-to-openapi em prod).
 if (env.OPENAPI_ENABLED) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { docsRoutes } = require('./docs.routes');
   v1.use('/docs', docsRoutes);
 }
 

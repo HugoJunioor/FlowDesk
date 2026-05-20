@@ -27,8 +27,24 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { pool } from '../config/database';
 import { logger } from '../shared/logging/logger';
+
+const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Converte ID legacy (ex: 'note_1778539566886_d7yn7d') em UUID v8-like
+ * deterministico (mesmo input -> mesma saida). Mantem UUID v4 ja existente.
+ *
+ * Permite re-rodar o import sem criar duplicatas (chave estavel).
+ */
+function toUuid(legacyId: string | null | undefined): string {
+  if (!legacyId) return crypto.randomUUID();
+  if (UUID_V4_RE.test(legacyId)) return legacyId;
+  const h = crypto.createHash('sha256').update(legacyId).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
 
 // Resolve a partir do cwd (esperado: rodar de apps/api). Se cwd for
 // diferente, define IMPORT_SOURCE_DIR explicitamente.
@@ -94,7 +110,7 @@ async function importNotas(dryRun: boolean): Promise<{ inserted: number; skipped
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (id) DO NOTHING`,
       [
-        n.id,
+        toUuid(n.id),
         n.userEmail,
         n.title,
         n.content ?? '',
@@ -115,7 +131,7 @@ async function importNotas(dryRun: boolean): Promise<{ inserted: number; skipped
           `INSERT INTO tb_item_nota (id, nota_id, texto, feito, ordem)
            VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (id) DO NOTHING`,
-          [item.id, n.id, item.text, item.done, ordem++],
+          [toUuid(item.id), toUuid(n.id), item.text, item.done, ordem++],
         );
       }
     } else {
@@ -160,7 +176,7 @@ async function importNotificacoes(
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (id) DO NOTHING`,
       [
-        n.id,
+        toUuid(n.id),
         n.userEmail,
         n.event,
         n.source,
@@ -267,7 +283,7 @@ async function importInfraDemandas(
                $14, $15, $16, $17, $18, $19)
        ON CONFLICT (id) DO NOTHING`,
       [
-        d.id,
+        toUuid(d.id),
         d.title,
         d.description ?? null,
         d.priority,

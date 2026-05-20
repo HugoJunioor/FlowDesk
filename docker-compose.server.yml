@@ -12,8 +12,8 @@
 services:
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     container_name: flowdesk-api
     restart: unless-stopped
     env_file:
