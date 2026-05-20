@@ -1,0 +1,91 @@
+# FlowDesk — compose para o servidor onde JA existem Traefik + Postgres rodando.
+#
+# - Reusa Traefik global do servidor (rede 'host') via labels Docker
+# - Reusa Postgres do compose cfo-db-1 via rede 'cfo_default' (cria DB `flowdesk` previamente)
+# - Aplica IP whitelist (vpn-only) e SSL automatico (cert resolver 'letsencrypt' do Traefik global)
+#
+# Uso (no diretorio /opt/flowdesk/app no servidor):
+#   docker compose -f docker-compose.server.yml build
+#   docker compose -f docker-compose.server.yml up -d
+#   docker compose -f docker-compose.server.yml logs -f api
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: flowdesk-api
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      TZ: America/Sao_Paulo
+      APP_BASE_URL: "https://${DOMAIN}"
+      ALLOWED_ORIGINS: "https://${DOMAIN}"
+      COOKIE_DOMAIN: "${DOMAIN}"
+      COOKIE_SECURE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      # Traefik global usa network cfo_default pra alcancar este container
+      - "traefik.docker.network=cfo_default"
+      - "traefik.http.services.flowdesk-api.loadbalancer.server.port=4000"
+      # /api/v1/*, /health, /healthz vao pra API
+      - "traefik.http.routers.flowdesk-api.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api/`) || Path(`/health`) || Path(`/healthz`))"
+      - "traefik.http.routers.flowdesk-api.entrypoints=websecure"
+      - "traefik.http.routers.flowdesk-api.tls=true"
+      - "traefik.http.routers.flowdesk-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.flowdesk-api.priority=10"
+      # IP whitelist (definido no router web pra reusar a mesma middleware)
+      - "traefik.http.routers.flowdesk-api.middlewares=flowdesk-vpn@docker"
+    networks:
+      # cfo_default = rede onde o Postgres (cfo-db-1) esta + Traefik consegue ler
+      - cfo_default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_BUILD_SHA: "${BUILD_SHA:-prod}"
+        VITE_BUILD_DATE: "${BUILD_DATE:-}"
+    container_name: flowdesk-web
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=cfo_default"
+      - "traefik.http.services.flowdesk-web.loadbalancer.server.port=80"
+      - "traefik.http.routers.flowdesk-web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.flowdesk-web.entrypoints=websecure"
+      - "traefik.http.routers.flowdesk-web.tls=true"
+      - "traefik.http.routers.flowdesk-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.flowdesk-web.priority=1"
+      # Middleware compartilhada: IP whitelist das VPNs autorizadas.
+      # Aplicada nos routers de web e api.
+      - "traefik.http.middlewares.flowdesk-vpn.ipallowlist.sourcerange=${VPN_IPS}"
+      - "traefik.http.routers.flowdesk-web.middlewares=flowdesk-vpn@docker"
+    networks:
+      - cfo_default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+networks:
+  # Rede do compose do cfo (onde mora cfo-db-1). Externa — ja existe.
+  cfo_default:
+    external: true
+    name: cfo_default
