@@ -1,31 +1,47 @@
-# FlowDesk API — Dockerfile para desenvolvimento local + build de produção
+# FlowDesk API — multi-stage build (monorepo npm workspaces)
+#
+# Build context: RAIZ do monorepo (precisa do package-lock.json + apps/api).
+# Em docker-compose.server.yml: context: . / dockerfile: apps/api/Dockerfile
+
+# ─── Stage 1: deps ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS deps
-
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --include=dev
+# Copia manifests do workspace
+COPY package.json package-lock.json ./
+COPY apps/api/package.json ./apps/api/
 
+RUN npm ci --legacy-peer-deps --workspace=@flowdesk/api --include-workspace-root
+
+# ─── Stage 2: build ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS build
-
 WORKDIR /app
+
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY package.json package-lock.json ./
+COPY apps/api ./apps/api
 
-RUN npm run build
+RUN npm run build -w @flowdesk/api
 
+# ─── Stage 3: runner (prod) ─────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Usuário não-root pra produção
+# Usuario nao-root
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 flowdesk
 
-COPY --from=build --chown=flowdesk:nodejs /app/dist ./dist
+# Copia so o necessario pra rodar (sem dev deps)
+COPY --from=build --chown=flowdesk:nodejs /app/apps/api/dist ./dist
+COPY --from=build --chown=flowdesk:nodejs /app/apps/api/package.json ./
 COPY --from=build --chown=flowdesk:nodejs /app/node_modules ./node_modules
-COPY --from=build --chown=flowdesk:nodejs /app/package.json ./
+COPY --from=build --chown=flowdesk:nodejs /app/apps/api/node_modules ./node_modules_local
+
+# Merge local node_modules sobrescrevem root (resolve simbolos do workspace)
+RUN cp -rn /app/node_modules_local/* /app/node_modules/ 2>/dev/null || true \
+ && rm -rf /app/node_modules_local
 
 USER flowdesk
 
