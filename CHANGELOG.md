@@ -4,6 +4,30 @@ Todas as mudanças relevantes deste projeto seguem o formato
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.1.0](https://github.com/HugoJunioor/FlowDesk/compare/v1.0.0...v1.1.0) (2026-05-20)
+
+
+### Features
+
+* **api:** lembrete diario por email — cron 9h BRT + nodemailer + toggle UI ([#100](https://github.com/HugoJunioor/FlowDesk/issues/100)) ([53277e5](https://github.com/HugoJunioor/FlowDesk/commit/53277e59addfb9ce174aaa1e90933bdc5349aae3))
+* **deploy:** checklist de env vars + preflight-check + GET /api/v1/version ([#106](https://github.com/HugoJunioor/FlowDesk/issues/106)) ([296d9c2](https://github.com/HugoJunioor/FlowDesk/commit/296d9c239740e049cd35a4d8473682718d2d5955))
+* **deploy:** docker-compose.server.yml — reusa Traefik+Postgres existentes ([#111](https://github.com/HugoJunioor/FlowDesk/issues/111)) ([d450995](https://github.com/HugoJunioor/FlowDesk/commit/d450995360c203a9f48b6ebbbe2f556ca72a02e6))
+* **deploy:** stack producao com Traefik + SSL ([#108](https://github.com/HugoJunioor/FlowDesk/issues/108)) ([27baaf7](https://github.com/HugoJunioor/FlowDesk/commit/27baaf79796260de272702a96836422455b3b316))
+* **nota:** migra /notas para modulo padrao Just ([#88](https://github.com/HugoJunioor/FlowDesk/issues/88)) ([31a3b8c](https://github.com/HugoJunioor/FlowDesk/commit/31a3b8c8c8bc226061155f4d65502b6f66467293))
+* **telegram:** integração Telegram — linking por código, webhook, notificações, UI ([#99](https://github.com/HugoJunioor/FlowDesk/issues/99)) ([00c8bd9](https://github.com/HugoJunioor/FlowDesk/commit/00c8bd950ee3845601ab51d197d15d26199b9e3e))
+* **web:** cookie consent banner LGPD + pagina politica de cookies ([#87](https://github.com/HugoJunioor/FlowDesk/issues/87)) ([8b874f3](https://github.com/HugoJunioor/FlowDesk/commit/8b874f38012f47df9a3c8ff55a5e69fcce8aaa79))
+* **web:** Demandas Internas — rename, tipo Suporte, chat e dropdown ([#98](https://github.com/HugoJunioor/FlowDesk/issues/98)) ([23be3ec](https://github.com/HugoJunioor/FlowDesk/commit/23be3ec413f22afb246efd023334ac7cb4b35e31))
+* **web:** filtro scope 'apenas minhas' em Demandas, Dashboard e Infra ([#97](https://github.com/HugoJunioor/FlowDesk/issues/97)) ([55078a9](https://github.com/HugoJunioor/FlowDesk/commit/55078a931183e1b54fdac97368a1a3cb12f02a0d))
+* **web:** Quem precisa olhar usa usuarios do sistema com busca ([#101](https://github.com/HugoJunioor/FlowDesk/issues/101)) ([ea8f797](https://github.com/HugoJunioor/FlowDesk/commit/ea8f797ffdeef96bb48bd45ba3ab275d75bcb484))
+
+
+### Bug Fixes
+
+* **scripts:** push-bitbucket nao falha se bitbucket-main nao existe ([#110](https://github.com/HugoJunioor/FlowDesk/issues/110)) ([4f40dcb](https://github.com/HugoJunioor/FlowDesk/commit/4f40dcb325223c12bc7c427c8ddfc1504e775779))
+* **web:** [@mention](https://github.com/mention) abaixo do caret + diagnostico de members ([#93](https://github.com/HugoJunioor/FlowDesk/issues/93)) ([2d94146](https://github.com/HugoJunioor/FlowDesk/commit/2d94146b05d1fea0833cf49a0037062760067e27))
+* **web:** filtro 'apenas minhas' usa so assignee (sem cc) ([#103](https://github.com/HugoJunioor/FlowDesk/issues/103)) ([ffb2a93](https://github.com/HugoJunioor/FlowDesk/commit/ffb2a932f93bf2aad8af57f8571359dcafe9242a))
+* **web:** mention dropdown acima do textarea + auto-mapear @Nome do canal ([#92](https://github.com/HugoJunioor/FlowDesk/issues/92)) ([48e1d26](https://github.com/HugoJunioor/FlowDesk/commit/48e1d2648d2dc5f956471430874250d6fa5f904c))
+
 ## 1.0.0 (2026-05-17)
 
 
