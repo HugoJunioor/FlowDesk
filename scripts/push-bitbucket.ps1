@@ -34,11 +34,21 @@ if ($exists) {
 }
 git checkout -b bitbucket-main | Out-Null
 
-# 4. Force-add dos arquivos gitignored com branding Just
+# 4. Force-add dos arquivos gitignored com branding Just (skip se nao existir)
 Write-Host "[3/5] Adicionando arquivos Just (force)..." -ForegroundColor Cyan
-git add -f apps/web/src/config/branding.local.ts
-git add -f apps/web/public/just-logo.png
-git add -f apps/web/public/just-logo.svg
+$brandFiles = @(
+  'apps/web/src/config/branding.local.ts',
+  'apps/web/public/just-logo.png',
+  'apps/web/public/just-logo.svg'
+)
+foreach ($f in $brandFiles) {
+  if (Test-Path $f) {
+    git add -f $f
+    Write-Host "  + $f" -ForegroundColor DarkGray
+  } else {
+    Write-Host "  - $f (nao existe, pulando)" -ForegroundColor Yellow
+  }
+}
 
 if (git diff --cached --quiet) {
   Write-Host "  Nada novo pra commitar (Bitbucket ja tem o branding)." -ForegroundColor DarkGray
