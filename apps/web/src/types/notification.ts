@@ -16,7 +16,9 @@ export type NotificationEvent =
   | "demand_reopened"      // Demanda reaberta
   | "demand_overdue"       // SLA estourado
   | "demand_due_soon"      // SLA vencendo (configuravel: X horas antes)
-  | "demand_created";      // Nova demanda criada (pra time de infra/sql)
+  | "demand_created"       // Nova demanda criada (pra time de infra/sql)
+  | "demand_approved"      // Demanda SQL/Deploy aprovada pelo aprovador
+  | "demand_rejected";     // Demanda SQL/Deploy reprovada pelo aprovador
 
 export type NotificationChannel = "inbox" | "browser_push" | "email";
 
@@ -84,6 +86,8 @@ export const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userEmail"> = {
     demand_overdue: true,
     demand_due_soon: true,
     demand_created: false,  // ruido pro time, off por default
+    demand_approved: true,
+    demand_rejected: true,
   },
   channels: {
     inbox: true,         // sempre ligado
@@ -107,4 +111,6 @@ export const EVENT_LABELS: Record<NotificationEvent, { label: string; icon: stri
   demand_overdue: { label: "SLA estourado", icon: "AlertCircle" },
   demand_due_soon: { label: "SLA vencendo", icon: "Clock" },
   demand_created: { label: "Nova demanda criada", icon: "Plus" },
+  demand_approved: { label: "Demanda aprovada", icon: "ThumbsUp" },
+  demand_rejected: { label: "Demanda reprovada", icon: "ThumbsDown" },
 };
