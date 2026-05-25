@@ -556,7 +556,7 @@ app.get('/auth/slack/start', (req, res) => {
   const email = String(req.query.email || '');
   const clientId = process.env.SLACK_CLIENT_ID;
   const redirectUri = process.env.SLACK_REDIRECT_URI ||
-    `https://${process.env.DOMAIN || 'flow.justit.cloud'}/auth/slack/callback`;
+    `https://${process.env.DOMAIN}/auth/slack/callback`;
   if (!clientId) return res.status(500).json({ error: 'SLACK_CLIENT_ID nao configurado' });
   const userScopes = ['chat:write', 'files:write', 'users.profile:read'].join(',');
   const state = encodeURIComponent(email);
@@ -574,7 +574,7 @@ app.get('/auth/slack/callback', async (req, res) => {
   if (!code) return res.status(400).send('<h1>Erro</h1><p>code ausente</p>');
   try {
     const redirectUri = process.env.SLACK_REDIRECT_URI ||
-      `https://${process.env.DOMAIN || 'flow.justit.cloud'}/auth/slack/callback`;
+      `https://${process.env.DOMAIN}/auth/slack/callback`;
     const params = new URLSearchParams({
       client_id: process.env.SLACK_CLIENT_ID,
       client_secret: process.env.SLACK_CLIENT_SECRET,
