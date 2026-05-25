@@ -1,0 +1,6 @@
+{
+  "name": "legacy-state",
+  "type": "module",
+  "version": "1.0.0",
+  "dependencies": { "express": "^4.21.0" }
+}
