@@ -68,13 +68,9 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().default(''),
 
   // Email via SMTP — opt-in. Sem EMAIL_ENABLED=true, dispatchEmail vira no-op.
+  // SMTP_HOST/PORT/USER/PASS/FROM ja declarados acima (reusados pelo lembrete diario).
   EMAIL_ENABLED: z.coerce.boolean().default(false),
-  SMTP_HOST: z.string().default(''),
-  SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false), // true=465 (TLS), false=587 (STARTTLS)
-  SMTP_USER: z.string().default(''),
-  SMTP_PASS: z.string().default(''),
-  SMTP_FROM: z.string().default(''),
 }).superRefine((data, ctx) => {
   if (data.TELEGRAM_ENABLED) {
     if (!data.TELEGRAM_BOT_TOKEN) {
