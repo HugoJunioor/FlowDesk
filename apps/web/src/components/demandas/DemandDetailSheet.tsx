@@ -23,6 +23,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { toast } from "sonner";
 
+// Normaliza texto pra dedup. Diferencas entre sync e refresh ao vivo:
+//   - sync: "@Nome" + anotacoes "[Reacao de conclusao]" / "[Loading]" etc
+//   - refresh: "<@USER_ID>" cru, sem anotacoes
+// Sem normalizar, mensagens iguais aparecem duplicadas.
+function normalizeForDedup(text: string): string {
+  return text
+    .replace(/<@[A-Z0-9]+>/g, '@MENTION')   // raw Slack mention
+    .replace(/@[\w.\s-]+/g, '@MENTION')      // mention resolvido
+    .replace(/\[[^\]]*\]/g, '')              // anotacoes do sync entre []
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
   if (!match) return 60;
@@ -87,7 +101,7 @@ const DemandDetailSheet = ({
   // Replies otimistas — enviadas via composer, aparecem na thread imediatamente
   // antes do proximo sync. Limpa quando troca de demanda ou re-sync traz a real.
   const [refreshingThread, setRefreshingThread] = useState(false);
-  const [extraReplies, setExtraReplies] = useState<Array<{ author: string; text: string; timestamp: string; isTeamMember: boolean; files?: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }> }>>([]);
+  const [extraReplies, setExtraReplies] = useState<Array<{ author: string; text: string; timestamp: string; ts?: string; isTeamMember: boolean; files?: Array<{ id: string; name: string; mimetype: string; size: number; urlPrivate?: string; thumb360?: string; isPublic?: boolean }> }>>([]);
   const [optimisticReplies, setOptimisticReplies] = useState<Array<{
     author: string;
     text: string;
@@ -115,6 +129,31 @@ const DemandDetailSheet = ({
       setCompleteDate(format(now, "yyyy-MM-dd"));
       setCompleteTime(format(now, "HH:mm"));
       setCompleteObservation(demand.closure?.observation || "");
+      // Auto-refresh thread on open: pega replies frescas do Slack
+      // mesmo antes do proximo ciclo de sync (1-5min). Evita ter que
+      // recarregar/clicar Atualizar pra ver mensagem recem-enviada.
+      if (demand.slackPermalink) {
+        (async () => {
+          try {
+            const res = await apiClient.slack.threadReplies(demand.slackPermalink);
+            const teamNames = new Set(
+              demand.threadReplies.filter((r) => r.isTeamMember).map((r) => r.author.toLowerCase())
+            );
+            const existing = new Set(demand.threadReplies.map((r) => `${r.author}|${normalizeForDedup(r.text)}`));
+            const fresh = res.replies
+              .map((r) => ({
+                author: r.author,
+                text: r.text,
+                timestamp: r.timestamp,
+                ts: r.ts,
+                isTeamMember: teamNames.has(r.author.toLowerCase()) || r.isBot,
+                files: r.files,
+              }))
+              .filter((r) => !existing.has(`${r.author}|${normalizeForDedup(r.text)}`));
+            setExtraReplies(fresh);
+          } catch { /* silencioso — usuario ainda pode clicar Atualizar */ }
+        })();
+      }
     }
   }, [demand?.id]);
 
@@ -150,20 +189,23 @@ const DemandDetailSheet = ({
       );
       if (currentUser?.name) teamNames.add(currentUser.name.toLowerCase());
       // Mapeia replies do slack pra formato local + filtra repetidas (ja em threadReplies)
-      const existingTexts = new Set(demand.threadReplies.map((r) => `${r.author}|${r.text}`));
+      const existingTexts = new Set(demand.threadReplies.map((r) => `${r.author}|${normalizeForDedup(r.text)}`));
       const fresh = res.replies
         .map((r) => ({
           author: r.author,
           text: r.text,
           timestamp: r.timestamp,
+          ts: r.ts,
           isTeamMember: teamNames.has(r.author.toLowerCase()) || r.isBot,
           files: r.files,
         }))
-        .filter((r) => !existingTexts.has(`${r.author}|${r.text}`));
+        .filter((r) => !existingTexts.has(`${r.author}|${normalizeForDedup(r.text)}`));
       setExtraReplies(fresh);
-      // Tira otimistas que ja vieram
+      // Tira otimistas que ja vieram. Match por pendingTs (ts real do Slack
+      // retornado pelo /slack/reply) — texto pode divergir por causa de @mention
+      // que o frontend mostra como "@Nome" mas o Slack retorna como "<@USER_ID>".
       setOptimisticReplies((prev) =>
-        prev.filter((o) => !res.replies.some((r) => r.text === o.text))
+        prev.filter((o) => !res.replies.some((r) => r.ts === o.pendingTs))
       );
       toast.success(`${fresh.length} novas mensagens` , {
         description: `Total na thread: ${res.count}`,
@@ -177,16 +219,16 @@ const DemandDetailSheet = ({
   };
 
   // Edit/delete handlers — backend (chat.update / chat.delete via stateSync plugin)
-  const handleEditReply = async (reply: { text: string; timestamp: string }) => {
+  const handleEditReply = async (reply: { text: string; timestamp: string; ts?: string }) => {
     const newText = window.prompt("Editar mensagem:", reply.text);
     if (newText === null || newText.trim() === "" || newText === reply.text) return;
     try {
-      // ts no Slack eh derivado do timestamp via permalink — em commit futuro
-      // passamos o ts direto. Por hora, busca via permalink.
       await apiClient.slack.editReply({
         permalink: demand.slackPermalink,
         replyTimestamp: reply.timestamp,
+        replyTs: reply.ts,
         newText,
+        senderEmail: currentUser?.email,
       });
       toast.success("Mensagem atualizada no Slack");
     } catch (err) {
@@ -195,12 +237,14 @@ const DemandDetailSheet = ({
     }
   };
 
-  const handleDeleteReply = async (reply: { text: string; timestamp: string }) => {
+  const handleDeleteReply = async (reply: { text: string; timestamp: string; ts?: string }) => {
     if (!window.confirm(`Excluir mensagem?\n\n"${reply.text.slice(0, 100)}${reply.text.length > 100 ? "..." : ""}"`)) return;
     try {
       await apiClient.slack.deleteReply({
         permalink: demand.slackPermalink,
         replyTimestamp: reply.timestamp,
+        replyTs: reply.ts,
+        senderEmail: currentUser?.email,
       });
       toast.success("Mensagem excluída do Slack");
     } catch (err) {
@@ -210,18 +254,26 @@ const DemandDetailSheet = ({
   };
 
   // Combina: replies do sync + extra (refresh manual) + otimistas (em voo).
-  // Dedup por author+text. Otimisticas/extras sumem quando sync proximo trouxer.
+  // Dedup por author+texto normalizado (remove formato de @mention pra que
+  // "@Nome" (do sync) e "<@USERID>" (do refresh ao vivo) sejam considerados iguais).
+  const normalizeForDedup = (text: string) =>
+    text
+      .replace(/<@[A-Z0-9]+>/g, '@MENTION') // raw Slack mention
+      .replace(/@[\w.\s-]+/g, '@MENTION')   // mention resolvido
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   const mergedReplies = (() => {
     const real = demand.threadReplies || [];
-    const seen = new Set(real.map((r) => `${r.author}|${r.text}`));
+    const seen = new Set(real.map((r) => `${r.author}|${normalizeForDedup(r.text)}`));
     const fromExtra = extraReplies.filter((e) => {
-      const k = `${e.author}|${e.text}`;
+      const k = `${e.author}|${normalizeForDedup(e.text)}`;
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
     });
     const stillPending = optimisticReplies.filter(
-      (o) => !seen.has(`${o.author}|${o.text}`)
+      (o) => !seen.has(`${o.author}|${normalizeForDedup(o.text)}`)
     );
     return [...real, ...fromExtra, ...stillPending].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()

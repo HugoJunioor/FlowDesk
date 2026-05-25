@@ -72,8 +72,30 @@ function countMatches(text: string, keywords: string[]): string[] {
   return keywords.filter((kw) => lower.includes(kw));
 }
 
+// Regra dedicada P3: tipos de demanda recorrentes que sao SEMPRE P3 por
+// definicao operacional (independente do texto livre). Conciliacao e
+// remessa Sitef caem aqui — pra mostrarem contagem de SLA como os outros.
+const P3_FORCED_PATTERNS = [
+  "conciliacao",
+  "conciliação",
+  "remessa sitef",
+  "remessa de sitef",
+  "sitef remessa",
+];
+
 export function classifyDemand(title: string, description: string): ClassificationResult {
   const fullText = `${title} ${description}`.toLowerCase();
+
+  // Match dedicado de P3 forcado (conciliacao / remessa sitef)
+  const forced = P3_FORCED_PATTERNS.find((p) => fullText.includes(p));
+  if (forced) {
+    return {
+      priority: "p3",
+      confidence: "alta",
+      reason: `Classificado como P3 (Media) — Tipo de demanda recorrente "${forced}" sempre tratado como P3 por definicao operacional. Resposta: 4h, Resolucao: 24h.`,
+      matchedKeywords: [forced],
+    };
+  }
 
   const p1Matches = countMatches(fullText, P1_KEYWORDS);
   const p2Matches = countMatches(fullText, P2_KEYWORDS);
