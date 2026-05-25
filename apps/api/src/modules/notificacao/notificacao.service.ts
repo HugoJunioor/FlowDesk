@@ -12,6 +12,7 @@ import { logger } from '@shared/logging/logger';
 import { env } from '@config/env';
 import { pool } from '@config/database';
 import { telegramService } from '@modules/telegram/telegram.service';
+import { emailService } from '@modules/email/email.service';
 import { notificacaoRepository } from './notificacao.repository';
 import type {
   CreateNotificacaoInput,
@@ -55,7 +56,26 @@ export const notificacaoService = {
         .catch((err) => logger.warn({ err }, 'notificacao: falha ao despachar via Telegram'));
     }
 
+    // Despacha via Email se habilitado e preferencia do user permite
+    if (env.EMAIL_ENABLED) {
+      void notificacaoService
+        .dispatchEmail(input)
+        .catch((err) => logger.warn({ err }, 'notificacao: falha ao despachar via Email'));
+    }
+
     return created;
+  },
+
+  async dispatchEmail(input: CreateNotificacaoInput): Promise<void> {
+    const prefs = await notificacaoService.getPreferencia(input.usuarioEmail);
+    if (!prefs.canais.email) return;
+    await emailService.sendNotification({
+      to: input.usuarioEmail,
+      titulo: input.titulo,
+      mensagem: input.mensagem ?? '',
+      demandaId: input.demandaId,
+      ator: input.ator,
+    });
   },
 
   async dispatchTelegram(input: CreateNotificacaoInput): Promise<void> {

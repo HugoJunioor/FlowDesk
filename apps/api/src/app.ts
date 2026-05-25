@@ -34,6 +34,10 @@ import { apiRouter } from './routes';
 export function createApp(): Express {
   const app = express();
 
+  // Traefik na frente — confia no X-Forwarded-* (necessario pro
+  // rate limit identificar IP real do cliente). 1 = um proxy unico.
+  app.set('trust proxy', 1);
+
   // 1. Request ID — sempre primeiro pra propagar no log
   app.use(requestId);
 
@@ -72,13 +76,11 @@ export function createApp(): Express {
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Requests sem Origin (curl / SSR / health checks)
-        if (!origin) {
-          if (env.NODE_ENV === 'production') {
-            return callback(new Error('Origin obrigatoria em producao'));
-          }
-          return callback(null, true);
-        }
+        // Requests sem Origin (curl / SSR / health checks / same-origin GET).
+        // Browsers nao mandam Origin em requests same-origin, e CORS so eh
+        // ameaca quando ha contexto cross-origin (sempre vem com Origin).
+        // Logo, ausencia de Origin eh segura — liberar.
+        if (!origin) return callback(null, true);
         if (env.ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
         return callback(new Error(`Origem nao permitida: ${origin}`));
       },
