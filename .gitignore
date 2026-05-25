@@ -68,3 +68,8 @@ apps/web/public/just-logo.*
 .env.bak*
 coverage
 storybook-static/
+
+# Worktree git órfão (cópia local equivocada)
+/app/
+# Backups locais
+flowdesk-data-backup.zip
