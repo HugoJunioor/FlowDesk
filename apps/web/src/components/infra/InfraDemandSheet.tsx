@@ -28,7 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/apiClient";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
-import { notifyStarted, notifyCompleted, notifyReopened } from "@/lib/notificationEvents";
+import { notifyStarted, notifyCompleted, notifyReopened, notifyApproved, notifyRejected } from "@/lib/notificationEvents";
 import InfraDemandChat from "@/components/infra/InfraDemandChat";
 
 interface InfraDemandSheetProps {
@@ -235,7 +235,10 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-                  onClick={() => updateDemand({ status: "aberta" })}
+                  onClick={async () => {
+                    await updateDemand({ status: "aberta" });
+                    void notifyApproved(demand, currentUser?.name);
+                  }}
                   disabled={saving}
                 >
                   <ThumbsUp size={13} /> Aprovar
@@ -305,13 +308,15 @@ const InfraDemandSheet = ({ demand, open, onClose, onChanged }: InfraDemandSheet
                   variant="destructive"
                   className="h-7 text-xs"
                   disabled={saving || !motivoReprovacao.trim()}
-                  onClick={() => {
-                    void updateDemand({
+                  onClick={async () => {
+                    const motivo = motivoReprovacao.trim();
+                    await updateDemand({
                       status: "reprovada",
                       description: demand.description
-                        ? `${demand.description}\n\n[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivoReprovacao.trim()}`
-                        : `[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivoReprovacao.trim()}`,
+                        ? `${demand.description}\n\n[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivo}`
+                        : `[Reprovada por ${currentUser?.name ?? "aprovador"}]: ${motivo}`,
                     });
+                    void notifyRejected(demand, currentUser?.name, motivo);
                     setShowReprovacao(false);
                     setMotivoReprovacao("");
                   }}

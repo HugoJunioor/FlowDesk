@@ -147,6 +147,55 @@ export async function notifyReopened(demand: SlackDemand, actorName?: string): P
   }
 }
 
+/** Demanda SQL/Deploy aprovada pelo aprovador.
+ * Notifica:
+ *   - Solicitante (saber que foi liberada)
+ *   - Responsavel (saber que agora pode executar)
+ */
+export async function notifyApproved(
+  demand: SlackDemand,
+  approverName?: string,
+): Promise<void> {
+  const actor = approverName || "—";
+  const targets = new Set<string>();
+  const requesterEmail = emailFromName(demand.requester?.name);
+  const assigneeEmail = emailFromName(demand.assignee?.name);
+  if (requesterEmail) targets.add(requesterEmail);
+  if (assigneeEmail) targets.add(assigneeEmail);
+  for (const email of targets) {
+    await notify({
+      userEmail: email,
+      event: "demand_approved",
+      source: demand.source === "internal" ? "infra" : "slack",
+      demandId: demand.id,
+      title: demand.title,
+      message: `${shortContext(demand)} · Aprovada por ${actor}`,
+      actor,
+    });
+  }
+}
+
+/** Demanda SQL/Deploy reprovada — notifica solicitante */
+export async function notifyRejected(
+  demand: SlackDemand,
+  approverName?: string,
+  motivo?: string,
+): Promise<void> {
+  const requesterEmail = emailFromName(demand.requester?.name);
+  if (!requesterEmail) return;
+  const actor = approverName || "—";
+  const motivoTxt = motivo ? ` — Motivo: ${motivo}` : "";
+  await notify({
+    userEmail: requesterEmail,
+    event: "demand_rejected",
+    source: demand.source === "internal" ? "infra" : "slack",
+    demandId: demand.id,
+    title: demand.title,
+    message: `${shortContext(demand)} · Reprovada por ${actor}${motivoTxt}`,
+    actor,
+  });
+}
+
 /** Resposta nova na thread */
 export async function notifyReplied(demand: SlackDemand, replyAuthor: string): Promise<void> {
   const assigneeEmail = emailFromName(demand.assignee?.name);
