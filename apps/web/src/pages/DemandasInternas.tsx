@@ -28,6 +28,15 @@ import StaleBadge from "@/components/demandas/StaleBadge";
 type StatusFilter = "todas" | "novas" | "em_andamento" | "em_atraso" | "concluidas";
 /** Filtro por tipo — chips toggleable que combinam com o status */
 type KindFilter = "todos" | "sql" | "deploy" | "suporte";
+/** Scope: "mine" = onde sou requester/assignee, "all" = todas */
+type DemandScope = "mine" | "all";
+
+function loadScope(): DemandScope {
+  try {
+    const v = localStorage.getItem("flowdesk:demandas:scope");
+    return v === "all" ? "all" : "mine";
+  } catch { return "mine"; }
+}
 
 function isOverdue(d: SlackDemand): boolean {
   if (d.status === "concluida") return false;
@@ -72,6 +81,7 @@ const DemandasInternas = () => {
   const [demands, setDemands] = useState<SlackDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todas");
+  const [scope, setScope] = useState<DemandScope>(loadScope);
   const [kindFilter, setKindFilter] = useState<KindFilter>("todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultKind, setModalDefaultKind] = useState<"sql" | "deploy" | "suporte">("sql");
@@ -173,9 +183,15 @@ const DemandasInternas = () => {
     return () => clearInterval(id);
   }, [reload]);
 
+  // Scope: "mine" mostra demandas onde sou requester ou assignee.
+  const scopedDemands = demands.filter((d) => {
+    if (scope === "all" || !currentUser) return true;
+    return d.assignee?.name === currentUser.name || d.requester?.name === currentUser.name;
+  });
+
   // Aplica primeiro o filtro de tipo (SQL/Deploy/Todos), depois o de status.
   // Assim os contadores dos quadros refletem a selecao de tipo atual.
-  const byKind = demands.filter((d) => {
+  const byKind = scopedDemands.filter((d) => {
     if (kindFilter === "todos") return true;
     return d.infraKind === kindFilter;
   });
@@ -198,9 +214,9 @@ const DemandasInternas = () => {
     em_andamento: byKind.filter(d => d.status === "em_andamento").length,
     em_atraso: byKind.filter(isOverdue).length,
     concluidas: byKind.filter(d => d.status === "concluida").length,
-    sql: demands.filter(d => d.infraKind === "sql").length,
-    deploy: demands.filter(d => d.infraKind === "deploy").length,
-    suporte: demands.filter(d => d.infraKind === "suporte").length,
+    sql: scopedDemands.filter(d => d.infraKind === "sql").length,
+    deploy: scopedDemands.filter(d => d.infraKind === "deploy").length,
+    suporte: scopedDemands.filter(d => d.infraKind === "suporte").length,
   };
 
   const handleAttend = async (d: SlackDemand) => {
@@ -276,6 +292,22 @@ const DemandasInternas = () => {
             </h1>
             <p className="text-sm text-muted-foreground">Demandas internas de Operações SQL, Deploy e Suporte</p>
           </div>
+          <div className="flex items-center gap-2">
+            {/* Scope toggle — mine | all */}
+            <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+              <button
+                onClick={() => { setScope("mine"); localStorage.setItem("flowdesk:demandas:scope", "mine"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Apenas minhas
+              </button>
+              <button
+                onClick={() => { setScope("all"); localStorage.setItem("flowdesk:demandas:scope", "all"); }}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Todas
+              </button>
+            </div>
           <div className="relative">
             <Button onClick={() => setDropdownOpen((v) => !v)} className="gap-2">
               <Plus size={14} /> Nova solicitação
@@ -302,6 +334,7 @@ const DemandasInternas = () => {
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
 
