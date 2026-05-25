@@ -162,9 +162,11 @@ const CHECK_REACTIONS = ['large_green_circle'];
 // reply vira o serviceStartedAt da demanda (usado pra SLA de 1a resposta).
 const LOADING_REACTIONS = ['loading', 'hourglass_flowing_sand', 'hourglass'];
 
-async function fetchChannelMessages(channelId, channelName, previousPriorities = new Map(), existingIds = new Set()) {
+async function fetchChannelMessages(channelId, channelName, previousPriorities = new Map(), existingIds = new Set(), previousThreadReplies = new Map(), previousLatestReplyTs = new Map(), previousConcluded = new Map()) {
   const demands = [];
   let cursor;
+  let cacheHits = 0;
+  let cacheMisses = 0;
 
   do {
     const result = await client.conversations.history({
@@ -209,28 +211,42 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       // a reaction foi feita). Por isso nao geramos reply sintetico aqui.
       const threadReplies = [];
       if (msg.reply_count > 0) {
-        try {
-          const replies = await fetchAllReplies(channelId, msg.ts);
+        // Cache hit APENAS para demandas ja concluidas (closureSource preserved).
+        // Pra demandas em andamento NAO da pra cachear: latest_reply nao muda
+        // quando alguem so adiciona uma REACAO (e a reacao 🟢 eh o sinal
+        // de fechamento que precisamos detectar a cada ciclo).
+        const demandIdGuess = `slack_${channelId}_${msg.ts}`;
+        const isAlreadyConcluded = previousConcluded.has(demandIdGuess);
+        const cached = previousThreadReplies.get(demandIdGuess);
+        if (isAlreadyConcluded && cached) {
+          threadReplies.push(...cached);
+          cacheHits++;
+        } else {
+          cacheMisses++;
+          try {
+            await sleep(250); // throttle vs rate limit
+            const replies = await fetchAllReplies(channelId, msg.ts);
 
-          for (const reply of replies.slice(1)) {
-            const info = reply.user ? await getUserInfo(reply.user) : { name: reply.username || 'Bot', isTeam: false };
-            const replyText = resolveUserMentions(reply.text || '');
-            const reactions = reply.reactions || [];
-            const hasCheckReaction = reactions.some(r => CHECK_REACTIONS.includes(r.name));
-            const hasLoadingReaction = reactions.some(r => LOADING_REACTIONS.includes(r.name));
+            for (const reply of replies.slice(1)) {
+              const info = reply.user ? await getUserInfo(reply.user) : { name: reply.username || 'Bot', isTeam: false };
+              const replyText = resolveUserMentions(reply.text || '');
+              const reactions = reply.reactions || [];
+              const hasCheckReaction = reactions.some(r => CHECK_REACTIONS.includes(r.name));
+              const hasLoadingReaction = reactions.some(r => LOADING_REACTIONS.includes(r.name));
 
-            threadReplies.push({
-              author: info.name,
-              text: hasCheckReaction ? `${replyText} [✅ Reacao de conclusao]` : replyText,
-              timestamp: new Date(parseFloat(reply.ts) * 1000).toISOString(),
-              isTeamMember: info.isTeam,
-              hasCheckReaction,
-              ...(hasLoadingReaction ? { hasLoadingReaction: true } : {}),
-              files: mapSlackFiles(reply.files),
-            });
+              threadReplies.push({
+                author: info.name,
+                text: hasCheckReaction ? `${replyText} [✅ Reacao de conclusao]` : replyText,
+                timestamp: new Date(parseFloat(reply.ts) * 1000).toISOString(),
+                isTeamMember: info.isTeam,
+                hasCheckReaction,
+                ...(hasLoadingReaction ? { hasLoadingReaction: true } : {}),
+                files: mapSlackFiles(reply.files),
+              });
+            }
+          } catch (e) {
+            console.error(`  Erro ao buscar replies de ${msg.ts}:`, e.message);
           }
-        } catch (e) {
-          console.error(`  Erro ao buscar replies de ${msg.ts}:`, e.message);
         }
       }
 
@@ -412,6 +428,9 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
     cursor = result.response_metadata?.next_cursor;
   } while (cursor);
 
+  if (cacheHits + cacheMisses > 0) {
+    console.log(`  cache replies: ${cacheHits} hits, ${cacheMisses} misses`);
+  }
   return demands;
 }
 
@@ -421,7 +440,13 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
 // sem_classificacao em demandas anteriores; novas viram P3).
 function loadPreviousState() {
   const previousFile = path.join(__dirname, '..', 'src', 'data', 'realDemands.ts');
-  const empty = { concluded: new Map(), priorities: new Map(), existingIds: new Set() };
+  const empty = {
+    concluded: new Map(),
+    priorities: new Map(),
+    existingIds: new Set(),
+    threadReplies: new Map(),
+    latestReplyTs: new Map(),
+  };
   if (!fs.existsSync(previousFile)) return empty;
   try {
     const content = fs.readFileSync(previousFile, 'utf-8');
@@ -431,19 +456,31 @@ function loadPreviousState() {
     const concluded = new Map();
     const priorities = new Map();
     const existingIds = new Set();
+    const threadReplies = new Map();
+    const latestReplyTs = new Map();
     for (const d of demands) {
       existingIds.add(d.id);
       if (d.priority) priorities.set(d.id, d.priority);
       if (d.status === 'concluida' && d.completedAt) {
         concluded.set(d.id, { status: d.status, completedAt: d.completedAt });
       }
+      if (Array.isArray(d.threadReplies) && d.threadReplies.length > 0) {
+        threadReplies.set(d.id, d.threadReplies);
+        // Ultimo reply (mais recente em timestamp ISO)
+        const last = d.threadReplies[d.threadReplies.length - 1];
+        if (last?.timestamp) latestReplyTs.set(d.id, last.timestamp);
+      }
     }
-    return { concluded, priorities, existingIds };
+    return { concluded, priorities, existingIds, threadReplies, latestReplyTs };
   } catch (e) {
     console.warn('  Aviso: nao foi possivel ler estado anterior:', e.message);
     return empty;
   }
 }
+
+// Throttle entre chamadas conversations.replies pra evitar rate limit.
+// Slack tier-3 = 50 req/min/method. 250ms = 4/s = 240/min → ainda confortável.
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function main() {
   console.log('Conectando ao Slack...');
@@ -459,6 +496,8 @@ async function main() {
   const previousConcluded = previousState.concluded;
   const previousPriorities = previousState.priorities;
   const existingIds = previousState.existingIds;
+  const previousThreadReplies = previousState.threadReplies;
+  const previousLatestReplyTs = previousState.latestReplyTs;
   console.log(`${previousConcluded.size} demandas com status concluida no sync anterior (serao preservadas)`);
   console.log(`${existingIds.size} demandas no arquivo anterior — novas demandas sem prioridade serao classificadas como P3.\n`);
 
@@ -472,7 +511,7 @@ async function main() {
   for (const channel of clientChannels) {
     console.log(`Buscando #${channel.name}...`);
     try {
-      const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds);
+      const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
       console.log(`  ${demands.length} demandas encontradas`);
       allDemands = allDemands.concat(demands);
     } catch (err) {
