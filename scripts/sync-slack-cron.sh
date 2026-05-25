@@ -25,7 +25,7 @@ docker run --rm \
   -v /opt/flowdesk/app:/app \
   -w /app \
   --env-file /opt/flowdesk/app/.env \
-  --network cfo_default \
+  --network app_network \
   node:20-alpine sh -c '
     cd /app && npm install --no-save --legacy-peer-deps @slack/web-api dotenv >/dev/null 2>&1 && \
     cd apps/web && node scripts/syncSlack.cjs
