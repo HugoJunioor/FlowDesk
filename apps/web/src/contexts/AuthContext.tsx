@@ -14,6 +14,8 @@ import {
 } from "@/lib/authStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { authApi } from "@/modules/auth/api";
+import { setAccessToken } from "@/lib/api/client";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -47,6 +49,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setMustChangePassword(user.isFirstAccess);
           loadForUser(user.id, user.themePreferences);
           loadLangForUser(user.id, user.language);
+          // Tenta restaurar accessToken da API via refresh cookie.
+          // Se nao tiver cookie valido, fica sem token (features de API offline).
+          authApi.refresh().catch(() => setAccessToken(null));
         } else {
           clearSession();
         }
@@ -107,6 +112,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMustChangePassword(user.isFirstAccess);
     loadForUser(user.id, user.themePreferences);
     loadLangForUser(user.id, user.language);
+
+    // Bridge: tenta login na API nova tambem pra setar JWT + refresh cookie.
+    // Silencioso — se usuario nao existir na API (so legacy), segue normal.
+    authApi.login({ login: loginInput, senha: password }).catch(() => {
+      /* sem conta na API; v1 features que dependem de API ficam indisponiveis */
+    });
+
     return { success: true };
   }, [loadForUser, loadLangForUser]);
 

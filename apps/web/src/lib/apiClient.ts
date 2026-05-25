@@ -132,13 +132,13 @@ export const apiClient = {
         files: params.files.map(() => ({ ok: true })),
       });
     },
-    editReply: (body: { permalink: string; replyTimestamp: string; newText: string }) =>
+    editReply: (body: { permalink: string; replyTimestamp: string; replyTs?: string; newText: string; senderEmail?: string }) =>
       request<{ ok: boolean }>("/slack/edit", {
         method: "POST",
         body: JSON.stringify(body),
         demoFallback: { ok: true },
       }),
-    deleteReply: (body: { permalink: string; replyTimestamp: string }) =>
+    deleteReply: (body: { permalink: string; replyTimestamp: string; replyTs?: string; senderEmail?: string }) =>
       request<{ ok: boolean }>("/slack/delete", {
         method: "POST",
         body: JSON.stringify(body),
