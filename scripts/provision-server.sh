@@ -68,11 +68,15 @@ chown -R flowdesk:flowdesk /opt/flowdesk /var/log/flowdesk /var/backups/flowdesk
 # 6. Firewall (UFW) — ACESSO RESTRITO A VPNs
 echo "[6/6] Configurando firewall (VPN-only)..."
 
-# IPs das VPNs autorizadas. Edite aqui se mudar.
-VPN_IPS=(
-  "51.91.156.227"
-  "52.67.76.99"
-)
+# IPs das VPNs autorizadas. Defina via env var VPN_IPS (separado por virgula)
+# antes de rodar o script. Ex:
+#   export VPN_IPS="1.2.3.4,5.6.7.8"
+#   bash scripts/provision-server.sh
+if [ -z "${VPN_IPS:-}" ]; then
+  echo "ERRO: defina VPN_IPS=\"ip1,ip2,...\" antes de rodar." >&2
+  exit 1
+fi
+IFS=',' read -ra VPN_IPS <<< "$VPN_IPS"
 
 ufw --force reset >/dev/null
 ufw default deny incoming
