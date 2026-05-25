@@ -62,6 +62,14 @@ const PageLoader = () => (
 const AppRoutes = () => {
   const { isAuthenticated, mustChangePassword, currentUser, initialized } = useAuth();
 
+  // One-shot migracao: forca filtro scope='mine' em todos os browsers (faz uma vez por user).
+  try {
+    if (typeof window !== "undefined" && !localStorage.getItem("flowdesk:demandas:scope:reset:v1")) {
+      localStorage.removeItem("flowdesk:demandas:scope");
+      localStorage.setItem("flowdesk:demandas:scope:reset:v1", "1");
+    }
+  } catch { /* ignore */ }
+
   // Wait for localStorage init
   if (!initialized) {
     return <PageLoader />;

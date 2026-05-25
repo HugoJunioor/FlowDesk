@@ -35,12 +35,32 @@ function loadAutoAssignRules(): { pattern: string; field: "title" | "workflow"; 
   } catch { return []; }
 }
 
+// Workflows que sao sempre P3 por definicao operacional (independente do texto).
+// Mantemos em lower-case pra comparar sem se preocupar com acento/caixa.
+const FORCED_P3_WORKFLOWS = [
+  "nova conciliacao", "nova conciliação",
+];
+
 function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
   const rules = loadAutoAssignRules();
 
   return demands.map((d) => {
     const titleLower = d.title.toLowerCase();
     const workflowLower = d.workflow.toLowerCase();
+
+    // Workflow forcado P3 (conciliacao etc) — sobrepoe regras manuais e classificador.
+    if (FORCED_P3_WORKFLOWS.includes(workflowLower)) {
+      return {
+        ...d,
+        priority: "p3",
+        autoClassification: {
+          priority: "p3" as const,
+          confidence: "alta" as const,
+          reason: `Workflow "${d.workflow}" classificado como P3 por definicao operacional.`,
+          matchedKeywords: [d.workflow],
+        },
+      };
+    }
 
     // Regras dinâmicas de auto-atribuição (configuradas localmente)
     for (const rule of rules) {
@@ -57,10 +77,21 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
       }
     }
 
-    if (d.priority === "sem_classificacao") return d;
-
     const classification = classifyDemand(d.title, d.description);
     const result = { ...d, autoClassification: classification };
+
+    // Sem_classificacao: se o classificador encontrou um p1/p2/p3, adota.
+    // Senao, mantem sem_classificacao mesmo.
+    if (d.priority === "sem_classificacao") {
+      if (classification.priority !== "sem_classificacao") {
+        result.priority = classification.priority;
+        result.autoClassification = {
+          ...classification,
+          reason: `Classificada automaticamente como ${PRIORITY_CONFIG[classification.priority].label}. ${classification.reason}`,
+        };
+      }
+      return result;
+    }
 
     if (classification.priority !== "sem_classificacao" && classification.priority !== d.priority) {
       result.autoClassification = {
