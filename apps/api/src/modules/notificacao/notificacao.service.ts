@@ -13,12 +13,14 @@ import { env } from '@config/env';
 import { pool } from '@config/database';
 import { telegramService } from '@modules/telegram/telegram.service';
 import { emailService } from '@modules/email/email.service';
+import { pushService } from '@modules/push/push.service';
 import { notificacaoRepository } from './notificacao.repository';
-import type {
-  CreateNotificacaoInput,
-  Notificacao,
-  Preferencia,
-  PreferenciaInput,
+import {
+  isEventEnabledForCanal,
+  type CreateNotificacaoInput,
+  type Notificacao,
+  type Preferencia,
+  type PreferenciaInput,
 } from './notificacao.dto';
 
 const MAX_PER_USER = 500;
@@ -63,12 +65,30 @@ export const notificacaoService = {
         .catch((err) => logger.warn({ err }, 'notificacao: falha ao despachar via Email'));
     }
 
+    // Despacha via Web Push (Service Worker) se habilitado
+    void notificacaoService
+      .dispatchPush(input)
+      .catch((err) => logger.warn({ err }, 'notificacao: falha ao despachar via Push'));
+
     return created;
+  },
+
+  async dispatchPush(input: CreateNotificacaoInput): Promise<void> {
+    const prefs = await notificacaoService.getPreferencia(input.usuarioEmail);
+    if (!prefs.canais.browserPush) return;
+    if (!isEventEnabledForCanal(prefs, 'browserPush', input.evento)) return;
+    await pushService.sendToUser(input.usuarioEmail, {
+      title: `FlowDesk · ${input.titulo}`,
+      body: input.mensagem ?? '',
+      url: input.demandaId ? `/demandas?openId=${encodeURIComponent(input.demandaId)}` : '/',
+      tag: `${input.evento}_${input.demandaId ?? Date.now()}`,
+    });
   },
 
   async dispatchEmail(input: CreateNotificacaoInput): Promise<void> {
     const prefs = await notificacaoService.getPreferencia(input.usuarioEmail);
     if (!prefs.canais.email) return;
+    if (!isEventEnabledForCanal(prefs, 'email', input.evento)) return;
     await emailService.sendNotification({
       to: input.usuarioEmail,
       titulo: input.titulo,
@@ -92,6 +112,7 @@ export const notificacaoService = {
     const chatId = userRes.rows[0]?.telegram_chat_id;
     if (!chatId) return;
     if (!prefs.canais.telegram) return;
+    if (!isEventEnabledForCanal(prefs, 'telegram', input.evento)) return;
 
     await telegramService.sendNotification({
       chatId,
