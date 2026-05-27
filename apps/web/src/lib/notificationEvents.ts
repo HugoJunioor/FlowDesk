@@ -9,9 +9,12 @@ import {
   NotificationEvent,
   NotificationPreferences,
   DEFAULT_PREFERENCES,
+  isEventEnabledForChannel,
+  EVENT_LABELS,
 } from "@/types/notification";
+import { showBrowserNotification, getPermission } from "./browserNotifications";
 import { SlackDemand } from "@/types/demand";
-import { getAllUsers } from "./authStorage";
+import { getAllUsers, getSession } from "./authStorage";
 
 /**
  * Resolve email do assignee/requester a partir do nome.
@@ -59,11 +62,34 @@ export async function notify(params: {
   if (!userEmail) return;
   try {
     const prefs = await loadPrefs(userEmail);
-    // Inbox sempre ligado (canal core)
-    if (!prefs.channels.inbox) return;
-    // Evento desabilitado pelo user? pula
-    if (prefs.events[event] === false) return;
-    await apiClient.notifications.create(params);
+    // Inbox: respeita master switch + override por canal
+    if (prefs.channels.inbox && isEventEnabledForChannel(prefs, "inbox", event)) {
+      await apiClient.notifications.create(params);
+    }
+
+    // Browser push: dispara local se permitido + canal ligado + evento ligado.
+    // So fira pro user logado nesta aba (push aparece no SO local; mandar pra
+    // outros users dependeria de Service Worker + Web Push API).
+    const session = getSession();
+    const currentEmail = session?.user?.email?.toLowerCase();
+    const isMyEvent = !!currentEmail && currentEmail === userEmail.toLowerCase();
+    if (
+      isMyEvent &&
+      prefs.channels.browserPush &&
+      isEventEnabledForChannel(prefs, "browserPush", event) &&
+      getPermission() === "granted"
+    ) {
+      const label = EVENT_LABELS[event]?.label || "Notificação";
+      const url = params.demandId
+        ? `/demandas?openId=${encodeURIComponent(params.demandId)}`
+        : undefined;
+      showBrowserNotification({
+        title: `FlowDesk · ${label}`,
+        body: `${params.title}\n${params.message || ""}`.trim(),
+        tag: `${event}_${params.demandId || Date.now()}`,
+        url,
+      });
+    }
   } catch (e) {
     // Notificacao nao deve quebrar fluxo do app
     console.warn("[notify] falhou:", e);
@@ -96,13 +122,26 @@ export async function notifyAssigned(demand: SlackDemand, assigneeEmail?: string
   });
 }
 
+/**
+ * Coleta emails de destinatarios pra eventos de demanda: requester + assignee.
+ * Filtra: emails resolvidos, sem duplicar e sem incluir o autor (actor).
+ */
+function recipientsForDemand(demand: SlackDemand, actorName?: string): string[] {
+  const set = new Set<string>();
+  const requesterEmail = emailFromName(demand.requester?.name);
+  const assigneeEmail = emailFromName(demand.assignee?.name);
+  const actorEmail = emailFromName(actorName);
+  if (requesterEmail && requesterEmail !== actorEmail) set.add(requesterEmail);
+  if (assigneeEmail && assigneeEmail !== actorEmail) set.add(assigneeEmail);
+  return [...set];
+}
+
 /** Atendimento iniciado (status → em_andamento) */
 export async function notifyStarted(demand: SlackDemand, actorName?: string): Promise<void> {
-  const requesterEmail = emailFromName(demand.requester?.name);
-  if (requesterEmail) {
-    const actor = actorName || demand.assignee?.name || "—";
+  const actor = actorName || demand.assignee?.name || "—";
+  for (const email of recipientsForDemand(demand, actorName)) {
     await notify({
-      userEmail: requesterEmail,
+      userEmail: email,
       event: "demand_started",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
@@ -115,11 +154,10 @@ export async function notifyStarted(demand: SlackDemand, actorName?: string): Pr
 
 /** Demanda concluida */
 export async function notifyCompleted(demand: SlackDemand, actorName?: string): Promise<void> {
-  const requesterEmail = emailFromName(demand.requester?.name);
-  if (requesterEmail) {
-    const actor = actorName || demand.assignee?.name || "—";
+  const actor = actorName || demand.assignee?.name || "—";
+  for (const email of recipientsForDemand(demand, actorName)) {
     await notify({
-      userEmail: requesterEmail,
+      userEmail: email,
       event: "demand_completed",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
@@ -132,11 +170,10 @@ export async function notifyCompleted(demand: SlackDemand, actorName?: string): 
 
 /** Demanda reaberta */
 export async function notifyReopened(demand: SlackDemand, actorName?: string): Promise<void> {
-  const assigneeEmail = emailFromName(demand.assignee?.name);
-  if (assigneeEmail) {
-    const actor = actorName || "—";
+  const actor = actorName || "—";
+  for (const email of recipientsForDemand(demand, actorName)) {
     await notify({
-      userEmail: assigneeEmail,
+      userEmail: email,
       event: "demand_reopened",
       source: demand.source === "internal" ? "infra" : "slack",
       demandId: demand.id,
