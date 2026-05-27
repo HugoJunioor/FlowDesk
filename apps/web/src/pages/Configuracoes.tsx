@@ -19,6 +19,7 @@ import { getAllUsers } from "@/lib/authStorage";
 import type { Language } from "@/types/auth";
 import NotificationPreferencesCard from "@/components/notifications/NotificationPreferencesCard";
 import { TelegramConnect } from "@/modules/configuracoes/components/TelegramConnect";
+import ReplyTemplatesCard from "@/components/settings/ReplyTemplatesCard";
 
 function loadApprovers(): string[] {
   try {
@@ -204,6 +205,9 @@ const Configuracoes = () => {
 
         {/* Telegram — conexão e preferência de canal */}
         <TelegramConnect />
+
+        {/* Templates de resposta — CRUD usado pelo composer */}
+        <ReplyTemplatesCard />
 
         {/* Master-only: Configuração de Operações SQL */}
         {isMaster ? (

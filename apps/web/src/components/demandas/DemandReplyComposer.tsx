@@ -10,6 +10,7 @@
  */
 import { useRef, useState, useEffect, type KeyboardEvent, type DragEvent, type ChangeEvent } from "react";
 import { Bold, Italic, Strikethrough, Code, Code2, Link2, Paperclip, Send, AtSign, X, FileText, Image as ImageIcon, List, ListOrdered, Quote } from "lucide-react";
+import ReplyTemplatePicker from "./ReplyTemplatePicker";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -497,6 +498,13 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         {/* Inserts */}
         <ToolbarButton icon={AtSign} label="Mencionar" onClick={() => insertAtCursor("@")} />
         <EmojiPicker onSelect={(name) => insertAtCursor(`:${name}: `)} />
+        <ReplyTemplatePicker
+          onSelect={(t) => {
+            // Se ja tem texto, adiciona quebra de linha antes
+            const prefix = text && !text.endsWith('\n') ? '\n' : '';
+            insertAtCursor(prefix + t.body);
+          }}
+        />
         <ToolbarButton
           icon={Paperclip}
           label="Anexar arquivo"
