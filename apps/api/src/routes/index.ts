@@ -16,8 +16,8 @@ import { auditoriaRoutes } from '@modules/auditoria/auditoria.routes';
 import { usuariosRoutes } from '@modules/usuarios/usuarios.routes';
 import { lembreteRoutes } from '@modules/lembretes/lembrete.routes';
 import { telegramRoutes } from '@modules/telegram/telegram.routes';
+import { pushRoutes } from '@modules/push/push.routes';
 import { env } from '@config/env';
-import { docsRoutes } from './docs.routes';
 
 export const apiRouter = Router();
 
@@ -36,10 +36,15 @@ v1.use('/usuarios', usuariosRoutes);
 v1.use('/templates', templateRoutes);
 v1.use('/lembretes', lembreteRoutes);
 v1.use('/telegram', telegramRoutes);
+v1.use('/push', pushRoutes);
 v1.use('/version', versionRoutes);
 
-// Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false
+// Documentação OpenAPI + Swagger UI — desabilitar via OPENAPI_ENABLED=false.
+// Import lazy: zod-to-openapi crasha em load se houver conflito de versao Zod,
+// entao so importa quando docs estiver ativo.
 if (env.OPENAPI_ENABLED) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const { docsRoutes } = require('./docs.routes');
   v1.use('/docs', docsRoutes);
 }
 
