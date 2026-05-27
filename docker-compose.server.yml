@@ -84,6 +84,61 @@ services:
         max-size: "20m"
         max-file: "3"
 
+  # Container auxiliar: serve endpoints v1 + proxy Slack/Telegram + dispatch email/push.
+  # Persiste em /opt/flowdesk/app/data (bind mount).
+  legacy_state:
+    build:
+      context: ./legacy-state
+    container_name: flowdesk-legacy-state
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      PORT: '8090'
+      EMAIL_ENABLED: "${EMAIL_ENABLED}"
+      SMTP_HOST: "${SMTP_HOST}"
+      SMTP_PORT: "${SMTP_PORT}"
+      SMTP_SECURE: "${SMTP_SECURE}"
+      SMTP_USER: "${SMTP_USER}"
+      SMTP_PASS: "${SMTP_PASS}"
+      SMTP_FROM: "${SMTP_FROM}"
+      APP_BASE_URL: "https://${DOMAIN}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      TELEGRAM_WEBHOOK_SECRET: "${TELEGRAM_WEBHOOK_SECRET}"
+      TELEGRAM_BOT_USERNAME: "${TELEGRAM_BOT_USERNAME:-just_floow_bot}"
+      DATABASE_URL: "${DATABASE_URL}"
+      DOMAIN: "${DOMAIN}"
+      SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}"
+      SLACK_CLIENT_ID: "${SLACK_CLIENT_ID:-}"
+      SLACK_CLIENT_SECRET: "${SLACK_CLIENT_SECRET:-}"
+    volumes:
+      - /opt/flowdesk/app/data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --no-verbose --tries=1 --spider http://127.0.0.1:8090/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=app_network
+      - traefik.http.services.fdlegacy.loadbalancer.server.port=8090
+      - traefik.http.routers.fdlegacy.rule=Host(`${DOMAIN}`) && (PathPrefix(`/__state`) || PathPrefix(`/notes`) || PathPrefix(`/infra`) || PathPrefix(`/notifications`) || PathPrefix(`/notification-preferences`) || PathPrefix(`/slack`) || PathPrefix(`/auth/slack`) || PathPrefix(`/telegram`))
+      - traefik.http.routers.fdlegacy.entrypoints=websecure
+      - traefik.http.routers.fdlegacy.tls.certresolver=letsencrypt
+      - traefik.http.routers.fdlegacy.priority=300
+      # Router separado pro webhook do Telegram — sem o middleware VPN
+      # porque os servers do Telegram nao estao na nossa whitelist.
+      - traefik.http.routers.fdtgevents.rule=Host(`${DOMAIN}`) && PathPrefix(`/telegram-events/`)
+      - traefik.http.routers.fdtgevents.entrypoints=websecure
+      - traefik.http.routers.fdtgevents.tls=true
+      - traefik.http.routers.fdtgevents.tls.certresolver=letsencrypt
+      - traefik.http.routers.fdtgevents.service=fdlegacy
+      - traefik.http.routers.fdtgevents.priority=400
+    networks:
+      - app_network
+
 networks:
   # Rede do compose do cfo (onde mora postgres). Externa — ja existe.
   app_network:

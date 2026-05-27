@@ -17,6 +17,7 @@
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
+import nodemailer from 'nodemailer';
 
 const app = express();
 app.use(express.json({ limit: '20mb' }));
@@ -36,6 +37,144 @@ function readJson(file, fallback) {
 function writeJson(file, data) {
   const p = path.join(DATA_DIR, file);
   fs.writeFileSync(p, JSON.stringify(data, null, 2));
+}
+
+// ============ SMTP helper ============
+// Cria transporter lazy se EMAIL_ENABLED + credenciais existirem.
+// Senao, sendEmail vira no-op.
+let _transporter = null;
+function getMailer() {
+  if (_transporter !== null) return _transporter;
+  if (process.env.EMAIL_ENABLED !== 'true' || !process.env.SMTP_HOST) {
+    _transporter = false;
+    return false;
+  }
+  _transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  return _transporter;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ============ Telegram links (mapping email -> chat_id) ============
+// Storage: /data/telegram-links.json
+//   { "email@x.com": { chatId: "12345", linkedAt: "ISO", username?: "@x" } }
+// Codes pendentes ficam in-memory (TTL 10min).
+
+const LINKS_FILE = 'telegram-links.json';
+const pendingCodes = new Map(); // code -> { email, expiresAt }
+const CODE_TTL_MS = 10 * 60 * 1000;
+
+function genTgCode() {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+function getTgLink(email) {
+  const all = readJson(LINKS_FILE, {});
+  return all[(email || '').toLowerCase()] || null;
+}
+function setTgLink(email, payload) {
+  const all = readJson(LINKS_FILE, {});
+  all[email.toLowerCase()] = payload;
+  writeJson(LINKS_FILE, all);
+}
+function removeTgLink(email) {
+  const all = readJson(LINKS_FILE, {});
+  delete all[(email || '').toLowerCase()];
+  writeJson(LINKS_FILE, all);
+}
+
+async function sendTelegramFor(notification, prefs) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return;
+  if (!prefs?.channels?.telegram) return;
+  const chOverride = prefs?.eventsByChannel?.telegram?.[notification.event];
+  const globalEv = prefs?.events?.[notification.event];
+  const ok = chOverride !== undefined ? chOverride : (globalEv !== false);
+  if (!ok) return;
+
+
+  const tgLink = getTgLink(notification.userEmail);
+  const chatId = tgLink?.chatId;
+  if (!chatId) return;
+
+  const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
+  const demandUrl = notification.demandId
+    ? `${base}/demandas?openId=${encodeURIComponent(notification.demandId)}`
+    : base;
+  const text =
+    `*${notification.title || 'FlowDesk'}*\n` +
+    `${notification.message || ''}\n\n` +
+    `[Abrir no FlowDesk](${demandUrl})`;
+
+  try {
+    const r = await fetch(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+        }),
+      },
+    );
+    const j = await r.json();
+    if (!j.ok) {
+      console.warn('[telegram] api ok=false:', j.description);
+    } else {
+      console.log(`[telegram] enviado pra ${notification.userEmail} - ${notification.event}`);
+    }
+  } catch (err) {
+    console.warn('[telegram] fetch falhou:', err.message);
+  }
+}
+
+async function sendEmailFor(notification, prefs) {
+  const m = getMailer();
+  if (!m) return;
+  if (!prefs?.channels?.email) return;
+  const chOverride = prefs?.eventsByChannel?.email?.[notification.event];
+  const globalEv = prefs?.events?.[notification.event];
+  const ok = chOverride !== undefined ? chOverride : (globalEv !== false);
+  if (!ok) return;
+
+  const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
+  const link = notification.demandId
+    ? `${base}/demandas?openId=${encodeURIComponent(notification.demandId)}`
+    : base;
+  const ator = notification.actor
+    ? `<p style="margin:8px 0;color:#64748b;">Por: <strong>${escapeHtml(notification.actor)}</strong></p>`
+    : '';
+  const html = `<!doctype html>
+<html><body style="font-family:system-ui,Arial,sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="font-size:13px;color:#3b82f6;font-weight:600;text-transform:uppercase;">FlowDesk</div>
+    <h2 style="margin:8px 0 12px;font-size:18px;">${escapeHtml(notification.title || '')}</h2>
+    <p style="margin:0 0 12px;line-height:1.5;color:#334155;">${escapeHtml(notification.message || '')}</p>
+    ${ator}
+    <a href="${link}" style="display:inline-block;margin-top:16px;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Abrir no FlowDesk</a>
+  </div>
+</body></html>`;
+
+  try {
+    await m.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: notification.userEmail,
+      subject: `[FlowDesk] ${notification.title || 'Notificação'}`,
+      text: `${notification.title || ''}\n\n${notification.message || ''}\n\n${link}`,
+      html,
+    });
+    console.log(`[email] enviado pra ${notification.userEmail} - ${notification.event}`);
+  } catch (err) {
+    console.warn('[email] falha:', err.message);
+  }
 }
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -273,6 +412,12 @@ app.post('/notifications', (req, res) => {
   arr.push(notification);
   writeJson('notifications.json', arr);
   res.json({ notification });
+
+  // Despacha email + telegram fire-and-forget se config + preferencia permitir
+  const allPrefs = readJson('notificationPreferences.json', {});
+  const userPrefs = allPrefs[notification.userEmail];
+  void sendEmailFor(notification, userPrefs);
+  void sendTelegramFor(notification, userPrefs);
 });
 
 app.patch('/notifications/:id', (req, res) => {
@@ -626,6 +771,116 @@ app.post('/auth/slack/disconnect', (req, res) => {
   delete all[String(req.body?.email || '').toLowerCase()];
   writeJson(SLACK_TOKENS_FILE, all);
   res.json({ ok: true });
+});
+
+// ============ /telegram/* — vinculacao por codigo ============
+
+app.post('/telegram/link/start', (req, res) => {
+  const email = String(req.body?.email || '').toLowerCase();
+  if (!email) return res.status(400).json({ error: 'email obrigatorio' });
+  // Limpa codigos expirados
+  const now = Date.now();
+  for (const [c, p] of pendingCodes) if (p.expiresAt < now) pendingCodes.delete(c);
+  const code = genTgCode();
+  pendingCodes.set(code, { email, expiresAt: now + CODE_TTL_MS });
+  res.json({ code, botUsername: process.env.TELEGRAM_BOT_USERNAME || 'just_floow_bot' });
+});
+
+app.post('/telegram/link/cancel', (req, res) => {
+  const code = String(req.body?.code || '');
+  pendingCodes.delete(code);
+  res.json({ ok: true });
+});
+
+app.get('/telegram/status', (req, res) => {
+  const link = getTgLink(String(req.query.email || ''));
+  res.json({
+    connected: !!link,
+    chatId: link?.chatId,
+    username: link?.username,
+    linkedAt: link?.linkedAt,
+  });
+});
+
+app.post('/telegram/disconnect', (req, res) => {
+  removeTgLink(String(req.body?.email || ''));
+  res.json({ ok: true });
+});
+
+// Webhook recebido do Telegram (Bot API). Path inclui secret pra evitar abuso.
+app.post('/telegram-events/:secret', async (req, res) => {
+  if (req.params.secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const update = req.body || {};
+  res.json({ ok: true }); // responde rapido pro Telegram nao timeoutar
+
+  const msg = update.message;
+  if (!msg || !msg.text) return;
+  const chatId = String(msg.chat.id);
+  const text = msg.text.trim();
+  const username = msg.from?.username ? '@' + msg.from.username : (msg.from?.first_name || '');
+
+  async function reply(replyText) {
+    try {
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: replyText }),
+      });
+    } catch (err) {
+      console.warn('[telegram] reply falhou:', err.message);
+    }
+  }
+
+  // /start <code> — vincula
+  const startMatch = text.match(/^\/start\s+([A-Z0-9]{6,12})$/i);
+  if (startMatch) {
+    const code = startMatch[1].toUpperCase();
+    const pending = pendingCodes.get(code);
+    if (!pending || pending.expiresAt < Date.now()) {
+      pendingCodes.delete(code);
+      await reply('Código inválido ou expirado. Gere um novo no FlowDesk.');
+      return;
+    }
+    pendingCodes.delete(code);
+    setTgLink(pending.email, {
+      chatId,
+      username,
+      linkedAt: new Date().toISOString(),
+    });
+    await reply(`✓ Conta FlowDesk vinculada (${pending.email}). Você receberá notificações aqui.`);
+    return;
+  }
+
+  if (text === '/start') {
+    await reply('Bem-vindo ao FlowDesk! Vá em Configurações → Telegram pra gerar um código de vinculação e enviá-lo aqui como: /start CODIGO');
+    return;
+  }
+
+  if (text === '/help') {
+    await reply('Comandos:\n/start CODIGO — vincular conta\n/status — ver vínculo\n/desconectar — remover vínculo');
+    return;
+  }
+
+  if (text === '/status') {
+    const all = readJson(LINKS_FILE, {});
+    const found = Object.entries(all).find(([_, v]) => v.chatId === chatId);
+    if (found) await reply(`Conta vinculada: ${found[0]} (desde ${new Date(found[1].linkedAt).toLocaleDateString('pt-BR')})`);
+    else await reply('Nenhuma conta vinculada neste chat. Gere um código no FlowDesk e envie /start CODIGO');
+    return;
+  }
+
+  if (text === '/desconectar' || text === '/disconnect') {
+    const all = readJson(LINKS_FILE, {});
+    let removed = null;
+    for (const [email, v] of Object.entries(all)) {
+      if (v.chatId === chatId) { removed = email; delete all[email]; }
+    }
+    writeJson(LINKS_FILE, all);
+    await reply(removed ? `Desconectado de ${removed}.` : 'Nenhum vínculo pra remover.');
+    return;
+  }
 });
 
 const PORT = process.env.PORT || 8090;
