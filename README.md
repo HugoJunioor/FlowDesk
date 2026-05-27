@@ -176,7 +176,7 @@ Detalhes técnicos em [`src/adapters/README.md`](./src/adapters/README.md).
 - 🔍 **Filtros avançados de demandas** — sheet lateral com cliente, prioridade, período, responsável e status combinados
 - 🔎 **Auditoria com diff visual** — payload antes/depois campo a campo, com toggle "JSON bruto"
 - 🩺 **Healthcheck detailed** — `GET /api/v1/health/detailed` com checks de DB, disco e memória
-- 🔔 **Notificações desktop** — Notification API do browser ativável pelo sidebar
+- 🔔 **Notificações multi-canal** — Inbox + Push (Service Worker/VAPID) + E-mail (SMTP) + Telegram, configurável por canal e por evento. Setup em [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)
 - 🔄 **Sync manual** — botão no header do dashboard dispara sincronização imediata via `POST /sync/trigger`
 
 ### Pós-migração padrão Just (v2)
@@ -303,6 +303,8 @@ flowdesk/
 ├── docs/
 │   ├── ARCHITECTURE.md       Visão técnica + ADRs
 │   ├── DEPLOY.md             Setup on-prem step-by-step
+│   ├── NOTIFICATIONS.md      Inbox + push + email + Telegram (setup completo)
+│   ├── PROD_ENV_CHECKLIST.md Vars de ambiente em produção
 │   ├── RUNBOOK.md            Operação do dia a dia
 │   ├── LGPD.md               Compliance + audit trail
 │   └── screenshots/          Prints das features (README.md lista pendentes)
