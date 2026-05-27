@@ -66,6 +66,11 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().default(''),
   TELEGRAM_BOT_USERNAME: z.string().default('FlowDeskBot'),
   TELEGRAM_WEBHOOK_SECRET: z.string().default(''),
+
+  // Email via SMTP — opt-in. Sem EMAIL_ENABLED=true, dispatchEmail vira no-op.
+  // SMTP_HOST/PORT/USER/PASS/FROM ja declarados acima (reusados pelo lembrete diario).
+  EMAIL_ENABLED: z.coerce.boolean().default(false),
+  SMTP_SECURE: z.coerce.boolean().default(false), // true=465 (TLS), false=587 (STARTTLS)
 }).superRefine((data, ctx) => {
   if (data.TELEGRAM_ENABLED) {
     if (!data.TELEGRAM_BOT_TOKEN) {
@@ -81,6 +86,17 @@ const envSchema = z.object({
         path: ['TELEGRAM_WEBHOOK_SECRET'],
         message: 'TELEGRAM_WEBHOOK_SECRET obrigatório (mínimo 16 chars) quando TELEGRAM_ENABLED=true',
       });
+    }
+  }
+  if (data.EMAIL_ENABLED) {
+    for (const k of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'] as const) {
+      if (!data[k]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [k],
+          message: `${k} obrigatório quando EMAIL_ENABLED=true`,
+        });
+      }
     }
   }
 });
