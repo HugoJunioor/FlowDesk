@@ -14,10 +14,22 @@ import { MessageCircle, Loader2, Check, X, Link2, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { apiClient } from '@/lib/api/client';
-import { toApiError } from '@/lib/api/client';
-import { unwrap } from '@/lib/api/response-mapper';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePreferencia, useSavePreferencia } from '@/modules/notificacao';
+
+/**
+ * Telegram vincula via legacy-state (que mantem mapping email -> chat_id em JSON)
+ * porque o frontend v1 usa email do localStorage, nao do tb_usuario da API nova.
+ */
+async function lsFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -35,22 +47,29 @@ interface LinkStartResponse {
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 
-async function fetchStatus(): Promise<TelegramStatus> {
-  const res = await apiClient.get('/telegram/status');
-  return unwrap<TelegramStatus>(res);
+async function fetchStatus(email: string): Promise<TelegramStatus> {
+  return lsFetch<TelegramStatus>(`/telegram/status?email=${encodeURIComponent(email)}`);
 }
 
-async function startLink(): Promise<LinkStartResponse> {
-  const res = await apiClient.post('/telegram/link/start', {});
-  return unwrap<LinkStartResponse>(res);
+async function startLink(email: string): Promise<LinkStartResponse> {
+  return lsFetch<LinkStartResponse>('/telegram/link/start', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 }
 
-async function cancelLink(): Promise<void> {
-  await apiClient.post('/telegram/link/cancel', {});
+async function cancelLink(code: string): Promise<void> {
+  await lsFetch('/telegram/link/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 }
 
-async function disconnect(): Promise<void> {
-  await apiClient.delete('/telegram/link');
+async function disconnect(email: string): Promise<void> {
+  await lsFetch('/telegram/disconnect', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -59,27 +78,30 @@ const QK_STATUS = ['telegram', 'status'] as const;
 
 export function TelegramConnect() {
   const qc = useQueryClient();
+  const { currentUser } = useAuth();
+  const email = currentUser?.email || '';
   const [linkInfo, setLinkInfo] = useState<LinkStartResponse | null>(null);
 
   const statusQuery = useQuery<TelegramStatus, Error>({
-    queryKey: QK_STATUS,
-    queryFn: fetchStatus,
+    queryKey: [...QK_STATUS, email],
+    queryFn: () => fetchStatus(email),
+    enabled: !!email,
     staleTime: 30_000,
     retry: false,
   });
 
   const startMutation = useMutation<LinkStartResponse, Error, void>({
-    mutationFn: startLink,
+    mutationFn: () => startLink(email),
     onSuccess: (data) => setLinkInfo(data),
   });
 
   const cancelMutation = useMutation<void, Error, void>({
-    mutationFn: cancelLink,
+    mutationFn: () => cancelLink(linkInfo?.code || ''),
     onSuccess: () => setLinkInfo(null),
   });
 
   const disconnectMutation = useMutation<void, Error, void>({
-    mutationFn: disconnect,
+    mutationFn: () => disconnect(email),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: QK_STATUS });
     },
@@ -110,24 +132,21 @@ export function TelegramConnect() {
     );
   }
 
-  // Se o backend retornou 503 (TELEGRAM_ENABLED=false) ou outro erro de API
+  // Erro generico de rede
   if (statusQuery.error) {
-    const apiErr = toApiError(statusQuery.error);
-    if (apiErr.codigo === 'TELEGRAM_DESABILITADO' || apiErr.status === 503) {
-      return (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <MessageCircle size={16} className="text-muted-foreground" />
-              <h2 className="font-semibold text-sm">Telegram</h2>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Integração com Telegram não está habilitada neste servidor.
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <MessageCircle size={16} className="text-muted-foreground" />
+            <h2 className="font-semibold text-sm">Telegram</h2>
+          </div>
+          <p className="text-xs text-destructive">
+            Erro ao verificar status: {statusQuery.error.message}
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   const status = statusQuery.data;
