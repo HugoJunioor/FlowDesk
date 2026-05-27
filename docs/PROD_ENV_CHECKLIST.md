@@ -101,26 +101,40 @@ openssl rand -base64 24 | tr -d '/+=' | head -c 32
 
 ### Telegram
 
-> Integracao opcional. Se `TELEGRAM_ENABLED` nao estiver como `true`, nenhuma das vars abaixo e necessaria.
+> Integracao opcional. Bot ja vinculado no `@just_floow_bot` para a Just;
+> em outras instalacoes, criar um bot novo via [@BotFather](https://t.me/BotFather)
+> e apontar o webhook para `https://<dominio>/telegram-events/<secret>`.
 
 | Var | Obrigatoria | Default | Descricao | Como obter |
 |-----|-------------|---------|-----------|------------|
-| `TELEGRAM_ENABLED` | Nao | — | Habilitar integracao Telegram. Definir como `true` para ativar. | — |
-| `TELEGRAM_BOT_TOKEN` | Condicional | — | Token do bot Telegram. Obrigatorio se `TELEGRAM_ENABLED=true`. | Conversar com @BotFather no Telegram |
-| `TELEGRAM_WEBHOOK_SECRET` | Condicional | — | Secret para validar requests do webhook Telegram. | `openssl rand -hex 16` |
+| `TELEGRAM_ENABLED` | Nao | `false` | Habilitar modulo Telegram na API (legacy-state usa o token diretamente). | — |
+| `TELEGRAM_BOT_TOKEN` | Sim (se usar Telegram) | — | Token do bot. | Conversar com @BotFather > `/newbot` |
+| `TELEGRAM_WEBHOOK_SECRET` | Sim (se usar Telegram) | — | Secret no path do webhook (`/telegram-events/<secret>`). | `openssl rand -hex 16` |
+| `TELEGRAM_BOT_USERNAME` | Nao | `FlowDeskBot` | Username do bot (mostrado na UI de vinculacao). | Mesmo nome definido no BotFather |
 
-### SMTP
+### Web Push (Service Worker)
 
-> Integracao opcional. Se `SMTP_HOST` nao estiver definido, envio de email fica desabilitado.
+> Push real, funciona com aba fechada. Sem `VAPID_*` definido, push fica apenas com aba aberta (Notification API direta).
 
 | Var | Obrigatoria | Default | Descricao | Como obter |
 |-----|-------------|---------|-----------|------------|
-| `SMTP_HOST` | Nao | — | Host do servidor SMTP. Ex: `smtp.gmail.com`. | Provedor de email |
-| `SMTP_PORT` | Nao | `587` | Porta SMTP. `587` para STARTTLS, `465` para SSL. | Provedor de email |
-| `SMTP_SECURE` | Nao | `false` | Usar SSL/TLS direto (porta 465). `false` = STARTTLS. | — |
-| `SMTP_USER` | Nao | — | Usuario de autenticacao SMTP. | Provedor de email |
-| `SMTP_PASS` | Nao | — | Senha ou App Password SMTP. | Provedor de email |
-| `SMTP_FROM` | Nao | — | Endereco remetente. Ex: `FlowDesk <noreply@empresa.com>`. | — |
+| `VAPID_PUBLIC_KEY` | Nao | — | Chave publica VAPID (frontend usa pra subscribe). | `npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | Nao | — | Chave privada VAPID. **Tratar como senha.** | Mesmo comando acima |
+| `VAPID_SUBJECT` | Nao | `mailto:admin@example.com` | URL `mailto:` ou `https:` que identifica o servidor. | `mailto:` do operador |
+
+### Email (SMTP)
+
+> Integracao opcional. Sem `EMAIL_ENABLED=true`, dispatch de email vira no-op.
+
+| Var | Obrigatoria | Default | Descricao | Como obter |
+|-----|-------------|---------|-----------|------------|
+| `EMAIL_ENABLED` | Nao | `false` | Habilita dispatch de email pelo legacy-state. | — |
+| `SMTP_HOST` | Sim (se `EMAIL_ENABLED`) | — | Host SMTP. Ex: `smtp.gmail.com`. | Provedor de email |
+| `SMTP_PORT` | Nao | `587` | `587` STARTTLS, `465` SSL direto. | Provedor de email |
+| `SMTP_SECURE` | Nao | `false` | `true` = porta 465 (TLS direto). `false` = STARTTLS. | — |
+| `SMTP_USER` | Sim (se `EMAIL_ENABLED`) | — | Usuario SMTP. | Provedor de email |
+| `SMTP_PASS` | Sim (se `EMAIL_ENABLED`) | — | Senha ou **App Password** (Gmail/Workspace exige). | https://myaccount.google.com/apppasswords |
+| `SMTP_FROM` | Sim (se `EMAIL_ENABLED`) | — | Remetente. Ex: `FlowDesk <suporte@empresa.com>`. | — |
 
 ### Observability / Sentry
 
