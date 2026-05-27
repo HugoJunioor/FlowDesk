@@ -220,19 +220,21 @@ const Demandas = () => {
         ? { ...prev, status: newStatus as any, completedAt: newStatus === "concluida" ? resolvedCompletedAt : prev.completedAt, manualStatusOverride: true }
         : prev
     );
+    // Pega status atual em memoria ANTES de salvar — esse e o que o usuario esta vendo
+    const demand = demands.find((d) => d.id === demandId);
+    const prevStatus = demand?.status;
+
     const overrides = loadOverrides();
-    const prevStatus = overrides[demandId]?.status;
     overrides[demandId] = { ...overrides[demandId], status: newStatus, manualStatusOverride: true, completedAt: resolvedCompletedAt };
     saveOverrides(overrides);
 
     // Dispara notificacao pra demanda Slack (fire-and-forget)
-    const demand = demands.find((d) => d.id === demandId);
     if (demand && prevStatus !== newStatus) {
       const actor = currentUser?.name;
       const updated = { ...demand, status: newStatus as any, completedAt: resolvedCompletedAt };
       if (newStatus === "em_andamento") void notifyStarted(updated, actor);
       else if (newStatus === "concluida") void notifyCompleted(updated, actor);
-      else if (newStatus === "aberta" && demand.status === "concluida") void notifyReopened(updated, actor);
+      else if (newStatus === "aberta" && prevStatus === "concluida") void notifyReopened(updated, actor);
     }
   }, [demands, currentUser]);
 
