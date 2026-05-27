@@ -127,10 +127,22 @@ export function getLastTeamReply(demand: SlackDemand) {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
+  // Prefere o reply mais recente com texto nao-vazio. Se nao tiver
+  // nenhum, cai pro mais recente e usa fallback de anexo/sem texto.
+  const withText = sorted.find((r) => (r.text || '').trim().length > 0);
+  const chosen = withText ?? sorted[0];
+  const rawText = (chosen.text || '').trim();
+  const hasFiles = Array.isArray(chosen.files) && chosen.files.length > 0;
+  const text = rawText
+    ? rawText
+    : hasFiles
+    ? `(${chosen.files!.length === 1 ? 'anexo' : `${chosen.files!.length} anexos`})`
+    : '(sem texto)';
+
   return {
-    author: sorted[0].author,
-    text: sorted[0].text,
-    timestamp: sorted[0].timestamp,
+    author: chosen.author,
+    text,
+    timestamp: chosen.timestamp,
   };
 }
 
