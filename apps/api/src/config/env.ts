@@ -71,6 +71,12 @@ const envSchema = z.object({
   // SMTP_HOST/PORT/USER/PASS/FROM ja declarados acima (reusados pelo lembrete diario).
   EMAIL_ENABLED: z.coerce.boolean().default(false),
   SMTP_SECURE: z.coerce.boolean().default(false), // true=465 (TLS), false=587 (STARTTLS)
+
+  // Web Push (Service Worker). Sem chaves definidas, push fica desligado.
+  // Gerar com: npx web-push generate-vapid-keys
+  VAPID_PUBLIC_KEY: z.string().default(''),
+  VAPID_PRIVATE_KEY: z.string().default(''),
+  VAPID_SUBJECT: z.string().default('mailto:admin@example.com'),
 }).superRefine((data, ctx) => {
   if (data.TELEGRAM_ENABLED) {
     if (!data.TELEGRAM_BOT_TOKEN) {
