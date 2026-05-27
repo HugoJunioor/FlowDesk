@@ -124,15 +124,19 @@ export async function notifyAssigned(demand: SlackDemand, assigneeEmail?: string
 
 /**
  * Coleta emails de destinatarios pra eventos de demanda: requester + assignee.
- * Filtra: emails resolvidos, sem duplicar e sem incluir o autor (actor).
+ * - Resolve emails, deduplica
+ * - Por padrao exclui o actor (quem fez a acao) pra evitar auto-notificacao
+ * - EXCECAO: assignee == actor (auto-atribuicao) — actor recebe a notificacao
+ *   pra ter confirmacao da propria acao
  */
 function recipientsForDemand(demand: SlackDemand, actorName?: string): string[] {
   const set = new Set<string>();
   const requesterEmail = emailFromName(demand.requester?.name);
   const assigneeEmail = emailFromName(demand.assignee?.name);
   const actorEmail = emailFromName(actorName);
+  const isSelfAssigned = !!assigneeEmail && assigneeEmail === actorEmail;
   if (requesterEmail && requesterEmail !== actorEmail) set.add(requesterEmail);
-  if (assigneeEmail && assigneeEmail !== actorEmail) set.add(assigneeEmail);
+  if (assigneeEmail && (assigneeEmail !== actorEmail || isSelfAssigned)) set.add(assigneeEmail);
   return [...set];
 }
 
