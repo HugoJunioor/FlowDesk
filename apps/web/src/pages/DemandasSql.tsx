@@ -21,6 +21,8 @@ import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import ReportButton from "@/components/reports/ReportButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { notifyStarted, notifyCompleted, notifyReopened } from "@/lib/notificationEvents";
 
 // === Overrides LOCAIS do modulo SQL (chave isolada) ===
 const SQL_OVERRIDES_KEY = "fd_sql_demand_overrides";
@@ -50,6 +52,7 @@ function saveSqlOverrides(ov: Record<string, SqlOverride>) {
 }
 
 const DemandasSql = () => {
+  const { currentUser } = useAuth();
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedSqlDemands());
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -145,6 +148,7 @@ const DemandasSql = () => {
           : prev
       );
       const overrides = loadSqlOverrides();
+      const prevStatus = overrides[demandId]?.status;
       overrides[demandId] = {
         ...overrides[demandId],
         status: newStatus,
@@ -152,8 +156,18 @@ const DemandasSql = () => {
         completedAt,
       };
       saveSqlOverrides(overrides);
+
+      // Dispara notify fire-and-forget se houver mudanca real de status
+      const demand = demands.find((d) => d.id === demandId);
+      if (demand && prevStatus !== newStatus) {
+        const actor = currentUser?.name;
+        const updated = { ...demand, status: newStatus as SlackDemand["status"], completedAt };
+        if (newStatus === "em_andamento") void notifyStarted(updated, actor);
+        else if (newStatus === "concluida") void notifyCompleted(updated, actor);
+        else if (newStatus === "aberta" && demand.status === "concluida") void notifyReopened(updated, actor);
+      }
     },
-    []
+    [demands, currentUser]
   );
 
   const handlePriorityChange = useCallback((demandId: string, priority: DemandPriority) => {

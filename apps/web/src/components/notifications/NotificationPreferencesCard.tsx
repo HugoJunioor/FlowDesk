@@ -101,15 +101,27 @@ const NotificationPreferencesCard = () => {
 
   const setChannelEvent = (channel: ChannelKey, event: NotificationEvent, enabled: boolean) => {
     if (!prefs) return;
+    const globalDefault = prefs.events?.[event] !== false; // global default permissivo
     const cur = prefs.eventsByChannel || {};
-    const curCh = cur[channel] || {};
-    setPrefs({
-      ...prefs,
-      eventsByChannel: {
-        ...cur,
-        [channel]: { ...curCh, [event]: enabled },
-      },
-    });
+    const curCh = { ...(cur[channel] || {}) };
+
+    if (enabled === globalDefault) {
+      // Voltou pro default global — apaga o override (evita override "preso" em false)
+      delete curCh[event];
+    } else {
+      curCh[event] = enabled;
+    }
+
+    const nextChannel = Object.keys(curCh).length > 0 ? curCh : undefined;
+    const nextByChannel = { ...cur };
+    if (nextChannel) {
+      nextByChannel[channel] = nextChannel;
+    } else {
+      delete nextByChannel[channel];
+    }
+    const finalByChannel = Object.keys(nextByChannel).length > 0 ? nextByChannel : undefined;
+
+    setPrefs({ ...prefs, eventsByChannel: finalByChannel });
     setDirty(true);
   };
 
