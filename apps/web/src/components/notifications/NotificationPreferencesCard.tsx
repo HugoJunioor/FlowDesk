@@ -1,19 +1,23 @@
 /**
  * Card de preferencias de notificacao — fica em /configuracoes.
  *
- * User configura:
- * - Por evento (atribuida, respondida, concluida, etc): liga/desliga
- * - Por canal (inbox sempre ligado, push e email opt-in)
- * - Lembretes SLA: quantas horas antes do vencimento notificar (P1/P2/P3)
+ * Estrutura em abas por canal (Inbox / Push / E-mail / Telegram).
+ * Cada aba tem:
+ *   - Toggle master do canal (habilita/desabilita o canal inteiro)
+ *   - Lista de eventos: por canal voce decide quais te notificam ali
+ *     (override sobre o default global definido em events)
+ *
+ * SLA reminders e resumo diario ficam abaixo (independentes de canal).
  *
  * Persistencia via apiClient.notifications (rota /notifications/preferences).
  */
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bell, Loader2, Save, Mail, BellRing, Inbox, AlertCircle, CheckCircle2, CalendarClock } from "lucide-react";
+import { Bell, Loader2, Save, Mail, BellRing, Inbox, AlertCircle, CheckCircle2, CalendarClock, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
@@ -22,6 +26,8 @@ import {
   DEFAULT_PREFERENCES,
   EVENT_LABELS,
   NotificationEvent,
+  ChannelKey,
+  isEventEnabledForChannel,
 } from "@/types/notification";
 import {
   requestBrowserNotificationPermission,
@@ -29,6 +35,7 @@ import {
   isBrowserNotificationSupported,
   showBrowserNotification,
 } from "@/lib/browserNotifications";
+import { subscribePush, unsubscribePush, isPushSupported } from "@/lib/pushSubscription";
 
 const EVENT_ORDER: NotificationEvent[] = [
   "demand_assigned",
@@ -38,7 +45,22 @@ const EVENT_ORDER: NotificationEvent[] = [
   "demand_reopened",
   "demand_overdue",
   "demand_due_soon",
+  "demand_approved",
+  "demand_rejected",
   "demand_created",
+];
+
+const CHANNELS: Array<{
+  key: ChannelKey;
+  label: string;
+  short: string;
+  icon: typeof Inbox;
+  description: string;
+}> = [
+  { key: "inbox", label: "Inbox no FlowDesk", short: "Inbox", icon: Inbox, description: "Sino na sidebar — sempre ativo." },
+  { key: "browserPush", label: "Push do navegador", short: "Push", icon: BellRing, description: "Notificações do sistema operacional." },
+  { key: "email", label: "E-mail", short: "E-mail", icon: Mail, description: "Recebe no e-mail cadastrado." },
+  { key: "telegram", label: "Telegram", short: "Telegram", icon: Send, description: "Mensagens diretas no bot conectado." },
 ];
 
 const NotificationPreferencesCard = () => {
@@ -59,10 +81,13 @@ const NotificationPreferencesCard = () => {
     apiClient.notifications.getPreferences(email)
       .then((r) => {
         if (cancelled) return;
-        // Merge defaults com o que tiver salvo
         const merged: NotificationPreferences = r.preferences
           ? { ...DEFAULT_PREFERENCES, ...r.preferences, userEmail: email }
           : { userEmail: email, ...DEFAULT_PREFERENCES };
+        // Garante campos novos em prefs antigos
+        if (!merged.channels.telegram && merged.channels.telegram === undefined) {
+          merged.channels = { ...merged.channels, telegram: true };
+        }
         setPrefs(merged);
       })
       .catch(() => {
@@ -74,9 +99,17 @@ const NotificationPreferencesCard = () => {
     return () => { cancelled = true; };
   }, [email]);
 
-  const updateEvent = (event: NotificationEvent, enabled: boolean) => {
+  const setChannelEvent = (channel: ChannelKey, event: NotificationEvent, enabled: boolean) => {
     if (!prefs) return;
-    setPrefs({ ...prefs, events: { ...prefs.events, [event]: enabled } });
+    const cur = prefs.eventsByChannel || {};
+    const curCh = cur[channel] || {};
+    setPrefs({
+      ...prefs,
+      eventsByChannel: {
+        ...cur,
+        [channel]: { ...curCh, [event]: enabled },
+      },
+    });
     setDirty(true);
   };
 
@@ -86,9 +119,8 @@ const NotificationPreferencesCard = () => {
     setDirty(true);
   };
 
-  const updateChannel = async (channel: "inbox" | "browserPush" | "email", enabled: boolean) => {
+  const updateChannelEnabled = async (channel: ChannelKey, enabled: boolean) => {
     if (!prefs) return;
-    // Pedir permissao do navegador ao ligar o toggle de push
     if (channel === "browserPush" && enabled) {
       if (!isBrowserNotificationSupported()) {
         toast({
@@ -108,16 +140,29 @@ const NotificationPreferencesCard = () => {
         });
         return;
       }
-      if (perm !== "granted") {
-        // user fechou o prompt sem decidir
-        return;
-      }
-      // Notificacao de teste pra confirmar que ta funcionando
+      if (perm !== "granted") return;
       showBrowserNotification({
         title: "FlowDesk · Notificações ativas",
         body: "Você vai receber novidades aqui daqui pra frente.",
         tag: `setup_push_${Date.now()}`,
       });
+      // Service Worker + Web Push: funciona com aba fechada (precisa do server VAPID configurado)
+      if (isPushSupported()) {
+        try {
+          const ok = await subscribePush();
+          if (ok) {
+            toast({ title: "Push em background ativado", description: "Você recebe mesmo com a aba fechada." });
+          } else {
+            toast({ title: "Push apenas com aba aberta", description: "Servidor sem chaves VAPID — push em background não disponível." });
+          }
+        } catch (err) {
+          console.warn("[push] subscribe falhou:", err);
+        }
+      }
+    }
+    if (channel === "browserPush" && !enabled) {
+      // Desliga subscription tambem no server
+      void unsubscribePush().catch(() => { /* ignore */ });
     }
     setPrefs({ ...prefs, channels: { ...prefs.channels, [channel]: enabled } });
     setDirty(true);
@@ -157,6 +202,82 @@ const NotificationPreferencesCard = () => {
     );
   }
 
+  const renderChannelTab = (ch: typeof CHANNELS[number]) => {
+    const Icon = ch.icon;
+    const channelEnabled = ch.key === "inbox" ? true : !!prefs.channels[ch.key];
+    const isPushPermDenied = ch.key === "browserPush" && (pushPerm === "denied" || pushPerm === "unsupported");
+
+    return (
+      <div className="space-y-4">
+        {/* Header do canal */}
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
+          <div className="flex items-start gap-3">
+            <Icon size={16} className="text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{ch.label}</p>
+              <p className="text-[11px] text-muted-foreground">{ch.description}</p>
+              {ch.key === "browserPush" && (
+                <p className="text-[11px] mt-1">
+                  {pushPerm === "granted" && (
+                    <span className="inline-flex items-center gap-0.5 text-success">
+                      <CheckCircle2 size={10} /> permitido
+                    </span>
+                  )}
+                  {pushPerm === "denied" && (
+                    <span className="inline-flex items-center gap-0.5 text-destructive">
+                      <AlertCircle size={10} /> bloqueado no navegador
+                    </span>
+                  )}
+                  {pushPerm === "default" && (
+                    <span className="text-warning">pedirá permissão ao ativar</span>
+                  )}
+                  {pushPerm === "unsupported" && (
+                    <span className="text-muted-foreground italic">não suportado</span>
+                  )}
+                </p>
+              )}
+              {ch.key === "telegram" && (
+                <p className="text-[11px] text-muted-foreground italic mt-1">
+                  Conecte sua conta em Telegram (card abaixo) pra começar a receber.
+                </p>
+              )}
+            </div>
+          </div>
+          <Switch
+            checked={channelEnabled}
+            disabled={ch.key === "inbox" || isPushPermDenied}
+            onCheckedChange={(v) => void updateChannelEnabled(ch.key, v)}
+          />
+        </div>
+
+        {/* Lista de eventos pro canal */}
+        <div>
+          <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+            Eventos que disparam por este canal
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {EVENT_ORDER.map((event) => {
+              const enabled = isEventEnabledForChannel(prefs, ch.key, event);
+              return (
+                <div
+                  key={event}
+                  className={`flex items-center justify-between p-2.5 rounded-lg border text-sm ${channelEnabled ? "" : "opacity-50"}`}
+                >
+                  <span>{EVENT_LABELS[event].label}</span>
+                  <Switch
+                    checked={enabled}
+                    disabled={!channelEnabled}
+                    onCheckedChange={(v) => setChannelEvent(ch.key, event, v)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -165,167 +286,70 @@ const NotificationPreferencesCard = () => {
           Notificações
         </CardTitle>
         <CardDescription>
-          Configure quais eventos te notificam e por onde (inbox, push do navegador, e-mail).
+          Configure individualmente cada canal — quais eventos te notificam por inbox, push, e-mail e Telegram.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* CANAIS GLOBAIS */}
-        <div>
-          <h3 className="text-sm font-semibold mb-3">Canais</h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-              <div className="flex items-center gap-3">
-                <Inbox size={14} className="text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Inbox no FlowDesk</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Sino na sidebar — sempre ativo
-                  </p>
-                </div>
-              </div>
-              <Switch checked={prefs.channels.inbox} disabled />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <BellRing size={14} className="text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Push do navegador</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Notificações no sistema operacional
-                    {pushPerm === "granted" && (
-                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-success">
-                        <CheckCircle2 size={10} /> permitido
-                      </span>
-                    )}
-                    {pushPerm === "denied" && (
-                      <span className="ml-1.5 inline-flex items-center gap-0.5 text-destructive">
-                        <AlertCircle size={10} /> bloqueado no navegador
-                      </span>
-                    )}
-                    {pushPerm === "default" && (
-                      <span className="ml-1.5 text-warning">
-                        pedirá permissão ao ativar
-                      </span>
-                    )}
-                    {pushPerm === "unsupported" && (
-                      <span className="ml-1.5 text-muted-foreground italic">
-                        não suportado neste navegador
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={prefs.channels.browserPush && pushPerm === "granted"}
-                disabled={pushPerm === "denied" || pushPerm === "unsupported"}
-                onCheckedChange={(v) => void updateChannel("browserPush", v)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Mail size={14} className="text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">E-mail</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Eventos importantes no e-mail cadastrado
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={prefs.channels.email}
-                onCheckedChange={(v) => updateChannel("email", v)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <CalendarClock size={14} className="text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Resumo diário por e-mail (9h)</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Lista de demandas em aberto toda manhã, dias úteis
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={prefs.dailyReminder ?? true}
-                onCheckedChange={updateDailyReminder}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* EVENTOS */}
-        <div>
-          <h3 className="text-sm font-semibold mb-3">Quais eventos te notificam</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {EVENT_ORDER.map((event) => (
-              <div
-                key={event}
-                className="flex items-center justify-between p-2.5 rounded-lg border text-sm"
-              >
-                <span>{EVENT_LABELS[event].label}</span>
-                <Switch
-                  checked={prefs.events[event] !== false}
-                  onCheckedChange={(v) => updateEvent(event, v)}
-                />
-              </div>
+        <Tabs defaultValue="inbox">
+          <TabsList className="grid grid-cols-4 w-full">
+            {CHANNELS.map((ch) => (
+              <TabsTrigger key={ch.key} value={ch.key} className="text-xs">
+                <ch.icon size={12} className="mr-1.5" />
+                {ch.short}
+              </TabsTrigger>
             ))}
-          </div>
-        </div>
+          </TabsList>
+          {CHANNELS.map((ch) => (
+            <TabsContent key={ch.key} value={ch.key} className="mt-4">
+              {renderChannelTab(ch)}
+            </TabsContent>
+          ))}
+        </Tabs>
 
-        {/* SLA REMINDERS */}
-        <div>
-          <h3 className="text-sm font-semibold mb-1">Lembretes de SLA</h3>
-          <p className="text-[11px] text-muted-foreground mb-3">
-            Quantas horas antes do vencimento te avisar (por prioridade).
-            Valor 0 desativa o lembrete pra essa prioridade.
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">P1 (Crítico)</label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  max={48}
-                  value={prefs.slaReminders.p1Hours}
-                  onChange={(e) => updateSlaReminder("p1Hours", Math.max(0, parseInt(e.target.value) || 0))}
-                  className="h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">h</span>
+        {/* DIÁRIO + SLA — independentes de canal */}
+        <div className="pt-2 border-t space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <CalendarClock size={14} className="text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Resumo diário por e-mail (9h)</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Lista de demandas em aberto toda manhã, dias úteis.
+                </p>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">P2 (Alta)</label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  max={48}
-                  value={prefs.slaReminders.p2Hours}
-                  onChange={(e) => updateSlaReminder("p2Hours", Math.max(0, parseInt(e.target.value) || 0))}
-                  className="h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">h</span>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">P3 (Média)</label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  max={48}
-                  value={prefs.slaReminders.p3Hours}
-                  onChange={(e) => updateSlaReminder("p3Hours", Math.max(0, parseInt(e.target.value) || 0))}
-                  className="h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">h</span>
-              </div>
+            <Switch
+              checked={prefs.dailyReminder ?? true}
+              onCheckedChange={updateDailyReminder}
+            />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold mb-1">Lembretes de SLA</h3>
+            <p className="text-[11px] text-muted-foreground mb-3">
+              Quantas horas antes do vencimento te avisar (por prioridade).
+              Valor 0 desativa o lembrete pra essa prioridade.
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {(["p1Hours", "p2Hours", "p3Hours"] as const).map((k) => (
+                <div className="space-y-1.5" key={k}>
+                  <label className="text-xs font-medium">
+                    {k === "p1Hours" ? "P1 (Crítico)" : k === "p2Hours" ? "P2 (Alta)" : "P3 (Média)"}
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={48}
+                      value={prefs.slaReminders[k]}
+                      onChange={(e) => updateSlaReminder(k, Math.max(0, parseInt(e.target.value) || 0))}
+                      className="h-8 text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground">h</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

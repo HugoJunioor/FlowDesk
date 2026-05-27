@@ -20,7 +20,10 @@ export type NotificationEvent =
   | "demand_approved"      // Demanda SQL/Deploy aprovada pelo aprovador
   | "demand_rejected";     // Demanda SQL/Deploy reprovada pelo aprovador
 
-export type NotificationChannel = "inbox" | "browser_push" | "email";
+export type NotificationChannel = "inbox" | "browser_push" | "email" | "telegram";
+
+/** Chave usada nos objetos channels/eventsByChannel (camelCase). */
+export type ChannelKey = "inbox" | "browserPush" | "email" | "telegram";
 
 export interface NotificationItem {
   id: string;
@@ -58,14 +61,23 @@ export interface NotificationItem {
 export interface NotificationPreferences {
   /** Email do usuario (chave) */
   userEmail: string;
-  /** Por evento — pode ligar/desligar cada um */
+  /** Por evento — defaults globais. Cada canal pode sobrescrever via eventsByChannel. */
   events: Partial<Record<NotificationEvent, boolean>>;
-  /** Canais ativos globalmente */
+  /** Canais ativos globalmente (master switch) */
   channels: {
     inbox: boolean;
     browserPush: boolean;
     email: boolean;
+    telegram: boolean;
   };
+  /**
+   * Override de eventos por canal. Se a chave estiver presente, vence sobre `events`.
+   * Se ausente, usa `events` (global).
+   *
+   * Ex: { email: { demand_replied: false } } => email NAO envia em respostas
+   * mesmo que events.demand_replied seja true.
+   */
+  eventsByChannel?: Partial<Record<ChannelKey, Partial<Record<NotificationEvent, boolean>>>>;
   /** Lembretes SLA: quantas horas antes do vencimento notificar (por prioridade) */
   slaReminders: {
     p1Hours: number;  // ex: 1 hora antes
@@ -93,6 +105,7 @@ export const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userEmail"> = {
     inbox: true,         // sempre ligado
     browserPush: false,  // opt-in
     email: false,        // opt-in
+    telegram: true,      // se conectado, envia por default
   },
   slaReminders: {
     p1Hours: 1,
@@ -101,6 +114,23 @@ export const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userEmail"> = {
   },
   dailyReminder: true,
 };
+
+/**
+ * Resolve se um evento deve disparar pra um canal específico.
+ * Regra: prefs.eventsByChannel[channel][event] vence sobre prefs.events[event].
+ * Se nenhum dos dois definir, retorna true (default permissivo).
+ */
+export function isEventEnabledForChannel(
+  prefs: NotificationPreferences | null | undefined,
+  channel: ChannelKey,
+  event: NotificationEvent,
+): boolean {
+  if (!prefs) return true;
+  const override = prefs.eventsByChannel?.[channel]?.[event];
+  if (override !== undefined) return override;
+  const global = prefs.events?.[event];
+  return global !== false; // undefined ou true => permite
+}
 
 export const EVENT_LABELS: Record<NotificationEvent, { label: string; icon: string }> = {
   demand_assigned: { label: "Atribuída a você", icon: "UserCheck" },
