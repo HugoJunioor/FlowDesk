@@ -136,6 +136,8 @@ export interface ThreadReply {
   author: string;
   text: string;
   timestamp: string;
+  /** Slack ts exato (ex "1779286668.749199") — opcional, populado em refresh ao vivo. */
+  ts?: string;
   isTeamMember: boolean;
   hasCheckReaction?: boolean;
   /**
