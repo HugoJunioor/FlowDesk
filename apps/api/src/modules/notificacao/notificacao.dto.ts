@@ -60,6 +60,7 @@ export interface Notificacao {
 }
 
 /** Preferências de notificação por usuário. */
+const channelEventsSchema = z.record(z.string(), z.boolean());
 export const preferenciaSchema = z.object({
   eventos: z.record(z.string(), z.boolean()).default({}),
   canais: z.object({
@@ -68,6 +69,13 @@ export const preferenciaSchema = z.object({
     email: z.boolean().default(false),
     telegram: z.boolean().default(true),
   }).default({ inbox: true, browserPush: false, email: false, telegram: true }),
+  /** Override por canal: se evento estiver definido aqui, vence sobre `eventos` global. */
+  eventosPorCanal: z.object({
+    inbox: channelEventsSchema.optional(),
+    browserPush: channelEventsSchema.optional(),
+    email: channelEventsSchema.optional(),
+    telegram: channelEventsSchema.optional(),
+  }).optional(),
   slaReminders: z.object({
     p1Hours: z.number().int().nonnegative().default(1),
     p2Hours: z.number().int().nonnegative().default(2),
@@ -77,10 +85,20 @@ export const preferenciaSchema = z.object({
 });
 export type PreferenciaInput = z.infer<typeof preferenciaSchema>;
 
+export type CanalKey = 'inbox' | 'browserPush' | 'email' | 'telegram';
 export interface Preferencia {
   usuarioEmail: string;
   eventos: Record<string, boolean>;
   canais: { inbox: boolean; browserPush: boolean; email: boolean; telegram: boolean };
+  eventosPorCanal?: Partial<Record<CanalKey, Record<string, boolean>>>;
   slaReminders: { p1Hours: number; p2Hours: number; p3Hours: number };
   dailyReminder: boolean;
+}
+
+/** Helper: o evento deve disparar pra esse canal? Considera override per-channel. */
+export function isEventEnabledForCanal(prefs: Preferencia, canal: CanalKey, evento: string): boolean {
+  const override = prefs.eventosPorCanal?.[canal]?.[evento];
+  if (override !== undefined) return override;
+  const global = prefs.eventos?.[evento];
+  return global !== false;
 }
