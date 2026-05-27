@@ -9,9 +9,9 @@ set -euo pipefail
 
 BACKUP_DIR="/opt/flowdesk/backups"
 DATA_DIR="/opt/flowdesk/app/data"
-DB_CONTAINER="cfo-db-1"
-DB_NAME="flowdesk"
-DB_USER="flowdesk"
+DB_CONTAINER="${DB_CONTAINER:-postgres}"
+DB_NAME="${DB_NAME:-flowdesk}"
+DB_USER="${DB_USER:-flowdesk}"
 
 if [ $# -lt 1 ]; then
   echo "Uso: $0 <timestamp>"

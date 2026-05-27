@@ -16,7 +16,11 @@ $ErrorActionPreference = "Stop"
 $remotes = git remote
 if ($remotes -notcontains "bitbucket") {
   Write-Host "[setup] Adicionando remote bitbucket..." -ForegroundColor Yellow
-  git remote add bitbucket https://bitbucket.org/cezarfelipe18/just-flow.git
+  if (-not $env:BITBUCKET_REPO_URL) {
+    Write-Host "BITBUCKET_REPO_URL nao definido. Ex: \$env:BITBUCKET_REPO_URL='https://bitbucket.org/<workspace>/<repo>.git'" -ForegroundColor Red
+    exit 1
+  }
+  git remote add bitbucket $env:BITBUCKET_REPO_URL
 }
 
 # 2. Garante que main esta atualizada
