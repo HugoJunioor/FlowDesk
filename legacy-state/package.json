@@ -2,5 +2,8 @@
   "name": "legacy-state",
   "type": "module",
   "version": "1.0.0",
-  "dependencies": { "express": "^4.21.0" }
+  "dependencies": {
+    "express": "^4.21.0",
+    "nodemailer": "^8.0.7"
+  }
 }
