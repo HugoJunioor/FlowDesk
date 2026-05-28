@@ -883,5 +883,161 @@ app.post('/telegram-events/:secret', async (req, res) => {
   }
 });
 
+// ============ Cron: lembrete diario por email ============
+// Roda em dias uteis as 9h BRT. Pra cada user em fd_users_v2 do shared-state,
+// monta resumo das demandas em aberto atribuidas a ele e manda email (canal
+// email do user precisa estar ligado nas prefs).
+//
+// Source de demandas: arquivos realDemands.ts e historicalDemands.ts montados
+// em /web-data:ro. Parse via regex pra evitar dependencia de TS runtime.
+
+const DAILY_TARGET_HOUR_BRT = 9;
+const DAILY_CHECK_INTERVAL_MS = 60_000;
+let lastDailyRun = null; // 'YYYY-MM-DD'
+
+function nowInBrt() {
+  // Retorna { date: 'YYYY-MM-DD', hour: number, weekday: string }
+  const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const hour = Number(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }),
+  );
+  const weekday = new Date().toLocaleDateString('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
+  return { date, hour, weekday };
+}
+
+function parseDemandsFile(filepath, exportName) {
+  try {
+    const c = fs.readFileSync(filepath, 'utf8');
+    const re = new RegExp(`${exportName}[^=]*=\\s*(\\[[\\s\\S]*?\\]);`);
+    const m = c.match(re);
+    if (!m) return [];
+    return JSON.parse(m[1]);
+  } catch (err) {
+    console.warn(`[daily] falha lendo ${filepath}:`, err.message);
+    return [];
+  }
+}
+
+function loadAllDemands() {
+  const base = process.env.WEB_DATA_DIR || '/web-data';
+  const current = parseDemandsFile(path.join(base, 'realDemands.ts'), 'mockDemands');
+  const historic = parseDemandsFile(path.join(base, 'historicalDemands.ts'), 'historicalDemands');
+  return [...current, ...historic];
+}
+
+function emailFromUserName(users, name) {
+  if (!name) return null;
+  const lower = name.toLowerCase();
+  const u = users.find((x) =>
+    String(x.name || '').toLowerCase() === lower ||
+    String(x.login || '').toLowerCase() === lower,
+  );
+  return u?.email || null;
+}
+
+function buildDailySummary(userName, demands) {
+  const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
+  const rows = demands.map((d) => {
+    const link = `${base}/demandas?openId=${encodeURIComponent(d.id)}`;
+    const prio = (d.priority || 'p3').toUpperCase();
+    const due = d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR') : '—';
+    const titulo = escapeHtml((d.title || '').slice(0, 80));
+    return `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;">${prio}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;"><a href="${link}" style="color:#0ea5e9;text-decoration:none;">${titulo}</a></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#64748b;">${due}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!doctype html>
+<html><body style="font-family:system-ui,Arial,sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a;">
+  <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="font-size:13px;color:#3b82f6;font-weight:600;text-transform:uppercase;">FlowDesk · Resumo diário</div>
+    <h2 style="margin:8px 0 4px;font-size:18px;">Bom dia, ${escapeHtml(userName)}!</h2>
+    <p style="margin:0 0 16px;color:#334155;font-size:14px;">Você tem <strong>${demands.length}</strong> demanda${demands.length !== 1 ? 's' : ''} em aberto:</p>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Prio</th>
+          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Demanda</th>
+          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Prazo</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <a href="${base}/demandas" style="display:inline-block;margin-top:20px;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Abrir FlowDesk</a>
+  </div>
+  <p style="text-align:center;color:#94a3b8;font-size:11px;margin-top:16px;">Desative em Configurações → Notificações → "Resumo diário".</p>
+</body></html>`;
+}
+
+async function runDailyReminder() {
+  const mailer = getMailer();
+  if (!mailer) { console.log('[daily] EMAIL_ENABLED off — pulando'); return; }
+
+  const state = readJson('shared-state.json', {});
+  const users = (state.fd_users_v2 || []).filter((u) => u.status !== 'inactive');
+  const prefsAll = readJson('notificationPreferences.json', {});
+  const allDemands = loadAllDemands();
+
+  let enviados = 0;
+  let pulados = 0;
+
+  for (const user of users) {
+    const email = user.email;
+    if (!email) { pulados++; continue; }
+    const prefs = prefsAll[email];
+    // Default: dailyReminder ligado
+    if (prefs?.dailyReminder === false) { pulados++; continue; }
+    if (prefs?.channels && prefs.channels.email === false) { pulados++; continue; }
+
+    // Demandas atribuidas a este user e em aberto
+    const minhas = allDemands.filter((d) => {
+      if (d.status === 'concluida' || d.status === 'reprovada') return false;
+      const assigneeName = d.assignee?.name;
+      if (!assigneeName) return false;
+      const assigneeEmail = emailFromUserName(users, assigneeName);
+      return assigneeEmail && assigneeEmail.toLowerCase() === email.toLowerCase();
+    });
+    if (minhas.length === 0) { pulados++; continue; }
+
+    try {
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: email,
+        subject: `[FlowDesk] ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto pra você`,
+        html: buildDailySummary(user.name || email, minhas),
+        text: `Você tem ${minhas.length} demandas em aberto. Abra ${process.env.APP_BASE_URL || ''}/demandas`,
+      });
+      enviados++;
+      console.log(`[daily] enviado pra ${email} (${minhas.length} demandas)`);
+    } catch (err) {
+      console.warn(`[daily] falha pra ${email}:`, err.message);
+    }
+  }
+  console.log(`[daily] ciclo concluido: ${enviados} enviados, ${pulados} pulados`);
+}
+
+function dailyTick() {
+  const { date, hour, weekday } = nowInBrt();
+  if (weekday === 'Saturday' || weekday === 'Sunday') return;
+  if (hour !== DAILY_TARGET_HOUR_BRT) return;
+  if (lastDailyRun === date) return;
+  lastDailyRun = date;
+  console.log(`[daily] disparando ciclo ${date}`);
+  void runDailyReminder();
+}
+
+if (process.env.DAILY_REMINDER_ENABLED === 'true') {
+  setInterval(dailyTick, DAILY_CHECK_INTERVAL_MS);
+  console.log('[daily] cron ativo — alvo 9h BRT dias uteis');
+}
+
+// Endpoint manual pra disparar agora (debug)
+app.post('/daily-reminder/run-now', async (_req, res) => {
+  await runDailyReminder();
+  res.json({ ok: true });
+});
+
 const PORT = process.env.PORT || 8090;
 app.listen(PORT, () => console.log(`legacy-state on ${PORT}`));
