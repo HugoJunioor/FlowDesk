@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
@@ -96,6 +96,20 @@ const Demandas = () => {
   }, []);
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
   const [selected, setSelected] = useState<SlackDemand | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Abre Sheet automaticamente se ?openId=<id> na URL (vindo de notificacao / email)
+  useEffect(() => {
+    const openId = searchParams.get("openId");
+    if (!openId || demands.length === 0) return;
+    const found = demands.find((d) => d.id === openId);
+    if (found) {
+      setSelected(found);
+      const next = new URLSearchParams(searchParams);
+      next.delete("openId");
+      setSearchParams(next, { replace: true });
+    }
+  }, [demands, searchParams, setSearchParams]);
   const [viewMode, setViewMode] = useState<"cards" | "lista">(() =>
     (localStorage.getItem("fd_view_mode") as "cards" | "lista") ?? "cards"
   );
