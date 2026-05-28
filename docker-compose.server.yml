@@ -110,8 +110,13 @@ services:
       SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}"
       SLACK_CLIENT_ID: "${SLACK_CLIENT_ID:-}"
       SLACK_CLIENT_SECRET: "${SLACK_CLIENT_SECRET:-}"
+      DAILY_REMINDER_ENABLED: "${DAILY_REMINDER_ENABLED:-false}"
+      WEB_DATA_DIR: /web-data
+      TZ: America/Sao_Paulo
     volumes:
       - /opt/flowdesk/app/data:/data
+      # Mount read-only para o cron do lembrete diario parsear realDemands.ts
+      - /opt/flowdesk/app/apps/web/src/data:/web-data:ro
     healthcheck:
       test:
         - CMD-SHELL
