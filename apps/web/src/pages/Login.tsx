@@ -46,9 +46,9 @@ const Login = () => {
     setIsLoading(false);
     if (!result.success) {
       toast({ title: "Erro ao entrar", description: result.error, variant: "destructive" });
-    } else {
-      navigate("/", { replace: true });
     }
+    // Sucesso: NAO navega. A re-renderizacao do App vai mostrar a rota atual
+    // (preservando ?openId=<id> etc) automaticamente quando isAuthenticated=true.
   };
 
   // ── Forgot password ───────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ const Login = () => {
       return;
     }
     toast({ title: "Senha criada com sucesso!", description: "Bem-vindo ao FlowDesk." });
-    navigate("/", { replace: true });
+    // Igual ao login: re-render mostra a rota atual sem forcar dashboard
   };
 
   // ── Shared brand panel ───────────────────────────────────────────────────────
