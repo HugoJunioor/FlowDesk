@@ -654,8 +654,8 @@ const Dashboard = () => {
             { title: "P1 Criticos", value: p1Count, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
             { title: "Concluidas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
             { title: "Expiradas", value: expiradas, icon: Clock, color: "text-destructive", bg: "bg-destructive/10" },
-            { title: "SLA Resolucao", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= 80 ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= 80 ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
-            { title: "SLA 1a Resposta", value: `${firstResponseData.rate}%`, icon: Zap, color: firstResponseData.rate >= 80 ? "text-success" : firstResponseData.rate >= 50 ? "text-warning" : "text-destructive", bg: firstResponseData.rate >= 80 ? "bg-success/10" : firstResponseData.rate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: "SLA Resolucao", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= SLA_TARGET_PERCENT ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= SLA_TARGET_PERCENT ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: "SLA 1a Resposta", value: `${firstResponseData.rate}%`, icon: Zap, color: firstResponseData.rate >= SLA_TARGET_PERCENT ? "text-success" : firstResponseData.rate >= 50 ? "text-warning" : "text-destructive", bg: firstResponseData.rate >= SLA_TARGET_PERCENT ? "bg-success/10" : firstResponseData.rate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
             { title: "SLA Estourado", value: resolutionSlaData.breached, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10" },
           ].map((kpi) => (
             <Card key={kpi.title} className="border border-border shadow-sm">
@@ -937,7 +937,7 @@ const Dashboard = () => {
                       <Building2 size={13} className="text-muted-foreground" />
                       <span className="text-sm font-medium text-foreground">{c.name}</span>
                     </div>
-                    <span className={`text-xs font-bold ${c.rate >= 80 ? "text-success" : c.rate >= 50 ? "text-warning" : "text-destructive"}`}>
+                    <span className={`text-xs font-bold ${c.rate >= SLA_TARGET_PERCENT ? "text-success" : c.rate >= 50 ? "text-warning" : "text-destructive"}`}>
                       {c.rate}%
                     </span>
                   </div>
