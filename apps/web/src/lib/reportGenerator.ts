@@ -1,6 +1,6 @@
 import { SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandPriority } from "@/types/demand";
 import { getFirstResponseMinutes, getResolutionMinutes, isExcludedFromFirstResponseSla } from "./businessHours";
-import { computeDemandMetrics, isSlaBreached as isSlaBreachedCommon, parseResponseSla } from "./slaCalculator";
+import { computeDemandMetrics, isSlaBreached as isSlaBreachedCommon, parseResponseSla, SLA_TARGET_PERCENT } from "./slaCalculator";
 import { branding } from "@/config/brandingLoader";
 
 interface ReportOptions {
@@ -988,16 +988,16 @@ export function generateInteractiveReport(options: ReportOptions): string {
   <div class="sla-gauges">
     <div class="gauge-card">
       <h3>SLA de Resolução</h3>
-      <div class="gauge-value" style="color: ${slaResRate >= 80 ? 'var(--success)' : slaResRate >= 60 ? 'var(--warning)' : 'var(--danger)'}">${slaResRate}%</div>
+      <div class="gauge-value" style="color: ${slaResRate >= SLA_TARGET_PERCENT ? 'var(--success)' : slaResRate >= 60 ? 'var(--warning)' : 'var(--danger)'}">${slaResRate}%</div>
       <div class="gauge-label">das demandas resolvidas no prazo</div>
-      <div class="gauge-bar"><div class="gauge-fill" style="width: ${slaResRate}%; background: ${slaResRate >= 80 ? 'var(--success)' : slaResRate >= 60 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+      <div class="gauge-bar"><div class="gauge-fill" style="width: ${slaResRate}%; background: ${slaResRate >= SLA_TARGET_PERCENT ? 'var(--success)' : slaResRate >= 60 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
       <div class="gauge-details"><span>✅ No prazo: ${slaResOk}</span><span>❌ Estourado: ${slaResBreach}</span></div>
     </div>
     <div class="gauge-card">
       <h3>SLA de 1ª Resposta</h3>
-      <div class="gauge-value" style="color: ${slaRespRate >= 80 ? 'var(--success)' : slaRespRate >= 60 ? 'var(--warning)' : 'var(--danger)'}">${slaRespRate}%</div>
+      <div class="gauge-value" style="color: ${slaRespRate >= SLA_TARGET_PERCENT ? 'var(--success)' : slaRespRate >= 60 ? 'var(--warning)' : 'var(--danger)'}">${slaRespRate}%</div>
       <div class="gauge-label">respondidas dentro do SLA</div>
-      <div class="gauge-bar"><div class="gauge-fill" style="width: ${slaRespRate}%; background: ${slaRespRate >= 80 ? 'var(--success)' : slaRespRate >= 60 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
+      <div class="gauge-bar"><div class="gauge-fill" style="width: ${slaRespRate}%; background: ${slaRespRate >= SLA_TARGET_PERCENT ? 'var(--success)' : slaRespRate >= 60 ? 'var(--warning)' : 'var(--danger)'}"></div></div>
       <div class="gauge-details"><span>✅ No prazo: ${slaRespOk}</span><span>❌ Atrasada: ${slaRespBreach}</span></div>
     </div>
   </div>
