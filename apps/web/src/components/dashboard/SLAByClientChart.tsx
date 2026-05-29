@@ -33,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const total: number = d?.total ?? 0;
   const dentro: number = d?.dentro ?? 0;
   const fora: number = total - dentro;
-  const color = rate >= 80 ? "#22c55e" : rate >= 50 ? "#f59e0b" : "#ef4444";
+  const color = rate >= SLA_TARGET_PERCENT ? "#22c55e" : rate >= 50 ? "#f59e0b" : "#ef4444";
   return (
     <div style={tooltipStyle}>
       <p style={{ fontWeight: 600, marginBottom: 6, color: "hsl(var(--foreground))" }}>{label}</p>
@@ -170,7 +170,7 @@ const SLAByClientChart = ({ demands }: SLAByClientChartProps) => {
                       <Cell
                         key={idx}
                         fill={
-                          entry.rate >= 80
+                          entry.rate >= SLA_TARGET_PERCENT
                             ? "#22c55e"
                             : entry.rate >= 50
                             ? "#f59e0b"

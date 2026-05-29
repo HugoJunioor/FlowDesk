@@ -8,8 +8,8 @@ import {
 import type { SlackDemand } from "@/types/demand";
 
 describe("SLA constants", () => {
-  it("SLA_TARGET_PERCENT eh 80", () => {
-    expect(SLA_TARGET_PERCENT).toBe(80);
+  it("SLA_TARGET_PERCENT eh 90", () => {
+    expect(SLA_TARGET_PERCENT).toBe(90);
   });
 
   it("lista de motivos de exclusao tem entradas conhecidas", () => {
