@@ -1,4 +1,9 @@
 #!/bin/bash
+# Carrega .env (cron tem ambiente limpo). DOCKER_NETWORK, SLACK_BOT_TOKEN, etc.
+set -a
+[ -f /opt/flowdesk/app/.env ] && . /opt/flowdesk/app/.env
+set +a
+
 # Sincroniza demandas do Slack a cada N min e atualiza /opt/flowdesk/app/web-dist.
 #
 # Diferenca pro fluxo antigo: NAO rebuilda o container Docker. Em vez disso,
@@ -25,7 +30,7 @@ docker run --rm \
   -v /opt/flowdesk/app:/app \
   -w /app \
   --env-file /opt/flowdesk/app/.env \
-  --network "${DOCKER_NETWORK:-app_network}" \
+  --network "${DOCKER_NETWORK:-cfo_default}" \
   node:20-alpine sh -c '
     cd /app && npm install --no-save --legacy-peer-deps @slack/web-api dotenv >/dev/null 2>&1 && \
     cd apps/web && node scripts/syncSlack.cjs
