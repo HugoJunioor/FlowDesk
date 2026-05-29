@@ -16,7 +16,7 @@ import {
 } from "@/lib/businessHours";
 
 /** Meta de SLA (em %) usada nos paineis e graficos. */
-export const SLA_TARGET_PERCENT = 80;
+export const SLA_TARGET_PERCENT = 90;
 
 /**
  * Motivos de expiracao que NAO penalizam o SLA da Just.
