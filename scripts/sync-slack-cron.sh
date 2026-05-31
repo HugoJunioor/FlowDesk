@@ -1,8 +1,24 @@
 #!/bin/bash
 # Carrega .env (cron tem ambiente limpo). DOCKER_NETWORK, SLACK_BOT_TOKEN, etc.
-set -a
-[ -f /opt/flowdesk/app/.env ] && . /opt/flowdesk/app/.env
-set +a
+#
+# IMPORTANTE: `. .env` num shell quebra com valores nao-quotados que tem
+# caracteres especiais (ex: SMTP_FROM=Just Flow <x@y.com> → erro de parse e,
+# com `set -e`, aborta o cron silenciosamente). Por isso parseamos manual:
+# - ignora comentarios e linhas vazias
+# - aceita valores com `<`, `>`, espacos sem precisar de aspas
+# - falhas em uma linha NAO matam o script todo
+ENV_FILE=/opt/flowdesk/app/.env
+if [ -f "$ENV_FILE" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      ''|\#*) continue ;;
+    esac
+    # tira aspas em volta do valor se houver
+    value="${value%\"}"; value="${value#\"}"
+    value="${value%\'}"; value="${value#\'}"
+    export "$key=$value" 2>/dev/null || true
+  done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE")
+fi
 
 # Sincroniza demandas do Slack a cada N min e atualiza /opt/flowdesk/app/web-dist.
 #
