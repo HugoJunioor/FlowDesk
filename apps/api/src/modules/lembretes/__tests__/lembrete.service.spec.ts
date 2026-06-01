@@ -24,8 +24,8 @@ jest.mock('@config/env', () => ({
     SMTP_PORT: 587,
     SMTP_USER: 'user@test',
     SMTP_PASS: 'pass',
-    SMTP_FROM: 'FlowDesk <no-reply@test>',
-    APP_BASE_URL: 'https://flowdesk.test',
+    SMTP_FROM: 'Just Flow <no-reply@test>',
+    APP_BASE_URL: 'https://justflow.test',
     DAILY_REMINDER_ENABLED: true,
   },
 }));
@@ -54,9 +54,17 @@ function mockUsers(users: Array<{ id: string; email: string; nome: string }>) {
 }
 
 function mockDemandas(
-  demandas: Array<{ id: string; titulo: string; prioridade: string; due_date: Date | null }>,
+  demandas: Array<{
+    id: string;
+    titulo: string;
+    prioridade: string;
+    due_date: Date | null;
+    permalink_slack?: string | null;
+  }>,
 ) {
-  poolMock.query.mockResolvedValueOnce({ rows: demandas } as never);
+  // permalink_slack vira null quando nao informado — espelha o que vem do DB
+  const rows = demandas.map((d) => ({ permalink_slack: null, ...d }));
+  poolMock.query.mockResolvedValueOnce({ rows } as never);
 }
 
 const USER_A = { id: 'u1', email: 'ana@just.com', nome: 'Ana Lima' };

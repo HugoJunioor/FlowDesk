@@ -78,7 +78,7 @@ export const notificacaoService = {
     if (!prefs.canais.browserPush) return;
     if (!isEventEnabledForCanal(prefs, 'browserPush', input.evento)) return;
     await pushService.sendToUser(input.usuarioEmail, {
-      title: `FlowDesk · ${input.titulo}`,
+      title: `Just Flow · ${input.titulo}`,
       body: input.mensagem ?? '',
       url: input.demandaId ? `/demandas?openId=${encodeURIComponent(input.demandaId)}` : '/',
       tag: `${input.evento}_${input.demandaId ?? Date.now()}`,
