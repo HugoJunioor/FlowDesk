@@ -139,7 +139,7 @@ const ConfiguracoesV2Page = () => {
             <div className="space-y-2">
               <label className="flex items-center justify-between gap-3 py-1">
                 <div>
-                  <div className="text-sm">Inbox no FlowDesk</div>
+                  <div className="text-sm">Inbox no Just Flow</div>
                   <div className="text-[10px] text-muted-foreground">Aparece no sino do sidebar</div>
                 </div>
                 <Switch

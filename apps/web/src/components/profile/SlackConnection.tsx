@@ -155,7 +155,7 @@ const SlackConnection = ({ email }: SlackConnectionProps) => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Não conectado</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Suas mensagens via FlowDesk aparecerão como "JustFlow" no Slack.
+                  Suas mensagens via Just Flow aparecerão como "JustFlow" no Slack.
                 </p>
               </div>
             </div>
