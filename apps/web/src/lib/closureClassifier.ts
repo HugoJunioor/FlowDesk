@@ -8,7 +8,7 @@ import { addBusinessHours, getBusinessMinutesBetween } from "./businessHours";
  * Classificador automatico de campos de fechamento.
  *
  * Categoria: analisa titulo + descricao para identificar area
- * Nivel de suporte: analisa quem resolveu (N1=Bruna/Schai, N2=Daniel/Hugo, N3=Rafa/Cezar/Erick/Gabriel)
+ * Nivel de suporte: analisa quem resolveu (mapeamento N1/N2/N3 em SUPPORT_LEVEL_MEMBERS, branding.local.ts)
  * Motivo de expiracao: analisa contexto da thread quando SLA estourou
  */
 

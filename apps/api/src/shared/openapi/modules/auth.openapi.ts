@@ -18,7 +18,7 @@ const AuthenticatedUserSchema = registry.register(
     id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     login: z.string().openapi({ example: 'hugo.cordeiro' }),
     email: z.string().email().openapi({ example: 'hugo@wearejust.it' }),
-    nome: z.string().openapi({ example: 'Hugo Cordeiro' }),
+    nome: z.string().openapi({ example: 'Operador Cordeiro' }),
     perfil: z.enum(['master', 'user']),
     status: z.enum(['active', 'blocked']),
     primeiroAcesso: z.boolean(),

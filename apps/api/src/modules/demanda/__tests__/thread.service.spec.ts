@@ -16,7 +16,7 @@ const fakeDemanda = (): any => ({
   descricao: null,
   prioridade: 'p3',
   status: 'aberta',
-  responsavelNome: 'Hugo',
+  responsavelNome: 'Operador',
   solicitanteNome: 'Cliente',
 });
 
@@ -38,7 +38,7 @@ describe('threadService', () => {
   it('add lança NotFound se demanda nao existe', async () => {
     demandaMock.findById.mockResolvedValue(null);
     await expect(
-      threadService.add('id', 'Hugo', { texto: 'resp', ehMembroEquipe: true, temCheckReaction: false, temLoadingReaction: false }),
+      threadService.add('id', 'Operador', { texto: 'resp', ehMembroEquipe: true, temCheckReaction: false, temLoadingReaction: false }),
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -47,7 +47,7 @@ describe('threadService', () => {
     threadMock.add.mockResolvedValue({
       id: 'r1',
       demandaId: 'd1',
-      autor: 'Hugo',
+      autor: 'Operador',
       texto: 'oi',
       timestampMsg: new Date(),
       ehMembroEquipe: true,
@@ -57,13 +57,13 @@ describe('threadService', () => {
       criadoEm: new Date(),
     });
 
-    await threadService.add('d1', 'Hugo', {
+    await threadService.add('d1', 'Operador', {
       texto: 'oi',
       ehMembroEquipe: true,
       temCheckReaction: false,
       temLoadingReaction: false,
     });
-    expect(threadMock.add).toHaveBeenCalledWith('d1', 'Hugo', expect.any(Object));
+    expect(threadMock.add).toHaveBeenCalledWith('d1', 'Operador', expect.any(Object));
   });
 
   it('updateClosure lança NotFound se demanda nao existe', async () => {

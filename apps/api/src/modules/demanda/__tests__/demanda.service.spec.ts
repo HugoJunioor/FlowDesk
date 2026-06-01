@@ -16,9 +16,9 @@ const fake = (overrides: Partial<Demanda> = {}): Demanda => ({
   tipoDemanda: null,
   workflow: null,
   produto: null,
-  solicitanteNome: 'Hugo',
+  solicitanteNome: 'Operador',
   solicitanteAvatar: null,
-  responsavelNome: 'Tiago Silva',
+  responsavelNome: 'Operador Infra',
   responsavelAvatar: null,
   infraKind: 'sql',
   infraQuery: null,
@@ -39,7 +39,7 @@ const fake = (overrides: Partial<Demanda> = {}): Demanda => ({
 });
 
 const actor = {
-  nome: 'Tiago Silva',
+  nome: 'Operador Infra',
   email: 'tiago@just.com.br',
   perfil: 'user' as const,
 };
@@ -60,20 +60,20 @@ describe('demandaService', () => {
   });
 
   it('createInfra usa nome do actor como solicitante', async () => {
-    const created = fake({ solicitanteNome: 'Hugo' });
+    const created = fake({ solicitanteNome: 'Operador' });
     repoMock.createInfra.mockResolvedValue(created);
     await demandaService.createInfra(
       {
         titulo: 'Nova',
         prioridade: 'p3',
         infraKind: 'sql',
-        responsavelNome: 'Tiago Silva',
+        responsavelNome: 'Operador Infra',
         tags: [],
       },
-      { nome: 'Hugo', email: 'h@just.com.br', perfil: 'user' },
+      { nome: 'Operador', email: 'h@just.com.br', perfil: 'user' },
     );
     expect(repoMock.createInfra).toHaveBeenCalledWith(expect.objectContaining({
-      solicitante: { nome: 'Hugo', avatar: null },
+      solicitante: { nome: 'Operador', avatar: null },
     }));
   });
 

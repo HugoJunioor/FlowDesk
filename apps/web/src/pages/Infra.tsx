@@ -6,7 +6,7 @@
  * - Deploy (release/deploy)
  *
  * Persistencia em data/infraDemands.json via apiClient.infra.
- * Responsavel padrao: Tiago Silva. Prioridade padrao: P3.
+ * Responsavel padrao: Operador Infra. Prioridade padrao: P3.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";

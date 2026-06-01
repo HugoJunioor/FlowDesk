@@ -42,7 +42,7 @@ function makeDemanda(overrides: Partial<{
     status: 'aberta',
     origem: 'internal',
     due_date: new Date(Date.now() + 3600000),
-    responsavel_nome: 'Tiago Silva',
+    responsavel_nome: 'Operador Infra',
     solicitante_nome: null,
     ...overrides,
   };
@@ -50,7 +50,7 @@ function makeDemanda(overrides: Partial<{
 
 function setupPoolMocks({
   demandas = [makeDemanda()],
-  users = [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+  users = [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
   prefs = [] as Array<{
     usuario_email: string;
     eventos: Record<string, boolean>;
@@ -111,7 +111,7 @@ describe('runSlaReminderCycle', () => {
   it('cria demand_due_soon quando dentro do threshold de p2 (2h = 120 min)', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p2' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_due_soon: true },
@@ -130,7 +130,7 @@ describe('runSlaReminderCycle', () => {
   it('NÃO cria due_soon quando fora do threshold (minsToDue > threshold)', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p2' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_due_soon: true },
@@ -147,7 +147,7 @@ describe('runSlaReminderCycle', () => {
   it('cria demand_overdue quando minsToDue < 0', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p1' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_overdue: true },
@@ -166,7 +166,7 @@ describe('runSlaReminderCycle', () => {
   it('anti-spam: não cria notificação se já foi notificado nas últimas 24h', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p1' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_overdue: true, demand_due_soon: true },
@@ -183,7 +183,7 @@ describe('runSlaReminderCycle', () => {
   it('respeita preferência demand_overdue=false: não cria overdue', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p1' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_overdue: false }, // usuário desativou
@@ -199,7 +199,7 @@ describe('runSlaReminderCycle', () => {
   it('respeita preferência demand_due_soon=false: não cria due_soon', async () => {
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p2' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [{
         usuario_email: 'tiago@just.com.br',
         eventos: { demand_due_soon: false },
@@ -218,7 +218,7 @@ describe('runSlaReminderCycle', () => {
         responsavel_nome: null,
         solicitante_nome: null, // nenhum match no mapa de users
       })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
     });
     getMinutesMock.mockReturnValue(30);
 
@@ -231,7 +231,7 @@ describe('runSlaReminderCycle', () => {
     // Prefs vazio — engine usa defaults: p1=1h, p2=2h, p3=4h
     setupPoolMocks({
       demandas: [makeDemanda({ prioridade: 'p2' })],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [], // sem prefs — usa defaults
       alreadyNotified: false,
     });
@@ -245,11 +245,11 @@ describe('runSlaReminderCycle', () => {
   it('retorna varridas corretamente com múltiplas demandas', async () => {
     setupPoolMocks({
       demandas: [
-        makeDemanda({ id: 'id-1', responsavel_nome: 'Tiago Silva' }),
-        makeDemanda({ id: 'id-2', responsavel_nome: 'Tiago Silva' }),
-        makeDemanda({ id: 'id-3', responsavel_nome: 'Tiago Silva' }),
+        makeDemanda({ id: 'id-1', responsavel_nome: 'Operador Infra' }),
+        makeDemanda({ id: 'id-2', responsavel_nome: 'Operador Infra' }),
+        makeDemanda({ id: 'id-3', responsavel_nome: 'Operador Infra' }),
       ],
-      users: [{ email: 'tiago@just.com.br', nome: 'Tiago Silva' }],
+      users: [{ email: 'tiago@just.com.br', nome: 'Operador Infra' }],
       prefs: [],
       alreadyNotified: true, // não cria nenhuma
     });

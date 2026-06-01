@@ -16,7 +16,7 @@ export interface BuildResult {
 
 /**
  * Constrói INSERT a partir de um objeto.
- * Ex: buildInsert('tb_usuario', { nome: 'Hugo', email: 'h@x' })
+ * Ex: buildInsert('tb_usuario', { nome: 'Operador', email: 'h@x' })
  *   → INSERT INTO tb_usuario (nome, email) VALUES ($1, $2)
  */
 export function buildInsert(table: string, data: Record<string, unknown>, returning?: string[]): BuildResult {
@@ -33,7 +33,7 @@ export function buildInsert(table: string, data: Record<string, unknown>, return
 
 /**
  * Constrói UPDATE a partir de objeto de updates e condição WHERE.
- * Ex: buildUpdate('tb_usuario', { nome: 'Hugo' }, { id: 'uuid' })
+ * Ex: buildUpdate('tb_usuario', { nome: 'Operador' }, { id: 'uuid' })
  *   → UPDATE tb_usuario SET nome = $1 WHERE id = $2
  */
 export function buildUpdate(

@@ -4,7 +4,7 @@
  * Tabs SQL | Deploy | Suporte. SQL e Deploy reusam o formulario original.
  * Suporte tem campos estruturados: contexto, aconteceu, impacto, quem olhar,
  * proximo passo, info adicionais — montados em description no submit.
- * Responsavel default = Tiago Silva.
+ * Responsavel default = Operador Infra.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -297,7 +297,7 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
           name: currentUser?.name || currentUser?.login || "Anônimo",
           avatar: "",
         },
-        assignee: { name: "Tiago Silva", avatar: "" },
+        assignee: { name: "Operador Infra", avatar: "" },
         dueDate: finalDueDate,
         client: client.trim() || undefined,
         infraQuery: kind === "sql" && query.trim() ? query.trim() : undefined,
@@ -321,7 +321,7 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
       const kindLabel = kind === "sql" ? "Operações SQL" : kind === "deploy" ? "Deploy" : "Suporte";
       toast({
         title: `Demanda de ${kindLabel} criada`,
-        description: "Atribuída a Tiago Silva.",
+        description: "Atribuída a Operador Infra.",
       });
       onCreated();
     } catch (e) {
@@ -347,7 +347,7 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
         <DialogHeader>
           <DialogTitle>Nova demanda interna</DialogTitle>
           <DialogDescription>
-            Demandas internas atendidas pelo time. Responsável padrão: <strong>Tiago Silva</strong>.
+            Demandas internas atendidas pelo time. Responsável padrão: <strong>Operador Infra</strong>.
           </DialogDescription>
         </DialogHeader>
 

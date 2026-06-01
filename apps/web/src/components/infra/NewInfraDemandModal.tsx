@@ -2,7 +2,7 @@
  * Modal pra abrir uma nova demanda interna (Infra).
  *
  * Tabs SQL | Deploy. Cada uma tem o mesmo formulario, so muda o infraKind
- * que vai ser enviado pro backend. Responsavel default = Tiago Silva.
+ * que vai ser enviado pro backend. Responsavel default = Operador Infra.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -253,8 +253,8 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
           name: currentUser?.name || currentUser?.login || "Anônimo",
           avatar: "",
         },
-        // assignee fixo: Tiago Silva (regra de negocio)
-        assignee: { name: "Tiago Silva", avatar: "" },
+        // assignee fixo: Operador Infra (regra de negocio)
+        assignee: { name: "Operador Infra", avatar: "" },
         dueDate: finalDueDate,
         client: client.trim() || undefined,
         // Query so faz sentido em SQL (deploy nao tem). Banco fica em ambos.
@@ -264,13 +264,13 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         // Anexos (so envia se houver — payload pode ficar grande, eh base64)
         ...(attachments.length > 0 ? { infraAttachments: attachments } : {}),
       });
-      // Notifica o assignee (Tiago Silva) que tem nova demanda
+      // Notifica o assignee (Operador Infra) que tem nova demanda
       if (created?.demand) {
         void notifyAssigned(created.demand);
       }
       toast({
         title: `Demanda de ${kind === "sql" ? "Operações SQL" : "Deploy"} criada`,
-        description: "Atribuída a Tiago Silva.",
+        description: "Atribuída a Operador Infra.",
       });
       onCreated();
     } catch (e) {
@@ -290,7 +290,7 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
         <DialogHeader>
           <DialogTitle>Nova demanda Infra</DialogTitle>
           <DialogDescription>
-            Demandas internas atendidas pelo time de Infra. Responsável padrão: <strong>Tiago Silva</strong>.
+            Demandas internas atendidas pelo time de Infra. Responsável padrão: <strong>Operador Infra</strong>.
           </DialogDescription>
         </DialogHeader>
 

@@ -26,7 +26,7 @@ const clientMock = telegramClient as jest.Mocked<typeof telegramClient>;
 const FAKE_USER = {
   id: 'uuid-1',
   email: 'hugo@just.com.br',
-  nome: 'Hugo',
+  nome: 'Operador',
   telegram_chat_id: null,
   telegram_connected_at: null,
 };
@@ -129,7 +129,7 @@ describe('telegramService', () => {
         update_id: 1,
         message: {
           message_id: 1,
-          from: { id: 1, first_name: 'Hugo' },
+          from: { id: 1, first_name: 'Operador' },
           chat: { id: 999, type: 'private' },
           date: Date.now(),
           text: '/help',
@@ -145,7 +145,7 @@ describe('telegramService', () => {
         update_id: 1,
         message: {
           message_id: 1,
-          from: { id: 1, first_name: 'Hugo' },
+          from: { id: 1, first_name: 'Operador' },
           chat: { id: 999, type: 'private' },
           date: Date.now(),
           text: '/start FFFFFFFF',
@@ -169,7 +169,7 @@ describe('telegramService', () => {
         update_id: 2,
         message: {
           message_id: 2,
-          from: { id: 77, first_name: 'Hugo' },
+          from: { id: 77, first_name: 'Operador' },
           chat: { id: 77, type: 'private' },
           date: Date.now(),
           text: `/start ${code}`,

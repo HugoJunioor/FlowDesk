@@ -6,9 +6,9 @@ import { buildInsert, buildUpdate, sanitizeSearch, paginate } from './query-buil
 
 describe('buildInsert', () => {
   it('gera SQL parametrizado básico', () => {
-    const { sql, values } = buildInsert('tb_x', { nome: 'Hugo', email: 'h@x' });
+    const { sql, values } = buildInsert('tb_x', { nome: 'Operador', email: 'h@x' });
     expect(sql).toBe('INSERT INTO tb_x (nome, email) VALUES ($1, $2)');
-    expect(values).toEqual(['Hugo', 'h@x']);
+    expect(values).toEqual(['Operador', 'h@x']);
   });
 
   it('inclui RETURNING quando solicitado', () => {
@@ -30,9 +30,9 @@ describe('buildInsert', () => {
 
 describe('buildUpdate', () => {
   it('gera SET + WHERE parametrizados', () => {
-    const { sql, values } = buildUpdate('tb_x', { nome: 'Hugo' }, { id: 'uuid-1' });
+    const { sql, values } = buildUpdate('tb_x', { nome: 'Operador' }, { id: 'uuid-1' });
     expect(sql).toBe('UPDATE tb_x SET nome = $1 WHERE id = $2');
-    expect(values).toEqual(['Hugo', 'uuid-1']);
+    expect(values).toEqual(['Operador', 'uuid-1']);
   });
 
   it('incrementa placeholders corretamente com múltiplos SET + WHERE', () => {
