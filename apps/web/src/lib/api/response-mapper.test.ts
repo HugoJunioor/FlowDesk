@@ -4,9 +4,9 @@ import { unwrap, unwrapPaginated } from './response-mapper';
 describe('unwrap', () => {
   it('extrai dados de envelope de sucesso', () => {
     const res = {
-      data: { sucesso: true as const, dados: { id: '1', nome: 'Hugo' } },
+      data: { sucesso: true as const, dados: { id: '1', nome: 'Operador' } },
     } as Parameters<typeof unwrap>[0];
-    expect(unwrap(res)).toEqual({ id: '1', nome: 'Hugo' });
+    expect(unwrap(res)).toEqual({ id: '1', nome: 'Operador' });
   });
 
   it('lança erro se envelope nao for sucesso', () => {

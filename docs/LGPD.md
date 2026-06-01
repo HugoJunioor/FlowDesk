@@ -164,7 +164,7 @@ Caso suspeite de incidente (acesso indevido, vazamento, ataque):
    - Snapshot dos dados: `tar czf /var/backups/flowdesk/incident-data-$(date +%s).tar.gz data/`
 
 2. **Em até 1h**:
-   - Comunicar Hugo Cordeiro + supervisor
+   - Comunicar Operador Cordeiro + supervisor
    - Identificar escopo (quais usuários/dados afetados)
 
 3. **Em até 72h** (prazo legal ANPD):

@@ -269,7 +269,7 @@ app.post('/infra/demands', (req, res) => {
     ...(b.infraSuporteProximoPasso ? { infraSuporteProximoPasso: b.infraSuporteProximoPasso } : {}),
     ...(b.infraSuporteInfoAdicionais ? { infraSuporteInfoAdicionais: b.infraSuporteInfoAdicionais } : {}),
     requester: b.requester || { name: 'Desconhecido', avatar: '' },
-    assignee: b.assignee || { name: 'Tiago Silva', avatar: '' },
+    assignee: b.assignee || { name: 'Operador Infra', avatar: '' },
     cc: [],
     createdAt: now,
     dueDate: b.dueDate || null,

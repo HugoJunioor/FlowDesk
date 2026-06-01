@@ -23,6 +23,32 @@ Abre uma [issue](https://github.com/HugoJunioor/FlowDesk/issues/new) com:
 
 - **Commits:** padrão simples — `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`
 - **Naming:** componentes `PascalCase`, hooks `useThing`, libs `camelCase`
+
+## Política de privacidade no historico
+
+Este repositorio é **publico**. NUNCA comite:
+
+- Nomes reais de operadores, clientes ou solicitantes (use `Operador`,
+  `Solicitante`, `Membro do time` em fixtures/comentarios/PRs)
+- Emails reais ou domínios proprietarios (use `empresa.com`, `exemplo.com`)
+- Titulos reais de demandas em commit messages ou PR bodies
+- Credenciais, tokens, IPs de produção (ja gitignored — confira `.env.example`)
+- Referencias a "Claude" como autor/co-autor em commits ou docs
+
+Dados reais ficam em arquivos gitignored (`.env.production`,
+`apps/web/data/shared-state.json`, `apps/web/src/data/realDemands.ts`).
+O branding customizado da empresa vai em `branding.local.ts` (tambem
+gitignored).
+
+Hook local recomendado (`.git/hooks/commit-msg`):
+
+```bash
+#!/bin/bash
+if grep -qE "Hugo|Bichof|Tiago Silva|Bruna|Joyce|wearejust\\.it" "$1"; then
+  echo "ERRO: commit message contem nome/email real. Generalize." >&2
+  exit 1
+fi
+```
 - **Strings:** em português no código de UI, em inglês em comentários técnicos
 - **CI obrigatório:** build precisa passar, lint não bloqueia mas evite regredir
 

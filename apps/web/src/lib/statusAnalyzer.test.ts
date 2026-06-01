@@ -42,7 +42,7 @@ describe("analyzeThreadStatus", () => {
 
   it("detecta CONCLUIDA via reaction ✅ na thread", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "vou olhar", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "vou olhar", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
       { author: "Cliente", text: "ok obrigado", timestamp: "2026-04-15T15:00:00Z", isTeamMember: false, hasCheckReaction: true },
     ]);
     const r = analyzeThreadStatus(d);
@@ -63,7 +63,7 @@ describe("analyzeThreadStatus", () => {
 
   it("detecta EM_ANDAMENTO via padrao de texto da equipe", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "estou analisando, vou verificar agora", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "estou analisando, vou verificar agora", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.suggestedStatus).toBe("em_andamento");
@@ -72,7 +72,7 @@ describe("analyzeThreadStatus", () => {
 
   it("detecta EM_ANDAMENTO ao mencionar task no clickup", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "criei a task: app.clickup.com/t/abc123", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "criei a task: app.clickup.com/t/abc123", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.suggestedStatus).toBe("em_andamento");
@@ -81,7 +81,7 @@ describe("analyzeThreadStatus", () => {
   it("NUNCA marca concluida por texto (apenas reaction)", () => {
     // Mesmo com palavras tipo "resolvido", "executado" — sem reaction = nao concluida
     const d = makeDemand([
-      { author: "Hugo", text: "resolvido, processado e executado", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "resolvido, processado e executado", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.suggestedStatus).not.toBe("concluida");
@@ -89,7 +89,7 @@ describe("analyzeThreadStatus", () => {
 
   it("normaliza acentos no matching", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "Já estou olhando, em análise", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "Já estou olhando, em análise", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.suggestedStatus).toBe("em_andamento");
@@ -97,7 +97,7 @@ describe("analyzeThreadStatus", () => {
 
   it("alta confianca quando tem 2+ patterns matchando", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "vou verificar, vou analisar e vou resolver", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "vou verificar, vou analisar e vou resolver", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.confidence).toBe("alta");
@@ -105,7 +105,7 @@ describe("analyzeThreadStatus", () => {
 
   it("retorno tem timestamp do detectedAt", () => {
     const d = makeDemand([
-      { author: "Hugo", text: "estou analisando", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
+      { author: "Operador", text: "estou analisando", timestamp: "2026-04-15T11:00:00Z", isTeamMember: true },
     ]);
     const r = analyzeThreadStatus(d);
     expect(r?.detectedAt).toBe("2026-04-15T11:00:00Z");

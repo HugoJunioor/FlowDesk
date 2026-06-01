@@ -879,7 +879,7 @@ async function handleInfra(req, res) {
         ...(infraSuporteProximoPasso ? { infraSuporteProximoPasso } : {}),
         ...(infraSuporteInfoAdicionais ? { infraSuporteInfoAdicionais } : {}),
         requester: requester || { name: "Desconhecido", avatar: "" },
-        assignee: assignee || { name: "Tiago Silva", avatar: "" },
+        assignee: assignee || { name: "Operador Infra", avatar: "" },
         cc: [],
         createdAt: now,
         dueDate: dueDate || null,

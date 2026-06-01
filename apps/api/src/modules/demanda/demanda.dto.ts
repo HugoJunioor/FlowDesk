@@ -42,7 +42,7 @@ export const createInfraSchema = z.object({
   infraQuery: z.string().max(50000).optional(),
   infraDatabase: z.string().max(100).optional(),
   infraExternalLink: z.string().url().optional(),
-  responsavelNome: z.string().max(200).default('Tiago Silva'),
+  responsavelNome: z.string().max(200).default('Operador Infra'),
   responsavelAvatar: z.string().max(500).optional(),
   dueDate: z.string().datetime().optional(),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),

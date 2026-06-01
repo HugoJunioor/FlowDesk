@@ -2,7 +2,7 @@
 # Sintaxe: <pattern> <owner1> <owner2> ...
 # Owners podem ser usuarios (@username) ou times (@org/team).
 
-# Default: tudo precisa do Hugo
+# Default: maintainer revisa tudo
 * @HugoJunioor
 
 # Areas criticas: enfatizar na review

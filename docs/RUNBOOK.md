@@ -166,6 +166,6 @@ Integre com a infra de monitoring da Just:
 
 ## Contato e escalada
 
-- Dúvidas operacionais → Hugo Cordeiro
-- Erros críticos em produção → criar issue no GitHub + acionar Hugo
+- Dúvidas operacionais → Operador Cordeiro
+- Erros críticos em produção → criar issue no GitHub + acionar Operador
 - Suspeita de segurança → veja [LGPD.md](./LGPD.md) seção "Incidentes"

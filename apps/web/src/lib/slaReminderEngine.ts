@@ -71,8 +71,8 @@ function hoursBeforeForPriority(
 /**
  * Filtra demandas que sao "do user logado" — solicitante ou assignee.
  * Comparacao por nome (case-insensitive). Esse eh um proxy do "tem
- * relacao com voce" — pra Infra o assignee eh fixo Tiago Silva, mas
- * o solicitante pode ser qualquer um.
+ * relacao com voce" — pra Infra o assignee eh fixo (operador default
+ * configurado em runtime), mas o solicitante pode ser qualquer um.
  */
 function isUsersConcern(demand: SlackDemand, user: FlowDeskUser): boolean {
   const userName = (user.name || "").toLowerCase();

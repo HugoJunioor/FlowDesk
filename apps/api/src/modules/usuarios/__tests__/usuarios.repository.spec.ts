@@ -14,7 +14,7 @@ const USUARIO_ROW = {
   id: 'user-id-001',
   login: 'hugo',
   email: 'hugo@just.com.br',
-  nome: 'Hugo',
+  nome: 'Operador',
   perfil: 'user',
   status: 'active',
   senha_hash: '$2b$12$fake',
