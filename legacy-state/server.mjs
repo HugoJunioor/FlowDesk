@@ -925,6 +925,36 @@ function loadAllDemands() {
   return [...current, ...historic];
 }
 
+/**
+ * Aplica overrides salvos no shared-state.json a cada demanda.
+ *
+ * Demandas fechadas/reclassificadas via UI nao alteram realDemands.ts (que so
+ * eh reescrito pelo sync do Slack quando detecta 🟢 na thread). Em vez disso
+ * o frontend salva mudancas em `fd_demand_overrides[demand.id]`. Pra o daily
+ * reminder bater com o que o usuario ve na tela, precisamos aplicar essas
+ * mesmas mudancas em runtime aqui.
+ *
+ * Campos sobrescritos seguem o padrao do frontend (ver applyDemandOverrides
+ * em apps/web/src/data/demandsLoader.ts):
+ *   - status, priority, assignee, completedAt, closure, slaResolutionStatus
+ */
+function applyOverrides(demands, overrides) {
+  if (!overrides || typeof overrides !== 'object') return demands;
+  return demands.map((d) => {
+    const ov = overrides[d.id];
+    if (!ov) return d;
+    return {
+      ...d,
+      ...(ov.status !== undefined ? { status: ov.status } : {}),
+      ...(ov.priority !== undefined ? { priority: ov.priority } : {}),
+      ...(ov.assignee !== undefined ? { assignee: ov.assignee } : {}),
+      ...(ov.completedAt !== undefined ? { completedAt: ov.completedAt } : {}),
+      ...(ov.closure !== undefined ? { closure: ov.closure } : {}),
+      ...(ov.slaResolutionStatus !== undefined ? { slaResolutionStatus: ov.slaResolutionStatus } : {}),
+    };
+  });
+}
+
 function emailFromUserName(users, name) {
   if (!name) return null;
   const lower = name.toLowerCase();
@@ -1071,7 +1101,11 @@ async function runDailyReminder({ onlyEmail = null } = {}) {
     console.log(`[daily] modo teste: filtrando para ${onlyEmail} (${users.length} usuario(s))`);
   }
   const prefsAll = readJson('notificationPreferences.json', {});
-  const allDemands = loadAllDemands();
+  const rawDemands = loadAllDemands();
+  // CRITICO: aplicar overrides — sem isso, demandas fechadas via UI ainda
+  // aparecem como em_andamento porque o sync do Slack so atualiza
+  // realDemands.ts quando detecta 🟢 na thread.
+  const allDemands = applyOverrides(rawDemands, state.fd_demand_overrides);
 
   let enviados = 0;
   let pulados = 0;
@@ -1096,7 +1130,11 @@ async function runDailyReminder({ onlyEmail = null } = {}) {
       const assigneeEmail = emailFromUserName(users, assigneeName);
       return assigneeEmail && assigneeEmail.toLowerCase() === email.toLowerCase();
     });
-    if (minhas.length === 0) { pulados++; continue; }
+    if (minhas.length === 0) {
+      console.log(`[daily] ${email}: 0 demandas — pulado`);
+      pulados++; continue;
+    }
+    console.log(`[daily] ${email}: ${minhas.length} demanda(s) — ${minhas.map((d) => d.title.slice(0, 30)).join(' | ')}`);
 
     try {
       await mailer.sendMail({
