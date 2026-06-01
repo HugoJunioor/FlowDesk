@@ -934,21 +934,29 @@ function loadAllDemands() {
  * reminder bater com o que o usuario ve na tela, precisamos aplicar essas
  * mesmas mudancas em runtime aqui.
  *
- * Campos sobrescritos seguem o padrao do frontend (ver applyDemandOverrides
- * em apps/web/src/data/demandsLoader.ts):
- *   - status, priority, assignee, completedAt, closure, slaResolutionStatus
+ * REGRA ESPECIAL: se a demanda foi fechada via 🟢 no Slack
+ * (closureSource === "green_circle"), um eventual manualStatusOverride que
+ * reabra a demanda eh IGNORADO — o sinal do Slack vence. Mesma logica que o
+ * frontend aplica em apps/web/src/data/demandsLoader.ts:102-104, pra evitar
+ * incluir no email demandas que o sistema ja considera concluidas.
  */
 function applyOverrides(demands, overrides) {
   if (!overrides || typeof overrides !== 'object') return demands;
   return demands.map((d) => {
     const ov = overrides[d.id];
     if (!ov) return d;
+
+    // 🟢 do Slack tem prioridade sobre reabertura manual
+    const syncConcludedViaReaction =
+      d.status === 'concluida' && d.completedAt && d.closureSource === 'green_circle';
+    const ignoreManualStatus = syncConcludedViaReaction && ov.manualStatusOverride;
+
     return {
       ...d,
-      ...(ov.status !== undefined ? { status: ov.status } : {}),
+      ...(ov.status !== undefined && !ignoreManualStatus ? { status: ov.status } : {}),
       ...(ov.priority !== undefined ? { priority: ov.priority } : {}),
       ...(ov.assignee !== undefined ? { assignee: ov.assignee } : {}),
-      ...(ov.completedAt !== undefined ? { completedAt: ov.completedAt } : {}),
+      ...(ov.completedAt !== undefined && !ignoreManualStatus ? { completedAt: ov.completedAt } : {}),
       ...(ov.closure !== undefined ? { closure: ov.closure } : {}),
       ...(ov.slaResolutionStatus !== undefined ? { slaResolutionStatus: ov.slaResolutionStatus } : {}),
     };
