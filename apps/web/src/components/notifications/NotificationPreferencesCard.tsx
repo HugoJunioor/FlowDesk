@@ -57,7 +57,7 @@ const CHANNELS: Array<{
   icon: typeof Inbox;
   description: string;
 }> = [
-  { key: "inbox", label: "Inbox no FlowDesk", short: "Inbox", icon: Inbox, description: "Sino na sidebar — sempre ativo." },
+  { key: "inbox", label: "Inbox no Just Flow", short: "Inbox", icon: Inbox, description: "Sino na sidebar — sempre ativo." },
   { key: "browserPush", label: "Push do navegador", short: "Push", icon: BellRing, description: "Notificações do sistema operacional." },
   { key: "email", label: "E-mail", short: "E-mail", icon: Mail, description: "Recebe no e-mail cadastrado." },
   { key: "telegram", label: "Telegram", short: "Telegram", icon: Send, description: "Mensagens diretas no bot conectado." },
@@ -154,7 +154,7 @@ const NotificationPreferencesCard = () => {
       }
       if (perm !== "granted") return;
       showBrowserNotification({
-        title: "FlowDesk · Notificações ativas",
+        title: "Just Flow · Notificações ativas",
         body: "Você vai receber novidades aqui daqui pra frente.",
         tag: `setup_push_${Date.now()}`,
       });

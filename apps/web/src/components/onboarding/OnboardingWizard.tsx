@@ -250,7 +250,7 @@ const OnboardingWizard = ({ currentStep, onStepChange, onDismiss }: OnboardingWi
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                O FlowDesk esta pronto para sincronizar as demandas do Slack. Apos o primeiro sync,
+                O Just Flow esta pronto para sincronizar as demandas do Slack. Apos o primeiro sync,
                 as demandas aparecerao automaticamente no dashboard.
               </p>
               <div className="flex items-center gap-3 pt-2">
