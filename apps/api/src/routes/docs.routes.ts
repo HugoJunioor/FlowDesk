@@ -25,7 +25,7 @@ docsRoutes.use(
   swaggerUi.serve,
   swaggerUi.setup(undefined, {
     swaggerUrl: '/api/v1/docs/openapi.json',
-    customSiteTitle: 'FlowDesk API Docs',
+    customSiteTitle: 'Just Flow API Docs',
     swaggerOptions: {
       url: '/api/v1/docs/openapi.json',
       persistAuthorization: true,

@@ -101,7 +101,7 @@ const Login = () => {
       toast({ title: "Erro ao salvar senha.", description: result.error, variant: "destructive" });
       return;
     }
-    toast({ title: "Senha criada com sucesso!", description: "Bem-vindo ao FlowDesk." });
+    toast({ title: "Senha criada com sucesso!", description: `Bem-vindo ao ${branding.name}.` });
     // Igual ao login: re-render mostra a rota atual sem forcar dashboard
   };
 
@@ -371,7 +371,7 @@ const Login = () => {
         )}
 
         <p className="text-xs text-white/50 lg:text-muted-foreground mt-6 text-center space-x-2">
-          <span>FlowDesk &middot; 2026</span>
+          <span>{branding.name} &middot; 2026</span>
           <span>&middot;</span>
           <a
             href="/politica-cookies"

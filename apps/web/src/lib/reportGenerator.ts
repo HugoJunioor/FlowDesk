@@ -51,7 +51,7 @@ const isSlaBreachedDemand = isSlaBreachedCommon;
 export function generateInteractiveReport(options: ReportOptions): string {
   const { title, subtitle, filters, demands, generatedFrom } = options;
   const now = new Date();
-  const brandName = branding.name || "FlowDesk";
+  const brandName = branding.name || "Just Flow";
 
   // === METRICS — mesma logica do dashboard (fonte unica de verdade) ===
   const metrics = computeDemandMetrics(demands);

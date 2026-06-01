@@ -28,10 +28,10 @@ export function generateOpenApiDocument(): OpenAPIObject {
   cached = generator.generateDocument({
     openapi: '3.1.0',
     info: {
-      title: 'FlowDesk API',
+      title: 'Just Flow API',
       version: '1.0.0',
       description:
-        'API REST do FlowDesk — gestão de demandas internas e Slack da equipe Just.\n\n' +
+        'API REST do Just Flow — gestão de demandas internas e Slack da equipe Just.\n\n' +
         '**Auth:** Bearer JWT em todos os endpoints marcados com o cadeado. ' +
         'Obtenha o token via `POST /api/v1/auth/login`.',
       contact: {

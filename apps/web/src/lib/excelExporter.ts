@@ -337,7 +337,7 @@ export function exportToExcel(demands: SlackDemand[], title: string): void {
   XLSX.utils.book_append_sheet(wb, buildDemandasSheet(demands), "Demandas");
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `Demandas_FlowDesk_${dateStr}.xlsx`, {
+  XLSX.writeFile(wb, `Demandas_JustFlow_${dateStr}.xlsx`, {
     cellStyles: true,
     bookSST: false,
   });

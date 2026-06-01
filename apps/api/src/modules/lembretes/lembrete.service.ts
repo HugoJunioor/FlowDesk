@@ -2,8 +2,12 @@
  * Service do lembrete diário.
  *
  * Para cada usuário ativo com daily_reminder=true:
- *   - Busca demandas onde ele é responsavel/solicitante e status não é concluida/expirada
+ *   - Busca demandas onde ele é o RESPONSÁVEL e status não é concluida/expirada
  *   - Se >= 1, envia e-mail com resumo
+ *
+ * Importante: filtra SO por responsavel_nome (nao solicitante). Demandas que
+ * voce CRIOU mas nao precisa atuar nao entram no resumo — caso contrario
+ * voce recebe inbox enorme com tudo que pediu pra outra pessoa fazer.
  *
  * Modo dry-run: se SMTP não estiver configurado, loga sem enviar.
  */
@@ -34,6 +38,7 @@ interface DemandaRow {
   titulo: string;
   prioridade: string;
   due_date: Date | null;
+  permalink_slack: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,8 +66,15 @@ function getTransporter(): nodemailer.Transporter {
 // SLA helpers
 // ---------------------------------------------------------------------------
 
-function calcSla(dueDate: Date | null, now: Date): { status: SlaStatus; label: string } {
-  if (!dueDate) return { status: 'sem_prazo', label: 'Sem prazo definido' };
+interface SlaCalc {
+  status: SlaStatus;
+  label: string;
+  /** Minutos uteis ate o prazo (negativo = estourado). null se sem prazo. */
+  minutes: number | null;
+}
+
+function calcSla(dueDate: Date | null, now: Date): SlaCalc {
+  if (!dueDate) return { status: 'sem_prazo', label: '—', minutes: null };
 
   const mins = getBusinessMinutesBetween(now, dueDate);
 
@@ -71,7 +83,7 @@ function calcSla(dueDate: Date | null, now: Date): { status: SlaStatus; label: s
     const label = elapsed < 60
       ? `estourado há ${Math.round(elapsed)}min`
       : `estourado há ${Math.round(elapsed / 60)}h`;
-    return { status: 'estourado', label };
+    return { status: 'estourado', label, minutes: mins };
   }
 
   if (mins <= 240) {
@@ -79,13 +91,13 @@ function calcSla(dueDate: Date | null, now: Date): { status: SlaStatus; label: s
     const label = mins < 60
       ? `${Math.round(mins)}min restantes`
       : `${Math.round(mins / 60)}h restantes`;
-    return { status: 'proximo', label };
+    return { status: 'proximo', label, minutes: mins };
   }
 
   const label = mins < 60
     ? `${Math.round(mins)}min restantes`
     : `${Math.round(mins / 60)}h restantes`;
-  return { status: 'no_prazo', label };
+  return { status: 'no_prazo', label, minutes: mins };
 }
 
 // ---------------------------------------------------------------------------
@@ -105,19 +117,16 @@ async function fetchActiveUsers(): Promise<UsuarioRow[]> {
 }
 
 async function fetchDemandasAbertas(nomeUsuario: string): Promise<DemandaRow[]> {
-  // Demandas onde o usuário é responsável ou solicitante, ainda abertas
+  // Demandas onde o usuario eh o RESPONSAVEL (precisa atuar), ainda abertas.
+  // NAO filtra por solicitante — voce nao quer ser lembrado de demandas que
+  // VOCE pediu pra outra pessoa fazer; quem precisa do lembrete eh o
+  // responsavel.
   const res = await pool.query<DemandaRow>(
-    `SELECT id, titulo, prioridade, due_date
+    `SELECT id, titulo, prioridade, due_date, permalink_slack
      FROM tb_demanda
      WHERE excluido_em IS NULL
        AND status NOT IN ('concluida', 'expirada')
-       AND (
-         LOWER(responsavel_nome) = LOWER($1)
-         OR LOWER(solicitante_nome) = LOWER($1)
-       )
-     ORDER BY
-       CASE prioridade WHEN 'p1' THEN 1 WHEN 'p2' THEN 2 WHEN 'p3' THEN 3 ELSE 4 END,
-       due_date ASC NULLS LAST`,
+       AND LOWER(responsavel_nome) = LOWER($1)`,
     [nomeUsuario],
   );
   return res.rows;
@@ -177,16 +186,31 @@ export async function runLembreteDiarioCycle(): Promise<LembreteCycleResult> {
         continue;
       }
 
-      const demandas: DemandaResumo[] = demandasRows.map((d) => {
-        const { status, label } = calcSla(d.due_date, now);
-        return {
-          id: d.id,
-          titulo: d.titulo,
-          prioridade: d.prioridade,
-          slaStatus: status,
-          slaLabel: label,
-        };
+      // Calcula SLA pra cada demanda. Mantemos minutes separado para sort.
+      const enriched = demandasRows.map((d) => {
+        const sla = calcSla(d.due_date, now);
+        return { row: d, sla };
       });
+
+      // Sort: estouradas primeiro (mais antigas = minutes mais negativo),
+      // depois por minutos restantes ASC (mais critico antes). Sem-prazo no fim.
+      enriched.sort((a, b) => {
+        const am = a.sla.minutes;
+        const bm = b.sla.minutes;
+        if (am === null && bm === null) return 0;
+        if (am === null) return 1;
+        if (bm === null) return -1;
+        return am - bm;
+      });
+
+      const demandas: DemandaResumo[] = enriched.map(({ row, sla }) => ({
+        id: row.id,
+        titulo: row.titulo,
+        prioridade: row.prioridade,
+        slaStatus: sla.status,
+        slaLabel: sla.label,
+        permalinkSlack: row.permalink_slack,
+      }));
 
       const html = buildEmailHtml({
         nomeUsuario: usuario.nome,
@@ -201,7 +225,7 @@ export async function runLembreteDiarioCycle(): Promise<LembreteCycleResult> {
 
       await sendEmail({
         to: usuario.email,
-        subject: `FlowDesk — ${demandas.length} demanda${demandas.length !== 1 ? 's' : ''} em aberto`,
+        subject: `Just Flow — ${demandas.length} demanda${demandas.length !== 1 ? 's' : ''} em aberto`,
         html,
         text,
       });

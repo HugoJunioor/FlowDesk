@@ -436,8 +436,8 @@ async function handleSlackOAuth(req, res) {
         <html><body style="font-family:system-ui;padding:40px;background:#0f172a;color:#e2e8f0">
           <h1 style="color:#10b981">✓ Slack conectado</h1>
           <p>Conta <strong>${email}</strong> ligada ao Slack como <strong>&lt;@${slackUserId}&gt;</strong>.</p>
-          <p>Agora suas mensagens via FlowDesk vão postar como você no Slack.</p>
-          <p><a href="/" style="color:#3b82f6">Voltar ao FlowDesk</a></p>
+          <p>Agora suas mensagens via Just Flow vão postar como você no Slack.</p>
+          <p><a href="/" style="color:#3b82f6">Voltar ao Just Flow</a></p>
         </body></html>
       `);
     } catch (err) {
