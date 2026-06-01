@@ -935,48 +935,141 @@ function emailFromUserName(users, name) {
   return u?.email || null;
 }
 
+// --- SLA helpers (horas uteis Mon-Fri 8h-18h, sem feriados pra simplificar) ---
+// Espelha a logica de apps/web/src/lib/businessHours.ts mas mais simples
+// (nao trata feriados — diferenca pequena pra resumo diario).
+const BUSINESS_START_HOUR = 8;
+const BUSINESS_END_HOUR = 18;
+const BUSINESS_MIN_PER_DAY = (BUSINESS_END_HOUR - BUSINESS_START_HOUR) * 60;
+
+function businessMinutesBetween(from, to) {
+  // Retorna minutos uteis. Negativo se `to` ja passou.
+  if (to <= from) return -businessMinutesBetween(to, from);
+  let cur = new Date(from);
+  let total = 0;
+  while (cur < to) {
+    const day = cur.getDay();
+    const isWeekday = day >= 1 && day <= 5;
+    const dayStart = new Date(cur); dayStart.setHours(BUSINESS_START_HOUR, 0, 0, 0);
+    const dayEnd = new Date(cur); dayEnd.setHours(BUSINESS_END_HOUR, 0, 0, 0);
+    if (isWeekday) {
+      const slotStart = cur < dayStart ? dayStart : cur;
+      const slotEnd = to < dayEnd ? to : dayEnd;
+      if (slotEnd > slotStart) total += (slotEnd - slotStart) / 60000;
+    }
+    // Avanca pro proximo dia 0h
+    cur = new Date(cur); cur.setDate(cur.getDate() + 1); cur.setHours(0, 0, 0, 0);
+  }
+  return Math.round(total);
+}
+
+// SLA padrao por prioridade (em horas uteis). Espelha PRIORITY_CONFIG do web.
+const SLA_RESOLUTION_HOURS = { p1: 8, p2: 24, p3: 72 };
+
+function computeDueDate(d) {
+  // Se demanda ja tem dueDate explicito, usa. Caso contrario, deriva de
+  // createdAt + SLA da prioridade (horas uteis).
+  if (d.dueDate) return new Date(d.dueDate);
+  if (!d.createdAt || d.priority === 'sem_classificacao') return null;
+  const hours = SLA_RESOLUTION_HOURS[d.priority];
+  if (!hours) return null;
+  // Aproxima: adiciona N dias uteis equivalentes. 8h = 1 dia util.
+  const days = hours / 10; // 10h por dia util
+  const due = new Date(d.createdAt);
+  let added = 0;
+  while (added < days) {
+    due.setDate(due.getDate() + 1);
+    if (due.getDay() >= 1 && due.getDay() <= 5) added++;
+  }
+  return due;
+}
+
+function computeSla(due, now) {
+  if (!due) return { status: 'sem_prazo', label: '—', minutes: null };
+  const mins = businessMinutesBetween(now, due);
+  if (mins < 0) {
+    const e = Math.abs(mins);
+    const lbl = e < 60 ? `estourado ha ${e}min` : `estourado ha ${Math.round(e / 60)}h`;
+    return { status: 'estourado', label: lbl, minutes: mins };
+  }
+  const lbl = mins < 60 ? `${mins}min restantes` : `${Math.round(mins / 60)}h restantes`;
+  return { status: mins <= 240 ? 'proximo' : 'no_prazo', label: lbl, minutes: mins };
+}
+
 function buildDailySummary(userName, demands) {
   const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
-  const rows = demands.map((d) => {
+  const now = new Date();
+  const nomeDisplay = (userName || '').split(' ')[0] || userName || 'time';
+
+  // Enrich + sort: estourados primeiro (mais negativos), depois por
+  // minutos restantes ASC. Sem-prazo no fim.
+  const enriched = demands.map((d) => ({ d, sla: computeSla(computeDueDate(d), now) }));
+  enriched.sort((a, b) => {
+    const am = a.sla.minutes, bm = b.sla.minutes;
+    if (am === null && bm === null) return 0;
+    if (am === null) return 1;
+    if (bm === null) return -1;
+    return am - bm;
+  });
+
+  const rows = enriched.map(({ d, sla }) => {
     const link = `${base}/demandas?openId=${encodeURIComponent(d.id)}`;
     const prio = (d.priority || 'p3').toUpperCase();
-    const due = d.dueDate ? new Date(d.dueDate).toLocaleDateString('pt-BR') : '—';
     const titulo = escapeHtml((d.title || '').slice(0, 80));
+    const prazoCor = sla.status === 'estourado' ? '#dc2626' : '#111827';
+    const slackCell = d.slackPermalink
+      ? `<a href="${escapeHtml(d.slackPermalink)}" target="_blank" rel="noopener" style="display:inline-block;background:#4a154b;color:#fff;font-size:11px;text-decoration:none;padding:4px 10px;border-radius:4px;">Slack ↗</a>`
+      : `<span style="color:#9ca3af;font-size:12px;">—</span>`;
     return `<tr>
-      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;">${prio}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;"><a href="${link}" style="color:#0ea5e9;text-decoration:none;">${titulo}</a></td>
-      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#64748b;">${due}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:13px;color:#111827;font-weight:600;vertical-align:top;width:48px;">${prio}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;"><a href="${link}" style="color:#1d4ed8;text-decoration:none;font-size:13px;">${titulo}</a></td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:500;white-space:nowrap;vertical-align:top;">${sla.label}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;text-align:center;vertical-align:top;white-space:nowrap;">${slackCell}</td>
     </tr>`;
   }).join('');
 
   return `<!doctype html>
-<html><body style="font-family:system-ui,Arial,sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a;">
-  <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-    <div style="font-size:13px;color:#3b82f6;font-weight:600;text-transform:uppercase;">FlowDesk · Resumo diário</div>
-    <h2 style="margin:8px 0 4px;font-size:18px;">Bom dia, ${escapeHtml(userName)}!</h2>
-    <p style="margin:0 0 16px;color:#334155;font-size:14px;">Você tem <strong>${demands.length}</strong> demanda${demands.length !== 1 ? 's' : ''} em aberto:</p>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="background:#f8fafc;">
-          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Prio</th>
-          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Demanda</th>
-          <th style="text-align:left;padding:8px;font-size:11px;color:#64748b;text-transform:uppercase;">Prazo</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <a href="${base}/demandas" style="display:inline-block;margin-top:20px;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Abrir FlowDesk</a>
+<html><body style="font-family:system-ui,Arial,sans-serif;background:#f9fafb;margin:0;padding:24px;color:#111827;">
+  <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="background:#1e3a5f;padding:20px 28px;">
+      <span style="color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;opacity:.8;">JUST FLOW · RESUMO DIÁRIO</span>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin:0 0 6px;font-size:16px;color:#111827;">Bom dia, <strong>${escapeHtml(nomeDisplay)}</strong>!</p>
+      <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">Você tem <strong>${demands.length} demanda${demands.length !== 1 ? 's' : ''} em aberto</strong>:</p>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f9fafb;">
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;width:48px;">Prio</th>
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Demanda</th>
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Prazo</th>
+            <th style="text-align:center;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Slack</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:24px;text-align:center;">
+        <a href="${base}/demandas" style="display:inline-block;background:#1e3a5f;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 24px;border-radius:6px;">Abrir Just Flow</a>
+      </div>
+    </div>
+    <div style="padding:16px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center;">
+      Just Flow &mdash; Atenciosamente, equipe Just.<br/>
+      Desative em Configurações → Notificações → "Resumo diário".
+    </div>
   </div>
-  <p style="text-align:center;color:#94a3b8;font-size:11px;margin-top:16px;">Desative em Configurações → Notificações → "Resumo diário".</p>
 </body></html>`;
 }
 
-async function runDailyReminder() {
+async function runDailyReminder({ onlyEmail = null } = {}) {
   const mailer = getMailer();
-  if (!mailer) { console.log('[daily] EMAIL_ENABLED off — pulando'); return; }
+  if (!mailer) { console.log('[daily] EMAIL_ENABLED off — pulando'); return { enviados: 0, pulados: 0 }; }
 
   const state = readJson('shared-state.json', {});
-  const users = (state.fd_users_v2 || []).filter((u) => u.status !== 'inactive');
+  let users = (state.fd_users_v2 || []).filter((u) => u.status !== 'inactive');
+  if (onlyEmail) {
+    users = users.filter((u) => String(u.email || '').toLowerCase() === onlyEmail);
+    console.log(`[daily] modo teste: filtrando para ${onlyEmail} (${users.length} usuario(s))`);
+  }
   const prefsAll = readJson('notificationPreferences.json', {});
   const allDemands = loadAllDemands();
 
@@ -987,13 +1080,17 @@ async function runDailyReminder() {
     const email = user.email;
     if (!email) { pulados++; continue; }
     const prefs = prefsAll[email];
-    // Default: dailyReminder ligado
-    if (prefs?.dailyReminder === false) { pulados++; continue; }
-    if (prefs?.channels && prefs.channels.email === false) { pulados++; continue; }
+    // Em modo teste (onlyEmail setado), ignora prefs — sempre envia
+    if (!onlyEmail) {
+      if (prefs?.dailyReminder === false) { pulados++; continue; }
+      if (prefs?.channels && prefs.channels.email === false) { pulados++; continue; }
+    }
 
-    // Demandas atribuidas a este user e em aberto
+    // Demandas atribuidas a este user e ativas (aberta ou em_andamento).
+    // Filtra explicitamente expirada/concluida/reprovada — expirada nao
+    // deve aparecer como "em aberto" pra atuacao.
     const minhas = allDemands.filter((d) => {
-      if (d.status === 'concluida' || d.status === 'reprovada') return false;
+      if (d.status !== 'aberta' && d.status !== 'em_andamento') return false;
       const assigneeName = d.assignee?.name;
       if (!assigneeName) return false;
       const assigneeEmail = emailFromUserName(users, assigneeName);
@@ -1005,9 +1102,9 @@ async function runDailyReminder() {
       await mailer.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: email,
-        subject: `[FlowDesk] ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto pra você`,
+        subject: `Just Flow — ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto`,
         html: buildDailySummary(user.name || email, minhas),
-        text: `Você tem ${minhas.length} demandas em aberto. Abra ${process.env.APP_BASE_URL || ''}/demandas`,
+        text: `Você tem ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto. Abra ${process.env.APP_BASE_URL || ''}/demandas`,
       });
       enviados++;
       console.log(`[daily] enviado pra ${email} (${minhas.length} demandas)`);
@@ -1016,6 +1113,7 @@ async function runDailyReminder() {
     }
   }
   console.log(`[daily] ciclo concluido: ${enviados} enviados, ${pulados} pulados`);
+  return { enviados, pulados };
 }
 
 function dailyTick() {
@@ -1033,10 +1131,16 @@ if (process.env.DAILY_REMINDER_ENABLED === 'true') {
   console.log('[daily] cron ativo — alvo 9h BRT dias uteis');
 }
 
-// Endpoint manual pra disparar agora (debug)
-app.post('/daily-reminder/run-now', async (_req, res) => {
-  await runDailyReminder();
-  res.json({ ok: true });
+// Endpoint manual pra disparar agora (debug).
+// Aceita ?email=foo@bar.com pra mandar so pra um usuario (teste).
+app.post('/daily-reminder/run-now', async (req, res) => {
+  const onlyEmail = String(req.query.email || '').trim().toLowerCase();
+  try {
+    const result = await runDailyReminder({ onlyEmail: onlyEmail || null });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 8090;
