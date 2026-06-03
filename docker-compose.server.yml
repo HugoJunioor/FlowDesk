@@ -129,7 +129,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=cfo_default
       - traefik.http.services.fdlegacy.loadbalancer.server.port=8090
-      - traefik.http.routers.fdlegacy.rule=Host(`${DOMAIN}`) && (PathPrefix(`/__state`) || PathPrefix(`/notes`) || PathPrefix(`/infra`) || PathPrefix(`/notifications`) || PathPrefix(`/notification-preferences`) || PathPrefix(`/slack`) || PathPrefix(`/auth/slack`) || PathPrefix(`/telegram`))
+      - traefik.http.routers.fdlegacy.rule=Host(`${DOMAIN}`) && (PathPrefix(`/__state`) || PathPrefix(`/notes`) || PathPrefix(`/infra`) || PathPrefix(`/notifications`) || PathPrefix(`/notification-preferences`) || PathPrefix(`/slack`) || PathPrefix(`/auth/slack`) || PathPrefix(`/telegram`) || PathPrefix(`/sync-status`) || PathPrefix(`/demands-snapshot`) || PathPrefix(`/daily-reminder`))
       - traefik.http.routers.fdlegacy.entrypoints=websecure
       - traefik.http.routers.fdlegacy.tls.certresolver=letsencrypt
       - traefik.http.routers.fdlegacy.priority=300

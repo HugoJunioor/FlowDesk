@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Timer } from "lucide-react";
-import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
+import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { isSlaCompliant } from "@/lib/slaCalculator";
 import { SLA_TARGET_PERCENT } from "@/lib/slaCalculator";
 
@@ -78,12 +78,17 @@ export interface SLAByClientChartProps {
 }
 
 const SLAByClientChart = ({ demands }: SLAByClientChartProps) => {
+  // Re-render quando sync polling detectar novo realDemands.ts
+  const [syncTick, setSyncTick] = useState(0);
+  useEffect(() => subscribeToSync(() => setSyncTick((t) => t + 1)), []);
+
   const chartData = useMemo(() => {
     const source = demands ?? (() => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 30);
       return getProcessedDemands().filter((d) => new Date(d.createdAt) >= cutoff);
     })();
+    void syncTick; // dependency pra useMemo re-executar
 
     // Agrupa por cliente
     const byClient: Record<string, { total: number; dentro: number }> = {};
@@ -108,7 +113,7 @@ const SLAByClientChart = ({ demands }: SLAByClientChartProps) => {
         dentro: v.dentro,
       }))
       .reverse(); // recharts horizontal: primeiro entry = barra de baixo
-  }, [demands]);
+  }, [demands, syncTick]);
 
   // Altura dinamica: 48px por barra + cabecalho
   const chartHeight = Math.max(160, chartData.length * 48);

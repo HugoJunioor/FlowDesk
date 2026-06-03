@@ -1177,6 +1177,37 @@ if (process.env.DAILY_REMINDER_ENABLED === 'true') {
   console.log('[daily] cron ativo — alvo 9h BRT dias uteis');
 }
 
+// ============ Auto-refresh: sync status + snapshot ============
+// Dois endpoints leves pro frontend pollar sem recarregar:
+//   GET /sync-status        -> { mtime, mtimeIso }    (~ 80 bytes)
+//   GET /demands-snapshot   -> { demands, mtime }     (~ tamanho do arquivo)
+//
+// O frontend pergunta /sync-status a cada 30s. Se mtime mudou desde
+// a ultima vez, busca /demands-snapshot e atualiza a UI sem F5.
+
+const REAL_DEMANDS_PATH = path.join(process.env.WEB_DATA_DIR || '/web-data', 'realDemands.ts');
+
+app.get('/sync-status', (_req, res) => {
+  try {
+    const stat = fs.statSync(REAL_DEMANDS_PATH);
+    res.json({ mtime: stat.mtimeMs, mtimeIso: stat.mtime.toISOString() });
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
+app.get('/demands-snapshot', (_req, res) => {
+  try {
+    const c = fs.readFileSync(REAL_DEMANDS_PATH, 'utf8');
+    const m = c.match(/mockDemands[^=]*=\s*(\[[\s\S]*?\]);/);
+    const arr = m ? JSON.parse(m[1]) : [];
+    const stat = fs.statSync(REAL_DEMANDS_PATH);
+    res.json({ demands: arr, mtime: stat.mtimeMs });
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
 // Endpoint manual pra disparar agora (debug).
 // Aceita ?email=foo@bar.com pra mandar so pra um usuario (teste).
 app.post('/daily-reminder/run-now', async (req, res) => {
