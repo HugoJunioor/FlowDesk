@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DemoBanner } from "./components/DemoBanner.tsx";
+import { useSyncPolling } from "@/hooks/useSyncPolling";
 
 // Code splitting por rota — cada page entra como chunk próprio.
 // Bundle inicial fica enxuto (Index + dependencies do shell);
@@ -61,6 +62,10 @@ const PageLoader = () => (
 
 const AppRoutes = () => {
   const { isAuthenticated, mustChangePassword, currentUser, initialized } = useAuth();
+
+  // Auto-refresh de demandas (poll /sync-status; ao detectar novo realDemands.ts,
+  // atualiza o cache runtime e re-renderiza componentes inscritos).
+  useSyncPolling();
 
   // One-shot migracao: forca filtro scope='mine' em todos os browsers (faz uma vez por user).
   try {

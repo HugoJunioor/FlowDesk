@@ -29,7 +29,7 @@ import {
   type ChannelRoute,
   type ChannelRoutingConfig,
 } from "@/lib/channelRouting";
-import { getProcessedDemands } from "@/data/demandsLoader";
+import { getProcessedDemands, subscribeToSync } from "@/data/demandsLoader";
 import { getProcessedSqlDemands } from "@/data/sqlDemandsLoader";
 
 const ROUTE_LABELS: Record<ChannelRoute, { label: string; icon: typeof Inbox; color: string }> = {
@@ -55,6 +55,11 @@ const ChannelRouting = () => {
       navigate("/");
     }
   }, [currentUser, navigate]);
+
+  // Sync polling: ao detectar novo realDemands.ts, refaz scan de canais
+  useEffect(() => {
+    return subscribeToSync(() => setScanCount((c) => c + 1));
+  }, []);
 
   // Canais detectados nas demandas atuais (sugestao de cadastro).
   // Inclui AMBOS realDemands (geral) e sqlDemands (SQL) — assim novos

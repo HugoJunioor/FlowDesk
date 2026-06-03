@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, Calendar, Signal, Users, List, Database } from "lucide-react";
 import { differenceInHours } from "date-fns";
-import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
+import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS } from "@/types/demand";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 
@@ -81,17 +81,22 @@ const Demandas = () => {
   const [scope, setScope] = useState<DemandScope>(loadScope);
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
 
-  // Revalida quando overrides mudarem em outra aba/dispositivo
+  // Revalida em 3 gatilhos:
+  //  - storage event (override mudou em outra aba)
+  //  - focus (usuario voltou pra aba)
+  //  - sync polling detectou novo realDemands.ts (auto-refresh sem F5)
   useEffect(() => {
+    const refresh = () => setDemands(getProcessedDemands());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "fd_demand_overrides") setDemands(getProcessedDemands());
+      if (e.key === "fd_demand_overrides") refresh();
     };
-    const onFocus = () => setDemands(getProcessedDemands());
     window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("focus", refresh);
+    const unsubSync = subscribeToSync(refresh);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", refresh);
+      unsubSync();
     };
   }, []);
   const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });

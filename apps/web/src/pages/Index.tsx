@@ -17,7 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
-import { getProcessedDemands, extractClientName } from "@/data/demandsLoader";
+import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { addBusinessHours, getBusinessMinutesBetween, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { SlackDemand } from "@/types/demand";
@@ -204,15 +204,18 @@ const Dashboard = () => {
     };
   }, []);
   useEffect(() => {
+    const bump = () => setRefreshTick((t) => t + 1);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "fd_demand_overrides") setRefreshTick((t) => t + 1);
+      if (e.key === "fd_demand_overrides") bump();
     };
-    const onFocus = () => setRefreshTick((t) => t + 1);
     window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("focus", bump);
+    // Sync polling detectou novo realDemands.ts -> re-render
+    const unsubSync = subscribeToSync(bump);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", bump);
+      unsubSync();
     };
   }, []);
   const allDemands = useMemo(() => getProcessedDemands(), [refreshTick]);
