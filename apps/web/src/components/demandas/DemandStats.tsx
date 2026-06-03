@@ -4,6 +4,7 @@ import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { isStale } from "@/lib/staleInteraction";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -19,6 +20,7 @@ interface DemandStatsProps {
 }
 
 const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps) => {
+  const { t } = useLanguage();
   const now = new Date();
 
   const open = demands.filter((d) => d.status === "aberta" || d.status === "em_andamento").length;
@@ -75,15 +77,15 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
   const semInteracao = demands.filter((d) => isStale(d, 24)).length;
 
   const stats = [
-    { key: "abertas", title: "Abertas", value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
-    { key: "urgentes", title: "P1 Criticos", value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
-    { key: "vencendo", title: "Vencendo Hoje", value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
-    { key: "concluidas", title: "Concluídas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
-    { key: "sla_estourado", title: "SLA Estourado", value: slaBreach, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
-    { key: "resposta_atrasada", title: "1a Resp. Atrasada", value: firstResponseBreach, icon: Zap, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
+    { key: "abertas", title: t("demands.stats.open"), value: open, icon: Inbox, color: "text-primary", bg: "bg-primary/10", ring: "ring-primary/30" },
+    { key: "urgentes", title: t("demands.stats.p1_critical"), value: urgent, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
+    { key: "vencendo", title: t("demands.stats.due_today"), value: dueSoon, icon: Clock, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
+    { key: "concluidas", title: t("demands.stats.completed"), value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10", ring: "ring-success/30" },
+    { key: "sla_estourado", title: t("demands.stats.sla_breached"), value: slaBreach, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/30" },
+    { key: "resposta_atrasada", title: t("demands.stats.first_response_late"), value: firstResponseBreach, icon: Zap, color: "text-warning", bg: "bg-warning/10", ring: "ring-warning/30" },
     {
       key: "sem_interacao",
-      title: "Sem Interação 24h",
+      title: t("demands.stats.no_interaction_24h"),
       value: semInteracao,
       icon: MessageCircleOff,
       color: semInteracao > 0 ? "text-destructive" : "text-muted-foreground",

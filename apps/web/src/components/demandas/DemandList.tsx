@@ -6,25 +6,28 @@ import { Building2, ExternalLink } from "lucide-react";
 import ExpirationCountdown from "@/components/demandas/ExpirationCountdown";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 import StaleBadge from "./StaleBadge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DemandListProps {
   demands: SlackDemand[];
   onSelect: (demand: SlackDemand) => void;
 }
 
-const HEADERS = [
-  { label: "Prior.", width: "w-[40px] flex-shrink-0" },
-  { label: "Título", width: "flex-1 min-w-0" },
-  { label: "Inatividade", width: "w-[130px] flex-shrink-0 text-center" },
-  { label: "Cliente", width: "w-[120px] flex-shrink-0" },
-  { label: "Tipo", width: "w-[100px] flex-shrink-0" },
-  { label: "Status", width: "w-[90px] flex-shrink-0" },
-  { label: "Responsável", width: "w-[80px] flex-shrink-0" },
-  { label: "Criado", width: "w-[70px] flex-shrink-0" },
-  { label: "SLA", width: "w-[90px] flex-shrink-0" },
-];
-
 const DemandList = ({ demands, onSelect }: DemandListProps) => {
+  const { t } = useLanguage();
+  // Headers reativos ao idioma — re-computa quando user troca lingua
+  const HEADERS = [
+    { label: t("demands.list.col.priority"), width: "w-[40px] flex-shrink-0" },
+    { label: t("demands.list.col.title"), width: "flex-1 min-w-0" },
+    { label: t("demands.list.col.inactivity"), width: "w-[130px] flex-shrink-0 text-center" },
+    { label: t("demands.list.col.client"), width: "w-[120px] flex-shrink-0" },
+    { label: t("demands.list.col.type"), width: "w-[100px] flex-shrink-0" },
+    { label: t("demands.list.col.status"), width: "w-[90px] flex-shrink-0" },
+    { label: t("demands.list.col.assignee"), width: "w-[80px] flex-shrink-0" },
+    { label: t("demands.list.col.created"), width: "w-[70px] flex-shrink-0" },
+    { label: t("demands.list.col.sla"), width: "w-[90px] flex-shrink-0" },
+  ];
+
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       {/* Header row */}
@@ -80,7 +83,7 @@ const DemandList = ({ demands, onSelect }: DemandListProps) => {
                         href={d.slackPermalink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Abrir no Slack"
+                        title={t("demands.list.open_in_slack")}
                         className="flex-shrink-0 opacity-0 group-hover/title:opacity-40 hover:!opacity-100 transition-opacity text-muted-foreground hover:text-primary"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -124,7 +127,7 @@ const DemandList = ({ demands, onSelect }: DemandListProps) => {
                 {/* Assignee */}
                 <div className="w-[80px] flex-shrink-0">
                   <span className="truncate text-xs block max-w-[80px]">
-                    {d.assignee?.name || "Sem resp."}
+                    {d.assignee?.name || t("demands.list.no_assignee")}
                   </span>
                 </div>
 
