@@ -171,6 +171,20 @@ const TRANSLATIONS: Translations = {
     "settings.display_name": "Nome de exibição",
     "settings.email": "E-mail",
     "settings.role": "Perfil",
+    // SQL Operations + Approvers (master-only)
+    "settings.sql_ops.title": "Configuração de Operações SQL",
+    "settings.sql_ops.description": "Apenas administradores podem configurar regras SQL/Deploy. Operações SQL e Deploy passam por um aprovador antes de serem executadas.",
+    "settings.sql_ops.warning": "Apenas administradores podem configurar regras SQL/Deploy.",
+    "settings.sql_ops.pending_status": "Aguardando Aprovação",
+    "settings.sql_ops.flow_pre": "Demandas de tipo SQL e Deploy criadas no módulo Infra entram com status",
+    "settings.sql_ops.flow_post": "e só são liberadas ao destinatário após aprovação de um dos aprovadores abaixo.",
+    "settings.restricted_access": "Acesso restrito",
+    "settings.approvers.title": "Aprovadores de Operações",
+    "settings.approvers.description": "Usuários que podem aprovar ou reprovar demandas SQL e Deploy. Por padrão, todos os masters podem aprovar.",
+    "settings.approvers.empty": "Nenhum usuário ativo encontrado.",
+    "settings.approvers.add_tooltip": "Adicionar aprovador",
+    "settings.approvers.remove_tooltip": "Remover aprovador",
+    "settings.approvers.local_note": "Lista salva localmente em {key}.",
   },
 
   "en-US": {
@@ -320,6 +334,20 @@ const TRANSLATIONS: Translations = {
     "settings.display_name": "Display name",
     "settings.email": "Email",
     "settings.role": "Role",
+    // SQL Operations + Approvers (master-only)
+    "settings.sql_ops.title": "SQL Operations Settings",
+    "settings.sql_ops.description": "Only administrators can configure SQL/Deploy rules. SQL and Deploy operations go through an approver before being executed.",
+    "settings.sql_ops.warning": "Only administrators can configure SQL/Deploy rules.",
+    "settings.sql_ops.pending_status": "Pending Approval",
+    "settings.sql_ops.flow_pre": "SQL and Deploy demands created in the Infra module enter with status",
+    "settings.sql_ops.flow_post": "and are only released to the recipient after approval from one of the approvers below.",
+    "settings.restricted_access": "Restricted access",
+    "settings.approvers.title": "Operations Approvers",
+    "settings.approvers.description": "Users who can approve or reject SQL and Deploy demands. By default, all masters can approve.",
+    "settings.approvers.empty": "No active user found.",
+    "settings.approvers.add_tooltip": "Add approver",
+    "settings.approvers.remove_tooltip": "Remove approver",
+    "settings.approvers.local_note": "List saved locally in {key}.",
   },
 
   "es-ES": {
@@ -469,13 +497,39 @@ const TRANSLATIONS: Translations = {
     "settings.display_name": "Nombre de visualización",
     "settings.email": "Correo electrónico",
     "settings.role": "Perfil",
+    // SQL Operations + Approvers (master-only)
+    "settings.sql_ops.title": "Configuración de Operaciones SQL",
+    "settings.sql_ops.description": "Solo los administradores pueden configurar reglas SQL/Deploy. Las operaciones SQL y Deploy pasan por un aprobador antes de ejecutarse.",
+    "settings.sql_ops.warning": "Solo los administradores pueden configurar reglas SQL/Deploy.",
+    "settings.sql_ops.pending_status": "Pendiente de Aprobación",
+    "settings.sql_ops.flow_pre": "Las demandas SQL y Deploy creadas en el módulo Infra entran con estado",
+    "settings.sql_ops.flow_post": "y solo se liberan al destinatario tras la aprobación de uno de los aprobadores listados.",
+    "settings.restricted_access": "Acceso restringido",
+    "settings.approvers.title": "Aprobadores de Operaciones",
+    "settings.approvers.description": "Usuarios que pueden aprobar o rechazar demandas SQL y Deploy. Por defecto, todos los masters pueden aprobar.",
+    "settings.approvers.empty": "Ningún usuario activo encontrado.",
+    "settings.approvers.add_tooltip": "Añadir aprobador",
+    "settings.approvers.remove_tooltip": "Quitar aprobador",
+    "settings.approvers.local_note": "Lista guardada localmente en {key}.",
   },
 };
 
 /**
  * Traduz uma chave para o idioma indicado.
  * Se nao achar no idioma, cai no pt-BR. Se nem no pt-BR achar, retorna a chave.
+ *
+ * Suporta interpolação opcional via params:
+ *   translate("greeting", "pt-BR", { name: "X" })
+ *   -> "Olá, X" (quando a chave for "Olá, {name}")
  */
-export function translate(key: string, lang: Language = DEFAULT_LANGUAGE): string {
-  return TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS[DEFAULT_LANGUAGE][key] ?? key;
+export function translate(
+  key: string,
+  lang: Language = DEFAULT_LANGUAGE,
+  params?: Record<string, string | number>,
+): string {
+  const raw = TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS[DEFAULT_LANGUAGE][key] ?? key;
+  if (!params) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_match, name: string) =>
+    name in params ? String(params[name]) : `{${name}}`,
+  );
 }
