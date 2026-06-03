@@ -185,6 +185,30 @@ const TRANSLATIONS: Translations = {
     "settings.approvers.add_tooltip": "Adicionar aprovador",
     "settings.approvers.remove_tooltip": "Remover aprovador",
     "settings.approvers.local_note": "Lista salva localmente em {key}.",
+    // Demands — stats / KPIs
+    "demands.stats.open": "Abertas",
+    "demands.stats.p1_critical": "P1 Críticos",
+    "demands.stats.due_today": "Vencendo Hoje",
+    "demands.stats.completed": "Concluídas",
+    "demands.stats.sla_breached": "SLA Estourado",
+    "demands.stats.first_response_late": "1a Resp. Atrasada",
+    "demands.stats.no_interaction_24h": "Sem Interação 24h",
+    // Demands — list columns
+    "demands.list.col.priority": "Prior.",
+    "demands.list.col.title": "Título",
+    "demands.list.col.inactivity": "Inatividade",
+    "demands.list.col.client": "Cliente",
+    "demands.list.col.type": "Tipo",
+    "demands.list.col.status": "Status",
+    "demands.list.col.assignee": "Responsável",
+    "demands.list.col.created": "Criado",
+    "demands.list.col.sla": "SLA",
+    "demands.list.no_assignee": "Sem resp.",
+    "demands.list.open_in_slack": "Abrir no Slack",
+    // Demands — filters
+    "demands.filter.month_placeholder": "Mês",
+    "demands.filter.year_placeholder": "Ano",
+    "common.select": "Selecionar",
   },
 
   "en-US": {
@@ -348,6 +372,30 @@ const TRANSLATIONS: Translations = {
     "settings.approvers.add_tooltip": "Add approver",
     "settings.approvers.remove_tooltip": "Remove approver",
     "settings.approvers.local_note": "List saved locally in {key}.",
+    // Demands — stats / KPIs
+    "demands.stats.open": "Open",
+    "demands.stats.p1_critical": "P1 Critical",
+    "demands.stats.due_today": "Due Today",
+    "demands.stats.completed": "Completed",
+    "demands.stats.sla_breached": "SLA Breached",
+    "demands.stats.first_response_late": "1st Response Late",
+    "demands.stats.no_interaction_24h": "No Interaction 24h",
+    // Demands — list columns
+    "demands.list.col.priority": "Prio.",
+    "demands.list.col.title": "Title",
+    "demands.list.col.inactivity": "Inactivity",
+    "demands.list.col.client": "Client",
+    "demands.list.col.type": "Type",
+    "demands.list.col.status": "Status",
+    "demands.list.col.assignee": "Assignee",
+    "demands.list.col.created": "Created",
+    "demands.list.col.sla": "SLA",
+    "demands.list.no_assignee": "No assignee",
+    "demands.list.open_in_slack": "Open in Slack",
+    // Demands — filters
+    "demands.filter.month_placeholder": "Month",
+    "demands.filter.year_placeholder": "Year",
+    "common.select": "Select",
   },
 
   "es-ES": {
@@ -511,6 +559,30 @@ const TRANSLATIONS: Translations = {
     "settings.approvers.add_tooltip": "Añadir aprobador",
     "settings.approvers.remove_tooltip": "Quitar aprobador",
     "settings.approvers.local_note": "Lista guardada localmente en {key}.",
+    // Demands — stats / KPIs
+    "demands.stats.open": "Abiertas",
+    "demands.stats.p1_critical": "P1 Críticas",
+    "demands.stats.due_today": "Vencen Hoy",
+    "demands.stats.completed": "Completadas",
+    "demands.stats.sla_breached": "SLA Vencido",
+    "demands.stats.first_response_late": "1ª Resp. Tardía",
+    "demands.stats.no_interaction_24h": "Sin Interacción 24h",
+    // Demands — list columns
+    "demands.list.col.priority": "Prio.",
+    "demands.list.col.title": "Título",
+    "demands.list.col.inactivity": "Inactividad",
+    "demands.list.col.client": "Cliente",
+    "demands.list.col.type": "Tipo",
+    "demands.list.col.status": "Estado",
+    "demands.list.col.assignee": "Asignado",
+    "demands.list.col.created": "Creado",
+    "demands.list.col.sla": "SLA",
+    "demands.list.no_assignee": "Sin asignado",
+    "demands.list.open_in_slack": "Abrir en Slack",
+    // Demands — filters
+    "demands.filter.month_placeholder": "Mes",
+    "demands.filter.year_placeholder": "Año",
+    "common.select": "Seleccionar",
   },
 };
 

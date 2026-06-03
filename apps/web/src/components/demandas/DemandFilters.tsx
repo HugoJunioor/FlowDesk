@@ -8,6 +8,7 @@ import { Search, X, CalendarDays, Shield } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DemandPriority, DemandStatus, DemandCategory, SupportLevel, CATEGORY_OPTIONS, SUPPORT_LEVEL_OPTIONS } from "@/types/demand";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export type PeriodPreset = "hoje" | "semanal" | "mensal" | "anual" | "personalizado" | "";
 
@@ -73,6 +74,7 @@ function getPeriodDates(preset: PeriodPreset): { from: string; to: string } {
 }
 
 const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersProps) => {
+  const { t } = useLanguage();
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -144,11 +146,11 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
       {/* Period quick filters */}
       <div className="flex flex-wrap gap-2">
         {([
-          { key: "hoje" as PeriodPreset, label: "Hoje" },
-          { key: "semanal" as PeriodPreset, label: "Semanal" },
-          { key: "mensal" as PeriodPreset, label: "Mensal" },
-          { key: "anual" as PeriodPreset, label: "Anual" },
-          { key: "personalizado" as PeriodPreset, label: "Personalizado" },
+          { key: "hoje" as PeriodPreset, label: t("dashboard.period.today") },
+          { key: "semanal" as PeriodPreset, label: t("dashboard.period.week") },
+          { key: "mensal" as PeriodPreset, label: t("dashboard.period.month") },
+          { key: "anual" as PeriodPreset, label: t("dashboard.period.year") },
+          { key: "personalizado" as PeriodPreset, label: t("dashboard.period.custom") },
         ]).map((p) => (
           <Button
             key={p.key}
@@ -184,7 +186,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 min-w-[120px] sm:min-w-[140px] justify-start text-xs font-normal">
                 <CalendarDays size={14} className="mr-2 text-muted-foreground" />
-                {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : "Selecionar"}
+                {filters.dateFrom ? formatDateDisplay(filters.dateFrom) : t("common.select")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -228,7 +230,7 @@ const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersP
             }}
           >
             <SelectTrigger className="h-9 w-[120px] text-xs">
-              <SelectValue placeholder="Mês" />
+              <SelectValue placeholder={t("demands.filter.month_placeholder")} />
             </SelectTrigger>
             <SelectContent>
               {Array.from({ length: new Date().getMonth() + 1 }, (_, i) => {
