@@ -5,7 +5,7 @@ import { DEFAULT_LANGUAGE, translate } from "@/lib/i18n";
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   /** Chamado pelo AuthContext ao logar — carrega idioma do perfil do usuario */
   loadForUser: (userId: string, language?: Language) => void;
   /** Chamado no logout — volta ao padrao */
@@ -64,7 +64,10 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     setLanguageState(lang);
   }, []);
 
-  const t = useCallback((key: string) => translate(key, language), [language]);
+  const t = useCallback(
+    (key: string, params?: Record<string, string | number>) => translate(key, language, params),
+    [language],
+  );
 
   const loadForUser = useCallback((userId: string, userLanguage?: Language) => {
     userIdRef.current = userId;

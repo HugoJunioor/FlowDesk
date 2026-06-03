@@ -215,22 +215,21 @@ const Configuracoes = () => {
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Lock size={18} className="text-primary" />
-                <CardTitle className="text-base font-semibold">Configuração de Operações SQL</CardTitle>
+                <CardTitle className="text-base font-semibold">{t("settings.sql_ops.title")}</CardTitle>
               </div>
               <CardDescription>
-                Apenas administradores podem configurar regras SQL/Deploy.
-                Operações SQL e Deploy passam por um aprovador antes de serem executadas.
+                {t("settings.sql_ops.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Demandas de tipo SQL e Deploy criadas no módulo Infra entram com status
-                <strong className="text-foreground mx-1">Aguardando Aprovação</strong>
-                e só são liberadas ao destinatário após aprovação de um dos aprovadores abaixo.
+                {t("settings.sql_ops.flow_pre")}
+                <strong className="text-foreground mx-1">{t("settings.sql_ops.pending_status")}</strong>
+                {t("settings.sql_ops.flow_post")}
               </p>
               <div className="rounded-md border p-3 bg-warning/5 border-warning/20 text-xs text-warning flex items-start gap-2">
                 <Lock size={13} className="mt-0.5 shrink-0" />
-                <span>Apenas administradores podem configurar regras SQL/Deploy.</span>
+                <span>{t("settings.sql_ops.warning")}</span>
               </div>
             </CardContent>
           </Card>
@@ -242,11 +241,11 @@ const Configuracoes = () => {
                   <Lock size={18} className="text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Configuração de Operações SQL</p>
-                  <p className="text-xs text-muted-foreground">Apenas administradores podem configurar regras SQL/Deploy.</p>
+                  <p className="text-sm font-medium text-foreground">{t("settings.sql_ops.title")}</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.sql_ops.warning")}</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="mt-3 text-[10px]">Acesso restrito</Badge>
+              <Badge variant="secondary" className="mt-3 text-[10px]">{t("settings.restricted_access")}</Badge>
             </CardContent>
           </Card>
         )}
@@ -257,16 +256,15 @@ const Configuracoes = () => {
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Users size={18} className="text-primary" />
-                <CardTitle className="text-base font-semibold">Aprovadores de Operações</CardTitle>
+                <CardTitle className="text-base font-semibold">{t("settings.approvers.title")}</CardTitle>
               </div>
               <CardDescription>
-                Usuários que podem aprovar ou reprovar demandas SQL e Deploy.
-                Por padrão, todos os masters podem aprovar.
+                {t("settings.approvers.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {allUsers.length === 0 && (
-                <p className="text-xs text-muted-foreground">Nenhum usuário ativo encontrado.</p>
+                <p className="text-xs text-muted-foreground">{t("settings.approvers.empty")}</p>
               )}
               {allUsers.map((u) => {
                 const isApprover = approvers.includes(u.email) || (approvers.length === 0 && u.role === "master");
@@ -289,7 +287,7 @@ const Configuracoes = () => {
                           ? "bg-primary border-primary text-primary-foreground"
                           : "bg-background border-border text-muted-foreground hover:border-primary/50"
                       }`}
-                      title={isApprover ? "Remover aprovador" : "Adicionar aprovador"}
+                      title={isApprover ? t("settings.approvers.remove_tooltip") : t("settings.approvers.add_tooltip")}
                     >
                       <Check size={14} strokeWidth={isApprover ? 3 : 1.5} />
                     </button>
@@ -297,7 +295,9 @@ const Configuracoes = () => {
                 );
               })}
               <p className="text-[11px] text-muted-foreground pt-1">
-                Lista salva localmente em <code>flowdesk:approvers</code>.
+                {t("settings.approvers.local_note").split("{key}")[0]}
+                <code>flowdesk:approvers</code>
+                {t("settings.approvers.local_note").split("{key}")[1] ?? ""}
               </p>
             </CardContent>
           </Card>
