@@ -18,6 +18,7 @@ import { apiClient, ApiError, type SlackChannelMember } from "@/lib/apiClient";
 import { getCaretCoordinates } from "@/lib/caretCoordinates";
 import EmojiPicker from "./EmojiPicker";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { SlackDemand } from "@/types/demand";
 
 interface DemandReplyComposerProps {
@@ -53,6 +54,7 @@ function formatBytes(b: number): string {
 
 const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) => {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -262,15 +264,15 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
     const valid: File[] = [];
     for (const f of newFiles) {
       if (f.size > MAX_FILE_BYTES) {
-        toast.error("Arquivo muito grande", {
-          description: `${f.name}: ${formatBytes(f.size)} excede 25MB`,
+        toast.error(t("composer.toast.file_too_big"), {
+          description: t("composer.toast.file_size_excess", { name: f.name, size: formatBytes(f.size) }),
         });
         continue;
       }
       valid.push(f);
     }
     if (files.length + valid.length > 5) {
-      toast.error("Máximo 5 arquivos por mensagem");
+      toast.error(t("composer.toast.max_files"));
       return;
     }
     setFiles((prev) => [...prev, ...valid]);
@@ -340,8 +342,10 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         });
         resultTs = `upload-${Date.now()}`;
         toast.success(
-          files.length === 1 ? "Arquivo enviado" : `${files.length} arquivos enviados`,
-          { description: text.trim() ? "Com mensagem inicial" : "Sem comentário" }
+          files.length === 1
+            ? t("composer.toast.file_sent")
+            : t("composer.toast.files_sent", { count: files.length }),
+          { description: text.trim() ? t("composer.toast.with_initial_msg") : t("composer.toast.no_comment") }
         );
       } else {
         const reply = await apiClient.slack.reply({
@@ -350,8 +354,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           senderEmail: currentUser?.email,
         });
         resultTs = reply.ts;
-        toast.success("Resposta enviada", {
-          description: "Mensagem postada no Slack",
+        toast.success(t("composer.toast.reply_sent"), {
+          description: t("composer.toast.posted_to_slack"),
         });
       }
 
@@ -364,8 +368,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           ? err.message
           : err instanceof Error
           ? err.message
-          : "Erro desconhecido";
-      toast.error("Falha ao enviar", { description: msg });
+          : t("composer.error.unknown");
+      toast.error(t("composer.toast.send_failed"), { description: msg });
       console.group("[composer] send falhou — info de debug");
       console.error("Error:", err);
       console.log("Demand ID:", demand.id);
@@ -467,36 +471,36 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
       {/* Toolbar — paridade com Slack mrkdwn */}
       <div className="flex items-center gap-0.5 mb-1.5 px-1 flex-wrap">
         {/* Formatacao inline */}
-        <ToolbarButton icon={Bold} label="Negrito (Ctrl+B)" onClick={() => wrapSelection("*")} />
-        <ToolbarButton icon={Italic} label="Itálico (Ctrl+I)" onClick={() => wrapSelection("_")} />
-        <ToolbarButton icon={Strikethrough} label="Tachado" onClick={() => wrapSelection("~")} />
-        <ToolbarButton icon={Code} label="Código inline (Ctrl+E)" onClick={() => wrapSelection("`")} />
+        <ToolbarButton icon={Bold} label={t("composer.toolbar.bold")} onClick={() => wrapSelection("*")} />
+        <ToolbarButton icon={Italic} label={t("composer.toolbar.italic")} onClick={() => wrapSelection("_")} />
+        <ToolbarButton icon={Strikethrough} label={t("composer.toolbar.strike")} onClick={() => wrapSelection("~")} />
+        <ToolbarButton icon={Code} label={t("composer.toolbar.code")} onClick={() => wrapSelection("`")} />
         <div className="w-px h-4 bg-border mx-0.5" />
         {/* Estrutura — listas, quote, code block */}
         <ToolbarButton
           icon={List}
-          label="Lista"
+          label={t("composer.toolbar.list")}
           onClick={() => prefixLines("• ")}
         />
         <ToolbarButton
           icon={ListOrdered}
-          label="Lista numerada"
+          label={t("composer.toolbar.list_numbered")}
           onClick={() => prefixLines((i) => `${i + 1}. `)}
         />
         <ToolbarButton
           icon={Quote}
-          label="Citação"
+          label={t("composer.toolbar.quote")}
           onClick={() => prefixLines("> ")}
         />
         <ToolbarButton
           icon={Code2}
-          label="Bloco de código"
+          label={t("composer.toolbar.code_block")}
           onClick={() => wrapBlock("```")}
         />
-        <ToolbarButton icon={Link2} label="Link" onClick={() => wrapSelection("<", "|texto>")} />
+        <ToolbarButton icon={Link2} label={t("composer.toolbar.link")} onClick={() => wrapSelection("<", "|texto>")} />
         <div className="w-px h-4 bg-border mx-0.5" />
         {/* Inserts */}
-        <ToolbarButton icon={AtSign} label="Mencionar" onClick={() => insertAtCursor("@")} />
+        <ToolbarButton icon={AtSign} label={t("composer.toolbar.mention")} onClick={() => insertAtCursor("@")} />
         <EmojiPicker onSelect={(name) => insertAtCursor(`:${name}: `)} />
         <ReplyTemplatePicker
           onSelect={(t) => {
@@ -507,7 +511,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
         />
         <ToolbarButton
           icon={Paperclip}
-          label="Anexar arquivo"
+          label={t("composer.toolbar.attach")}
           onClick={() => fileInputRef.current?.click()}
         />
         <input
@@ -526,16 +530,16 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           {slackConnected ? (
             <span className="text-success/80 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              Postando com sua identidade Slack
+              {t("composer.identity.connected")}
             </span>
           ) : (
             <a
               href="/perfil"
               className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-              title="Conecte sua conta Slack pra postar com sua identidade real"
+              title={t("composer.identity.bot_tooltip")}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-              Postando como JustFlow · conectar →
+              {t("composer.identity.bot")}
             </a>
           )}
         </div>
@@ -580,8 +584,8 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
           disabled={!canSend}
           onClick={handleSend}
           className="absolute bottom-2 right-2 h-9 w-9 rounded-full shadow-md"
-          title="Enviar (Ctrl+Enter)"
-          aria-label="Enviar"
+          title={t("composer.send.tooltip")}
+          aria-label={t("composer.send.aria")}
         >
           {sending ? (
             <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -608,30 +612,30 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
               style={{ top: mentionAnchor.top, left: mentionAnchor.left }}
             >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 py-1.5 border-b flex items-center gap-1.5 sticky top-0 bg-popover">
-                <AtSign size={10} /> Mencionar
+                <AtSign size={10} /> {t("composer.mention.title")}
                 {membersLoading ? (
-                  <span className="ml-auto opacity-70 normal-case">buscando...</span>
+                  <span className="ml-auto opacity-70 normal-case">{t("composer.mention.searching")}</span>
                 ) : channelMembers.length > 0 && membersSource === "channel" ? (
-                  <span className="ml-auto opacity-70 normal-case">{channelMembers.length} no canal</span>
+                  <span className="ml-auto opacity-70 normal-case">{t("composer.mention.in_channel", { count: channelMembers.length })}</span>
                 ) : channelMembers.length > 0 && membersSource === "workspace" ? (
                   <span
                     className="ml-auto opacity-70 normal-case"
-                    title="Bot nao acessou membros deste canal; mostrando todos do workspace. Mention ainda notifica."
+                    title={t("composer.mention.workspace_tooltip")}
                   >
-                    {channelMembers.length} no workspace
+                    {t("composer.mention.in_workspace", { count: channelMembers.length })}
                   </span>
                 ) : (
                   <span
                     className="ml-auto opacity-70 normal-case text-warning"
-                    title="Bot nao retornou nem membros do canal nem do workspace. Confira escopos users:read e channels:read no app Slack."
+                    title={t("composer.mention.thread_only_tooltip")}
                   >
-                    só thread (sem notificar)
+                    {t("composer.mention.thread_only")}
                   </span>
                 )}
               </div>
               {filtered.length === 0 ? (
                 <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-                  {membersLoading ? "Carregando membros..." : `Nenhum match com "${mentionFilter}"`}
+                  {membersLoading ? t("composer.mention.loading") : t("composer.mention.no_match", { filter: mentionFilter })}
                 </div>
               ) : filtered.slice(0, 12).map((person, idx) => {
                 const isSelected = idx === Math.min(mentionSelectedIdx, filtered.length - 1);
@@ -663,7 +667,7 @@ const DemandReplyComposer = ({ demand, onReplied }: DemandReplyComposerProps) =>
                     )}
                   </div>
                   {person.slackId && (
-                    <span className="text-[10px] text-success" title="Mention real (notifica)">●</span>
+                    <span className="text-[10px] text-success" title={t("composer.mention.real_tooltip")}>●</span>
                   )}
                 </button>
                 );
