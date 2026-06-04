@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Hash, Plus, Trash2, Inbox, Database, Ban, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   loadChannelRouting,
   upsertChannelRule,
@@ -32,15 +33,18 @@ import {
 import { getProcessedDemands, subscribeToSync } from "@/data/demandsLoader";
 import { getProcessedSqlDemands } from "@/data/sqlDemandsLoader";
 
-const ROUTE_LABELS: Record<ChannelRoute, { label: string; icon: typeof Inbox; color: string }> = {
-  demandas: { label: "Demandas Geral", icon: Inbox, color: "text-info" },
-  sql: { label: "Operações SQL", icon: Database, color: "text-warning" },
-  ignore: { label: "Ignorar (não sincroniza)", icon: Ban, color: "text-muted-foreground" },
+// Mapa estatico de chaves i18n por rota — label resolvida em render via t().
+// O campo `label` aqui era pt-BR hardcoded; substituido por labelKey.
+const ROUTE_LABELS: Record<ChannelRoute, { labelKey: string; icon: typeof Inbox; color: string }> = {
+  demandas: { labelKey: "channel_routing.route.demandas", icon: Inbox, color: "text-info" },
+  sql: { labelKey: "channel_routing.route.sql", icon: Database, color: "text-warning" },
+  ignore: { labelKey: "channel_routing.route.ignore_subtitle", icon: Ban, color: "text-muted-foreground" },
 };
 
 const ChannelRouting = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const [config, setConfig] = useState<ChannelRoutingConfig>(() => loadChannelRouting());
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelRoute, setNewChannelRoute] = useState<ChannelRoute>("demandas");
@@ -51,7 +55,7 @@ const ChannelRouting = () => {
   // Master only
   useEffect(() => {
     if (currentUser && currentUser.role !== "master") {
-      toast.error("Acesso restrito ao master");
+      toast.error(t("channel_routing.master_only"));
       navigate("/");
     }
   }, [currentUser, navigate]);
@@ -81,8 +85,8 @@ const ChannelRouting = () => {
   const handleScanRefresh = () => {
     setScanCount((n) => n + 1);
     setLastScanAt(new Date());
-    toast.success("Canais re-escaneados", {
-      description: "Buscando novos canais nas demandas sincronizadas.",
+    toast.success(t("channel_routing.toast.rescanned"), {
+      description: t("channel_routing.toast.rescanned_desc"),
     });
   };
 
@@ -94,7 +98,7 @@ const ChannelRouting = () => {
     }
     setConfig({ ...updated });
     toast.success(
-      `${suggestedChannels.length} canais cadastrados como ${ROUTE_LABELS[route].label}`
+      `${suggestedChannels.length} canais cadastrados como ${t(ROUTE_LABELS[route].labelKey)}`
     );
   };
 
@@ -110,7 +114,7 @@ const ChannelRouting = () => {
   const handleRouteChange = (channelName: string, route: ChannelRoute) => {
     const updated = upsertChannelRule(channelName, route);
     setConfig({ ...updated });
-    toast.success(`#${channelName} → ${ROUTE_LABELS[route].label}`);
+    toast.success(`#${channelName} → ${t(ROUTE_LABELS[route].labelKey)}`);
   };
 
   const handleRemove = (channelName: string) => {
@@ -122,7 +126,7 @@ const ChannelRouting = () => {
   const handleDefaultChange = (route: ChannelRoute) => {
     const updated = setDefaultRoute(route);
     setConfig({ ...updated });
-    toast.success("Rota padrão atualizada");
+    toast.success(t("channel_routing.toast.default_updated"));
   };
 
   const handleAddSuggested = (channelName: string, route: ChannelRoute) => {
@@ -201,9 +205,9 @@ const ChannelRouting = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="demandas">Demandas Geral</SelectItem>
-                <SelectItem value="sql">Operações SQL</SelectItem>
-                <SelectItem value="ignore">Ignorar</SelectItem>
+                <SelectItem value="demandas">{t("channel_routing.route.demandas")}</SelectItem>
+                <SelectItem value="sql">{t("channel_routing.route.sql")}</SelectItem>
+                <SelectItem value="ignore">{t("channel_routing.route.ignore")}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground mt-1">
@@ -224,14 +228,14 @@ const ChannelRouting = () => {
             </CardTitle>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground">
-                escaneado {lastScanAt.toLocaleTimeString("pt-BR")}
+                {t("channel_routing.last_scan", { time: lastScanAt.toLocaleTimeString() })}
               </span>
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 text-xs gap-1"
                 onClick={handleScanRefresh}
-                title="Re-escanear demandas pra detectar canais novos"
+                title={t("channel_routing.rescan_tooltip")}
               >
                 <RefreshCw size={12} /> Atualizar
               </Button>
@@ -299,7 +303,7 @@ const ChannelRouting = () => {
               <Input
                 value={newChannelName}
                 onChange={(e) => setNewChannelName(e.target.value)}
-                placeholder="cliente-novo (sem #)"
+                placeholder={t("channel_routing.add_placeholder")}
                 className="border-0 h-7 px-0 focus-visible:ring-0"
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               />
@@ -309,9 +313,9 @@ const ChannelRouting = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="demandas">Demandas Geral</SelectItem>
-                <SelectItem value="sql">Operações SQL</SelectItem>
-                <SelectItem value="ignore">Ignorar</SelectItem>
+                <SelectItem value="demandas">{t("channel_routing.route.demandas")}</SelectItem>
+                <SelectItem value="sql">{t("channel_routing.route.sql")}</SelectItem>
+                <SelectItem value="ignore">{t("channel_routing.route.ignore")}</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleAdd} disabled={!newChannelName.trim()} className="h-9">
@@ -331,7 +335,7 @@ const ChannelRouting = () => {
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filtrar..."
+              placeholder={t("channel_routing.filter_placeholder")}
               className="h-8 text-sm w-48"
             />
           </div>
@@ -340,8 +344,8 @@ const ChannelRouting = () => {
           {filteredChannels.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               {config.channels.length === 0
-                ? "Nenhum canal cadastrado. Use a seção acima pra adicionar."
-                : "Nenhum canal corresponde ao filtro."}
+                ? t("channel_routing.empty")
+                : t("channel_routing.no_match")}
             </p>
           ) : (
             <div className="space-y-1.5">
@@ -367,7 +371,7 @@ const ChannelRouting = () => {
                         <SelectTrigger className="w-44 h-8 text-xs">
                           <span className="flex items-center gap-1.5">
                             <RouteIcon size={12} className={ROUTE_LABELS[channel.routeTo].color} />
-                            {ROUTE_LABELS[channel.routeTo].label}
+                            {t(ROUTE_LABELS[channel.routeTo].labelKey)}
                           </span>
                         </SelectTrigger>
                         <SelectContent>
