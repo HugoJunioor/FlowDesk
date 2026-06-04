@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +102,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 
 /** Tooltip especifico do grafico de SLA — mostra % + total de demandas. */
 const CustomSlaTooltip = ({ active, payload, label }: any) => {
+  const { t } = useLanguage();
   if (!active || !payload?.length) return null;
   const data = payload[0];
   const total = data.payload?.total ?? 0;
@@ -128,7 +130,7 @@ const CustomSlaTooltip = ({ active, payload, label }: any) => {
         />
         <span style={{ fontWeight: 600 }}>{rate}%</span>
         <span style={{ color: "hsl(var(--muted-foreground))" }}>
-          ({total} {total === 1 ? "demanda" : "demandas"})
+          ({total} {total === 1 ? t("dashboard.chart.tooltip.demand_singular") : t("dashboard.chart.tooltip.demand_plural")})
         </span>
       </div>
     </div>
@@ -148,6 +150,7 @@ function loadDashboardScope(): DashboardScope {
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const { trigger: triggerSync, isPending: isSyncing } = useSyncTrigger();
   const [scope, setScope] = useState<DashboardScope>(loadDashboardScope);
   const [period, setPeriod] = useState<Period>("mensal");
@@ -472,7 +475,7 @@ const Dashboard = () => {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="text-muted-foreground text-sm text-center sm:text-left">Visao analitica das demandas Slack</p>
+              <p className="text-muted-foreground text-sm text-center sm:text-left">{t("dashboard.subtitle")}</p>
             </div>
             <div className="flex items-center gap-2">
               {/* Scope toggle */}
@@ -481,13 +484,13 @@ const Dashboard = () => {
                   onClick={() => { setScope("mine"); localStorage.setItem("flowdesk:demandas:scope", "mine"); }}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  Apenas minhas
+                  {t("dashboard.scope.mine")}
                 </button>
                 <button
                   onClick={() => { setScope("all"); localStorage.setItem("flowdesk:demandas:scope", "all"); }}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                 >
-                  Todas
+                  {t("dashboard.scope.all")}
                 </button>
               </div>
               {!presentationMode && (
@@ -496,10 +499,10 @@ const Dashboard = () => {
                   size="sm"
                   className="h-8 text-xs gap-1.5"
                   onClick={enterPresentation}
-                  title="Modo apresentacao (fullscreen, auto-refresh 30s)"
+                  title={t("dashboard.presentation_tooltip")}
                 >
                   <Maximize2 size={13} />
-                  Apresentacao
+                  {t("dashboard.presentation")}
                 </Button>
               )}
               <ReportButton
@@ -522,29 +525,38 @@ const Dashboard = () => {
                 onClick={() => triggerSync()}
                 disabled={isSyncing}
                 className="gap-1 fd-no-print"
-                title="Sincronizar agora"
+                title={t("dashboard.sync_now_tooltip")}
               >
                 <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
                 <span className="hidden sm:inline ml-1">
-                  {isSyncing ? "Sincronizando..." : "Sync"}
+                  {isSyncing ? t("dashboard.syncing") : t("dashboard.sync_label")}
                 </span>
               </Button>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(["hoje", "semanal", "mensal", "anual", "personalizado"] as Period[]).map((p) => (
-              <Button
-                key={p}
-                variant={period === p ? "default" : "outline"}
-                size="sm"
-                className="h-8 text-xs capitalize"
-                onClick={() => setPeriod(p)}
-              >
-                {p === "personalizado" && <CalendarDays size={13} className="mr-1" />}
-                {p}
-              </Button>
-            ))}
+            {(["hoje", "semanal", "mensal", "anual", "personalizado"] as Period[]).map((p) => {
+              const labelKey: Record<Period, string> = {
+                hoje: "dashboard.period.today",
+                semanal: "dashboard.period.week",
+                mensal: "dashboard.period.month",
+                anual: "dashboard.period.year",
+                personalizado: "dashboard.period.custom",
+              };
+              return (
+                <Button
+                  key={p}
+                  variant={period === p ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setPeriod(p)}
+                >
+                  {p === "personalizado" && <CalendarDays size={13} className="mr-1" />}
+                  {t(labelKey[p])}
+                </Button>
+              );
+            })}
 
             {period === "anual" && (
               <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
@@ -561,12 +573,12 @@ const Dashboard = () => {
 
             {period === "personalizado" && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground">De:</span>
+                <span className="text-xs text-muted-foreground">{t("dashboard.from_label")}</span>
                 <Popover open={fromOpen} onOpenChange={setFromOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 min-w-[120px] justify-start text-xs font-normal">
                       <CalendarDays size={13} className="mr-1.5 text-muted-foreground" />
-                      {customFrom ? format(customFrom, "dd/MM/yyyy", { locale: ptBR }) : "Início"}
+                      {customFrom ? format(customFrom, "dd/MM/yyyy", { locale: ptBR }) : t("dashboard.start_date_placeholder")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -579,12 +591,12 @@ const Dashboard = () => {
                     />
                   </PopoverContent>
                 </Popover>
-                <span className="text-xs text-muted-foreground">Até:</span>
+                <span className="text-xs text-muted-foreground">{t("dashboard.to_label")}</span>
                 <Popover open={toOpen} onOpenChange={setToOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="h-8 min-w-[120px] justify-start text-xs font-normal">
                       <CalendarDays size={13} className="mr-1.5 text-muted-foreground" />
-                      {customTo ? format(customTo, "dd/MM/yyyy", { locale: ptBR }) : "Fim"}
+                      {customTo ? format(customTo, "dd/MM/yyyy", { locale: ptBR }) : t("dashboard.end_date_placeholder")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -607,7 +619,7 @@ const Dashboard = () => {
                   }}
                 >
                   <SelectTrigger className="h-8 w-[110px] text-xs">
-                    <SelectValue placeholder="Mês" />
+                    <SelectValue placeholder={t("demands.filter.month_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: new Date().getMonth() + 1 }, (_, i) => {
@@ -625,10 +637,10 @@ const Dashboard = () => {
 
             <Select value={client || "_all_"} onValueChange={(v) => setClient(v === "_all_" ? "" : v)}>
               <SelectTrigger className="h-8 w-[160px] text-xs">
-                <SelectValue placeholder="Cliente" />
+                <SelectValue placeholder={t("common.client")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all_">Cliente</SelectItem>
+                <SelectItem value="_all_">{t("common.client")}</SelectItem>
                 {clients.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
@@ -637,10 +649,10 @@ const Dashboard = () => {
 
             <Select value={assignee || "_all_"} onValueChange={(v) => setAssignee(v === "_all_" ? "" : v)}>
               <SelectTrigger className="h-8 w-[180px] text-xs">
-                <SelectValue placeholder="Responsável" />
+                <SelectValue placeholder={t("common.assignee")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_all_">Responsável</SelectItem>
+                <SelectItem value="_all_">{t("common.assignee")}</SelectItem>
                 {assignees.map((a) => (
                   <SelectItem key={a} value={a}>{a}</SelectItem>
                 ))}
@@ -652,14 +664,14 @@ const Dashboard = () => {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
           {[
-            { title: "Total", value: total, icon: BarChart3, color: "text-foreground", bg: "bg-muted" },
-            { title: "Abertas", value: abertas, icon: Inbox, color: "text-primary", bg: "bg-primary/10" },
-            { title: "P1 Criticos", value: p1Count, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
-            { title: "Concluidas", value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
-            { title: "Expiradas", value: expiradas, icon: Clock, color: "text-destructive", bg: "bg-destructive/10" },
-            { title: "SLA Resolucao", value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= SLA_TARGET_PERCENT ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= SLA_TARGET_PERCENT ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
-            { title: "SLA 1a Resposta", value: `${firstResponseData.rate}%`, icon: Zap, color: firstResponseData.rate >= SLA_TARGET_PERCENT ? "text-success" : firstResponseData.rate >= 50 ? "text-warning" : "text-destructive", bg: firstResponseData.rate >= SLA_TARGET_PERCENT ? "bg-success/10" : firstResponseData.rate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
-            { title: "SLA Estourado", value: resolutionSlaData.breached, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10" },
+            { title: t("common.total"), value: total, icon: BarChart3, color: "text-foreground", bg: "bg-muted" },
+            { title: t("demands.stats.open"), value: abertas, icon: Inbox, color: "text-primary", bg: "bg-primary/10" },
+            { title: t("demands.stats.p1_critical"), value: p1Count, icon: AlertTriangle, color: "text-destructive", bg: "bg-destructive/10" },
+            { title: t("demands.stats.completed"), value: concluidas, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
+            { title: t("dashboard.kpi.expired"), value: expiradas, icon: Clock, color: "text-destructive", bg: "bg-destructive/10" },
+            { title: t("dashboard.kpi.sla_resolution"), value: `${slaRate}%`, icon: TrendingUp, color: slaRate >= SLA_TARGET_PERCENT ? "text-success" : slaRate >= 50 ? "text-warning" : "text-destructive", bg: slaRate >= SLA_TARGET_PERCENT ? "bg-success/10" : slaRate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: t("dashboard.kpi.sla_first_response"), value: `${firstResponseData.rate}%`, icon: Zap, color: firstResponseData.rate >= SLA_TARGET_PERCENT ? "text-success" : firstResponseData.rate >= 50 ? "text-warning" : "text-destructive", bg: firstResponseData.rate >= SLA_TARGET_PERCENT ? "bg-success/10" : firstResponseData.rate >= 50 ? "bg-warning/10" : "bg-destructive/10" },
+            { title: t("demand.sla.breached_short"), value: resolutionSlaData.breached, icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10" },
           ].map((kpi) => (
             <Card key={kpi.title} className="border border-border shadow-sm">
               <CardContent className="p-3 sm:p-4">
@@ -690,17 +702,25 @@ const Dashboard = () => {
                   Demandas por Cliente
                 </CardTitle>
                 <div className="flex gap-1">
-                  {(["all", "abertas", "concluidas", "expiradas"] as BarStatusFilter[]).map((s) => (
-                    <Button
-                      key={s}
-                      variant={barStatusFilter === s ? "default" : "ghost"}
-                      size="sm"
-                      className="h-6 px-2 text-[10px]"
-                      onClick={() => setBarStatusFilter(s)}
-                    >
-                      {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
-                    </Button>
-                  ))}
+                  {(["all", "abertas", "concluidas", "expiradas"] as BarStatusFilter[]).map((s) => {
+                    const labelKey: Record<BarStatusFilter, string> = {
+                      all: "dashboard.bar.all",
+                      abertas: "dashboard.bar.open",
+                      concluidas: "dashboard.bar.completed",
+                      expiradas: "dashboard.bar.expired",
+                    };
+                    return (
+                      <Button
+                        key={s}
+                        variant={barStatusFilter === s ? "default" : "ghost"}
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => setBarStatusFilter(s)}
+                      >
+                        {t(labelKey[s])}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             </CardHeader>
@@ -713,13 +733,13 @@ const Dashboard = () => {
                     <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
                     <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} />
                     {(barStatusFilter === "all" || barStatusFilter === "abertas") && (
-                      <Bar dataKey="abertas" fill={BAR_COLORS.abertas} radius={[3, 3, 0, 0]} name="Abertas" stackId="a" />
+                      <Bar dataKey="abertas" fill={BAR_COLORS.abertas} radius={[3, 3, 0, 0]} name={t("dashboard.bar.open")} stackId="a" />
                     )}
                     {(barStatusFilter === "all" || barStatusFilter === "concluidas") && (
-                      <Bar dataKey="concluidas" fill={BAR_COLORS.concluidas} radius={[0, 0, 0, 0]} name="Concluidas" stackId="a" />
+                      <Bar dataKey="concluidas" fill={BAR_COLORS.concluidas} radius={[0, 0, 0, 0]} name={t("dashboard.bar.completed")} stackId="a" />
                     )}
                     {(barStatusFilter === "all" || barStatusFilter === "expiradas") && (
-                      <Bar dataKey="expiradas" fill={BAR_COLORS.expiradas} radius={[3, 3, 0, 0]} name="Expiradas" stackId="a" />
+                      <Bar dataKey="expiradas" fill={BAR_COLORS.expiradas} radius={[3, 3, 0, 0]} name={t("dashboard.bar.expired")} stackId="a" />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -753,7 +773,7 @@ const Dashboard = () => {
                           }`}
                           onClick={() => setPieFilter(f)}
                         >
-                          {f === "all" ? "Todas" : f === "p1" ? "P1 - Critico" : f === "p2" ? "P2 - Alta" : "P3 - Media"}
+                          {f === "all" ? t("dashboard.pie.all") : f === "p1" ? t("priority.p1") : f === "p2" ? t("priority.p2") : t("priority.p3")}
                         </button>
                       ))}
                     </div>
@@ -859,9 +879,9 @@ const Dashboard = () => {
                     <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="square" iconSize={10} />
-                    <Bar dataKey="P1" name="P1 (Crítico)" fill="#ef4444" stackId="prio" />
-                    <Bar dataKey="P2" name="P2 (Alto)" fill="#f59e0b" stackId="prio" />
-                    <Bar dataKey="P3" name="P3 (Normal)" fill="#3b82f6" stackId="prio" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="P1" name={t("dashboard.chart.priority.p1")} fill="#ef4444" stackId="prio" />
+                    <Bar dataKey="P2" name={t("dashboard.chart.priority.p2")} fill="#f59e0b" stackId="prio" />
+                    <Bar dataKey="P3" name={t("dashboard.chart.priority.p3")} fill="#3b82f6" stackId="prio" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -895,9 +915,9 @@ const Dashboard = () => {
                       iconType="square"
                       iconSize={10}
                       payload={[
-                        { value: `Atingiu meta (≥${SLA_TARGET_PERCENT}%)`, type: "square", color: "#22c55e" },
-                        { value: `Abaixo da meta (<${SLA_TARGET_PERCENT}%)`, type: "square", color: "#f59e0b" },
-                        { value: `Meta ${SLA_TARGET_PERCENT}%`, type: "line", color: "#ef4444" },
+                        { value: t("dashboard.chart.sla.met", { target: SLA_TARGET_PERCENT }), type: "square", color: "#22c55e" },
+                        { value: t("dashboard.chart.sla.below", { target: SLA_TARGET_PERCENT }), type: "square", color: "#f59e0b" },
+                        { value: t("dashboard.chart.sla.target", { target: SLA_TARGET_PERCENT }), type: "line", color: "#ef4444" },
                       ]}
                     />
                     <ReferenceLine
@@ -907,7 +927,7 @@ const Dashboard = () => {
                       strokeWidth={2}
                       ifOverflow="extendDomain"
                     />
-                    <Bar dataKey="rate" name="% SLA atingido" radius={[3, 3, 0, 0]}>
+                    <Bar dataKey="rate" name={t("dashboard.chart.sla.percent")} radius={[3, 3, 0, 0]}>
                       {monthlySlaData.map((d, idx) => (
                         <Cell
                           key={idx}
@@ -998,7 +1018,7 @@ const Dashboard = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-primary transition-colors"
-                            title="Abrir no Slack"
+                            title={t("demands.list.open_in_slack")}
                           >
                             <ExternalLink size={13} />
                           </a>
