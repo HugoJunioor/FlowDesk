@@ -132,15 +132,21 @@ export function isEventEnabledForChannel(
   return global !== false; // undefined ou true => permite
 }
 
-export const EVENT_LABELS: Record<NotificationEvent, { label: string; icon: string }> = {
-  demand_assigned: { label: "Atribuída a você", icon: "UserCheck" },
-  demand_replied: { label: "Resposta nova", icon: "MessageSquare" },
-  demand_started: { label: "Atendimento iniciado", icon: "Loader2" },
-  demand_completed: { label: "Demanda concluída", icon: "CheckCircle2" },
-  demand_reopened: { label: "Demanda reaberta", icon: "RotateCcw" },
-  demand_overdue: { label: "SLA estourado", icon: "AlertCircle" },
-  demand_due_soon: { label: "SLA vencendo", icon: "Clock" },
-  demand_created: { label: "Nova demanda criada", icon: "Plus" },
-  demand_approved: { label: "Demanda aprovada", icon: "ThumbsUp" },
-  demand_rejected: { label: "Demanda reprovada", icon: "ThumbsDown" },
+/**
+ * Mapa de evento -> chave de tradução (i18n) + ícone.
+ * Consumers usam `t(EVENT_LABELS[event].labelKey)` pra obter o label traduzido.
+ * O campo `label` permanece como fallback (pt-BR) quando o consumer ainda não
+ * foi migrado pra i18n.
+ */
+export const EVENT_LABELS: Record<NotificationEvent, { label: string; labelKey: string; icon: string }> = {
+  demand_assigned: { label: "Atribuída a você", labelKey: "notifications.event.demand_assigned", icon: "UserCheck" },
+  demand_replied: { label: "Resposta nova", labelKey: "notifications.event.demand_replied", icon: "MessageSquare" },
+  demand_started: { label: "Atendimento iniciado", labelKey: "notifications.event.demand_started", icon: "Loader2" },
+  demand_completed: { label: "Demanda concluída", labelKey: "notifications.event.demand_completed", icon: "CheckCircle2" },
+  demand_reopened: { label: "Demanda reaberta", labelKey: "notifications.event.demand_reopened", icon: "RotateCcw" },
+  demand_overdue: { label: "SLA estourado", labelKey: "notifications.event.demand_overdue", icon: "AlertCircle" },
+  demand_due_soon: { label: "SLA vencendo", labelKey: "notifications.event.demand_due_soon", icon: "Clock" },
+  demand_created: { label: "Nova demanda criada", labelKey: "notifications.event.demand_created", icon: "Plus" },
+  demand_approved: { label: "Demanda aprovada", labelKey: "notifications.event.demand_approved", icon: "ThumbsUp" },
+  demand_rejected: { label: "Demanda reprovada", labelKey: "notifications.event.demand_rejected", icon: "ThumbsDown" },
 };
