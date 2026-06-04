@@ -27,6 +27,7 @@ import {
 import { ShieldCheck, Plus, Pencil, Trash2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   GroupPermissions,
   ModuleId,
@@ -50,6 +51,7 @@ const emptyGroup = (): GroupPermissions => ({
 
 const GroupsManagement = () => {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [groups, setGroups] = useState<GroupPermissions[]>([]);
   const [editing, setEditing] = useState<GroupPermissions | null>(null);
@@ -115,23 +117,23 @@ const GroupsManagement = () => {
     if (!editing) return;
     const name = editing.name.trim();
     if (!name) {
-      toast({ title: "Informe o nome do grupo", variant: "destructive" });
+      toast({ title: t("groups.toast.name_required"), variant: "destructive" });
       return;
     }
     if (isCreating) {
       const ok = createGroup({ ...editing, name });
       if (!ok) {
-        toast({ title: "Já existe um grupo com esse nome", variant: "destructive" });
+        toast({ title: t("groups.toast.duplicate_name"), variant: "destructive" });
         return;
       }
-      toast({ title: "Grupo criado", description: `"${name}" foi adicionado.` });
+      toast({ title: t("groups.toast.created"), description: t("groups.toast.created_desc", { name }) });
     } else {
       const ok = updateGroup(editingOriginalName!, { ...editing, name });
       if (!ok) {
-        toast({ title: "Erro ao salvar (nome duplicado?)", variant: "destructive" });
+        toast({ title: t("groups.toast.save_error"), variant: "destructive" });
         return;
       }
-      toast({ title: "Grupo atualizado", description: `"${name}" foi salvo.` });
+      toast({ title: t("groups.toast.updated"), description: t("groups.toast.updated_desc", { name }) });
     }
     setEditing(null);
     setEditingOriginalName(null);
@@ -142,9 +144,9 @@ const GroupsManagement = () => {
     if (!deleteTarget) return;
     const ok = deleteGroup(deleteTarget);
     if (ok) {
-      toast({ title: "Grupo removido", description: `"${deleteTarget}" foi excluído.` });
+      toast({ title: t("groups.toast.removed"), description: t("groups.toast.removed_desc", { name: deleteTarget }) });
     } else {
-      toast({ title: "Erro ao remover", variant: "destructive" });
+      toast({ title: t("groups.toast.remove_error"), variant: "destructive" });
     }
     setDeleteTarget(null);
     reload();
@@ -158,15 +160,15 @@ const GroupsManagement = () => {
           <div className="flex items-center gap-2">
             <ShieldCheck className="text-primary" size={22} />
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Grupos e Permissões</h1>
+              <h1 className="text-xl font-semibold text-foreground">{t("groups.title")}</h1>
               <p className="text-xs text-muted-foreground">
-                Defina o que cada grupo pode ver, criar, alterar, excluir e exportar
+                {t("groups.description")}
               </p>
             </div>
           </div>
           <Button onClick={openCreate} className="gap-1.5">
             <Plus size={14} />
-            Novo grupo
+            {t("groups.new")}
           </Button>
         </div>
 
@@ -177,7 +179,7 @@ const GroupsManagement = () => {
               <CardContent className="p-12 flex flex-col items-center text-center gap-3">
                 <ShieldCheck size={40} className="text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Nenhum grupo cadastrado. Crie um para começar.
+                  {t("groups.empty")}
                 </p>
               </CardContent>
             </Card>
@@ -207,7 +209,7 @@ const GroupsManagement = () => {
                           variant="ghost"
                           className="h-7 w-7"
                           onClick={() => openEdit(g)}
-                          title="Editar grupo"
+                          title={t("groups.edit_tooltip")}
                         >
                           <Pencil size={13} />
                         </Button>
@@ -216,7 +218,7 @@ const GroupsManagement = () => {
                           variant="ghost"
                           className="h-7 w-7 text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(g.name)}
-                          title="Remover grupo"
+                          title={t("groups.remove_tooltip")}
                         >
                           <Trash2 size={13} />
                         </Button>
@@ -225,7 +227,7 @@ const GroupsManagement = () => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {modulesWithAccess.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">Sem permissões ativas</p>
+                      <p className="text-xs text-muted-foreground italic">{t("groups.no_permissions")}</p>
                     ) : (
                       <div className="space-y-1.5">
                         {modulesWithAccess.map(([moduleId, perms]) => {
@@ -263,38 +265,38 @@ const GroupsManagement = () => {
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isCreating ? "Novo grupo" : `Editar ${editingOriginalName}`}</DialogTitle>
+            <DialogTitle>{isCreating ? t("groups.dialog.new_title") : t("groups.dialog.edit_title", { name: editingOriginalName })}</DialogTitle>
             <DialogDescription>
-              Marque as permissões que os usuários deste grupo terão em cada módulo.
+              {t("groups.dialog.description")}
             </DialogDescription>
           </DialogHeader>
 
           {editing && (
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Nome</label>
+                <label className="text-sm font-medium">{t("groups.field.name")}</label>
                 <Input
                   value={editing.name}
                   onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  placeholder="Ex: Suporte N2"
+                  placeholder={t("groups.field.name_placeholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Descrição</label>
+                <label className="text-sm font-medium">{t("groups.field.description")}</label>
                 <Textarea
                   value={editing.description || ""}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  placeholder="Breve descrição do grupo"
+                  placeholder={t("groups.field.description_placeholder")}
                   rows={2}
                 />
               </div>
 
               {/* Matriz de permissoes */}
               <div>
-                <label className="text-sm font-medium block mb-2">Permissões por módulo</label>
+                <label className="text-sm font-medium block mb-2">{t("groups.permissions_label")}</label>
                 <div className="rounded-lg border border-border overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border/60 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-                    <span className="flex-1 min-w-[130px]">Módulo</span>
+                    <span className="flex-1 min-w-[130px]">{t("groups.module_header")}</span>
                     {PERMISSIONS.map((p) => (
                       <span key={p.id} className="w-[70px] text-center">
                         {p.label}
@@ -325,7 +327,7 @@ const GroupsManagement = () => {
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Dica: sem <strong>Visualizar</strong>, as outras permissões não têm efeito.
+                  {t("groups.tip_prefix")} <strong>{t("groups.tip_visualize")}</strong>, {t("groups.tip_suffix")}
                 </p>
               </div>
             </div>
@@ -333,10 +335,10 @@ const GroupsManagement = () => {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSave}>
-              {isCreating ? "Criar grupo" : "Salvar alterações"}
+              {isCreating ? t("groups.create_button") : t("groups.save_button")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -346,15 +348,15 @@ const GroupsManagement = () => {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover grupo "{deleteTarget}"?</AlertDialogTitle>
+            <AlertDialogTitle>{t("groups.delete_title", { name: deleteTarget ?? "" })}</AlertDialogTitle>
             <AlertDialogDescription>
-              Usuários que pertenciam a este grupo perderão essas permissões. A ação é permanente.
+              {t("groups.delete_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Remover
+              {t("groups.delete_action")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
