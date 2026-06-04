@@ -20,6 +20,7 @@ import CopyLinkButton from "./CopyLinkButton";
 import DemandReplyComposer from "./DemandReplyComposer";
 import SlackFilesList from "./SlackFilesList";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { toast } from "sonner";
 
@@ -81,7 +82,8 @@ const DemandDetailSheet = ({
   onTaskLinkChange,
 }: DemandDetailSheetProps) => {
   const { currentUser } = useAuth();
-  const currentUserName = currentUser?.name || currentUser?.login || "Equipe";
+  const { t } = useLanguage();
+  const currentUserName = currentUser?.name || currentUser?.login || t("common.team");
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [completeDate, setCompleteDate] = useState("");
   const [completeTime, setCompleteTime] = useState("");
@@ -212,7 +214,7 @@ const DemandDetailSheet = ({
       });
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      toast.error("Falha ao atualizar thread", { description: msg });
+      toast.error(t("demand.toast.thread_update_failed"), { description: msg });
     } finally {
       setRefreshingThread(false);
     }
@@ -220,7 +222,7 @@ const DemandDetailSheet = ({
 
   // Edit/delete handlers — backend (chat.update / chat.delete via stateSync plugin)
   const handleEditReply = async (reply: { text: string; timestamp: string; ts?: string }) => {
-    const newText = window.prompt("Editar mensagem:", reply.text);
+    const newText = window.prompt(t("demand.prompt.edit_message"), reply.text);
     if (newText === null || newText.trim() === "" || newText === reply.text) return;
     try {
       await apiClient.slack.editReply({
@@ -230,10 +232,10 @@ const DemandDetailSheet = ({
         newText,
         senderEmail: currentUser?.email,
       });
-      toast.success("Mensagem atualizada no Slack");
+      toast.success(t("demand.toast.message_updated"));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      toast.error("Falha ao editar", { description: msg });
+      toast.error(t("demand.toast.edit_failed"), { description: msg });
     }
   };
 
@@ -246,10 +248,10 @@ const DemandDetailSheet = ({
         replyTs: reply.ts,
         senderEmail: currentUser?.email,
       });
-      toast.success("Mensagem excluída do Slack");
+      toast.success(t("demand.toast.message_deleted"));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      toast.error("Falha ao excluir", { description: msg });
+      toast.error(t("demand.toast.delete_failed"), { description: msg });
     }
   };
 
@@ -335,7 +337,7 @@ const DemandDetailSheet = ({
             {isSlaBreach && demand.status !== "expirada" && (
               <Badge variant="secondary" className="text-[10px] bg-destructive/10 text-destructive animate-pulse">
                 <AlertTriangle size={10} className="mr-0.5" />
-                SLA Estourado
+                {t("demand.sla.breached_short")}
               </Badge>
             )}
           </div>
@@ -363,7 +365,7 @@ const DemandDetailSheet = ({
 
             const countdownBlock = showCountdown ? (
               <div className="p-3 rounded-lg bg-muted/50">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Tempo restante (horario util)</p>
+                <p className="text-xs text-muted-foreground mb-2 font-medium">{t("demand.section.time_remaining")}</p>
                 <ExpirationCountdown
                   dueDate={demand.dueDate || ""}
                   createdAt={demand.createdAt}
@@ -379,7 +381,7 @@ const DemandDetailSheet = ({
               <div className="p-3 rounded-lg border border-border">
                 <div className="flex items-center gap-1.5 mb-2">
                   <UserCog size={14} className="text-primary" />
-                  <p className="text-xs text-muted-foreground font-medium">Responsavel</p>
+                  <p className="text-xs text-muted-foreground font-medium">{t("demand.section.assignee")}</p>
                 </div>
                 <Select
                   value={demand.assignee?.name || "_none_"}
@@ -393,16 +395,16 @@ const DemandDetailSheet = ({
                   }}
                 >
                   <SelectTrigger className="w-full h-9 text-sm">
-                    <SelectValue placeholder="Sem responsavel" />
+                    <SelectValue placeholder={t("demand.label.no_assignee_select")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none_">Sem responsavel</SelectItem>
+                    <SelectItem value="_none_">{t("demand.label.no_assignee_select")}</SelectItem>
                     {assignees.map((a) => (
                       <SelectItem key={a} value={a}>{a}</SelectItem>
                     ))}
                     <SelectItem value="__add_new__">
                       <span className="flex items-center gap-1.5 text-primary">
-                        <Plus size={12} /> Adicionar responsavel...
+                        <Plus size={12} /> {t("demand.action.add_assignee")}
                       </span>
                     </SelectItem>
                   </SelectContent>
@@ -411,7 +413,7 @@ const DemandDetailSheet = ({
                   <div className="mt-2 flex gap-2">
                     <Input
                       ref={newAssigneeRef}
-                      placeholder="Nome do responsavel"
+                      placeholder={t("demand.placeholder.assignee_name")}
                       className="h-9 flex-1"
                       value={newAssigneeName}
                       onChange={(e) => setNewAssigneeName(e.target.value)}
@@ -460,10 +462,10 @@ const DemandDetailSheet = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="aberta">Aberta</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
-                    <SelectItem value="concluida">Concluida</SelectItem>
-                    <SelectItem value="expirada">Expirada</SelectItem>
+                    <SelectItem value="aberta">{t("status.open")}</SelectItem>
+                    <SelectItem value="em_andamento">{t("status.in_progress")}</SelectItem>
+                    <SelectItem value="concluida">{t("status.completed")}</SelectItem>
+                    <SelectItem value="expirada">{t("status.expired")}</SelectItem>
                   </SelectContent>
                 </Select>
                 {showCompleteForm && (
@@ -488,7 +490,7 @@ const DemandDetailSheet = ({
                         className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[48px]"
                         rows={2}
                         maxLength={2000}
-                        placeholder="Observação sobre a conclusão (opcional)..."
+                        placeholder={t("demand.placeholder.closure_note")}
                         value={completeObservation}
                         onChange={(e) => setCompleteObservation(e.target.value)}
                       />
@@ -518,10 +520,10 @@ const DemandDetailSheet = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="p1">P1 - Critico</SelectItem>
-                    <SelectItem value="p2">P2 - Alta</SelectItem>
-                    <SelectItem value="p3">P3 - Media</SelectItem>
-                    <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
+                    <SelectItem value="p1">{t("priority.p1")}</SelectItem>
+                    <SelectItem value="p2">{t("priority.p2")}</SelectItem>
+                    <SelectItem value="p3">{t("priority.p3")}</SelectItem>
+                    <SelectItem value="sem_classificacao">{t("priority.unclassified")}</SelectItem>
                   </SelectContent>
                 </Select>
                 {demand.autoClassification && (
@@ -530,8 +532,8 @@ const DemandDetailSheet = ({
                       <Sparkles size={12} className="text-primary" />
                       <span className="text-[11px] font-semibold text-primary">Classificacao automatica</span>
                       <Badge variant="secondary" className="text-[9px] ml-auto">
-                        {demand.autoClassification.confidence === "alta" ? "Alta confianca" :
-                         demand.autoClassification.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                        {demand.autoClassification.confidence === "alta" ? t("demand.confidence.high") :
+                         demand.autoClassification.confidence === "media" ? t("demand.confidence.medium") : t("demand.confidence.low")}
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -557,8 +559,8 @@ const DemandDetailSheet = ({
                   <Sparkles size={12} className="text-primary" />
                   <span className="text-[11px] font-semibold text-primary">Deteccao automatica de status</span>
                   <Badge variant="secondary" className="text-[9px] ml-auto">
-                    {demand.statusAnalysis.confidence === "alta" ? "Alta confianca" :
-                     demand.statusAnalysis.confidence === "media" ? "Media confianca" : "Baixa confianca"}
+                    {demand.statusAnalysis.confidence === "alta" ? t("demand.confidence.high") :
+                     demand.statusAnalysis.confidence === "media" ? t("demand.confidence.medium") : t("demand.confidence.low")}
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -686,10 +688,10 @@ const DemandDetailSheet = ({
                 onClick={refreshThread}
                 disabled={refreshingThread}
                 className="text-[10px] flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                title="Buscar mensagens novas direto do Slack"
+                title={t("demand.thread.refresh_tooltip")}
               >
                 <span className={refreshingThread ? "inline-block animate-spin" : ""}>↻</span>
-                {refreshingThread ? "Atualizando..." : "Atualizar"}
+                {refreshingThread ? t("demand.thread.refreshing") : t("common.refresh")}
               </button>
             </div>
             {mergedReplies.length > 0 && (
@@ -718,7 +720,7 @@ const DemandDetailSheet = ({
                                 type="button"
                                 className="text-[10px] text-muted-foreground hover:text-primary"
                                 onClick={() => handleEditReply(reply)}
-                                title="Editar mensagem"
+                                title={t("demand.thread.edit_tooltip")}
                               >
                                 Editar
                               </button>
@@ -726,7 +728,7 @@ const DemandDetailSheet = ({
                                 type="button"
                                 className="text-[10px] text-muted-foreground hover:text-destructive"
                                 onClick={() => handleDeleteReply(reply)}
-                                title="Excluir mensagem"
+                                title={t("demand.thread.delete_tooltip")}
                               >
                                 Excluir
                               </button>
@@ -807,7 +809,7 @@ const DemandDetailSheet = ({
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-medium text-foreground">{formatBusinessTime(firstRespMinutes)}</span>
                           <Badge variant="secondary" className={`text-[9px] px-1.5 ${firstRespOk ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                            {firstRespOk ? "No prazo" : "Atrasada"}
+                            {firstRespOk ? t("demand.sla.on_time") : t("demand.sla.late")}
                           </Badge>
                         </div>
                       ) : (
@@ -822,7 +824,7 @@ const DemandDetailSheet = ({
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-medium text-foreground">{formatBusinessTime(resolutionMinutes)}</span>
                           <Badge variant="secondary" className={`text-[9px] px-1.5 ${resolutionOk ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                            {resolutionOk ? "No prazo" : "Estourado"}
+                            {resolutionOk ? t("demand.sla.on_time") : t("demand.sla.breached")}
                           </Badge>
                         </div>
                       ) : (
@@ -864,10 +866,10 @@ const DemandDetailSheet = ({
                   }}
                 >
                   <SelectTrigger className="w-full h-9 mt-1 text-sm">
-                    <SelectValue placeholder="Selecionar..." />
+                    <SelectValue placeholder={t("common.select_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none_">Selecionar...</SelectItem>
+                    <SelectItem value="_none_">{t("common.select_placeholder")}</SelectItem>
                     {categories.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
@@ -882,7 +884,7 @@ const DemandDetailSheet = ({
                   <div className="mt-2 flex gap-2">
                     <Input
                       ref={newCategoryRef}
-                      placeholder="Nome da categoria"
+                      placeholder={t("demand.placeholder.category_name")}
                       className="h-9 flex-1"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
@@ -903,7 +905,7 @@ const DemandDetailSheet = ({
                           onClosureChange(demand.id, { category: newCategoryName.trim() as DemandCategory });
                           setNewCategoryName(""); setShowAddCategory(false);
                         }
-                      }}>Adicionar</Button>
+                      }}>{t("common.add")}</Button>
                     <Button variant="ghost" size="sm" className="h-9" onClick={() => setShowAddCategory(false)}>
                       <X size={14} />
                     </Button>
@@ -924,10 +926,10 @@ const DemandDetailSheet = ({
                   onValueChange={(v) => onClosureChange(demand.id, { supportLevel: (v === "_none_" ? "" : v) as SupportLevel })}
                 >
                   <SelectTrigger className="w-full h-9 mt-1 text-sm">
-                    <SelectValue placeholder="Selecionar..." />
+                    <SelectValue placeholder={t("common.select_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none_">Selecionar...</SelectItem>
+                    <SelectItem value="_none_">{t("common.select_placeholder")}</SelectItem>
                     {SUPPORT_LEVEL_OPTIONS.map((l) => (
                       <SelectItem key={l} value={l}>{l}</SelectItem>
                     ))}
@@ -956,10 +958,10 @@ const DemandDetailSheet = ({
                     }}
                   >
                     <SelectTrigger className="w-full h-9 mt-1 text-sm">
-                      <SelectValue placeholder="Selecionar..." />
+                      <SelectValue placeholder={t("common.select_placeholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none_">Selecionar...</SelectItem>
+                      <SelectItem value="_none_">{t("common.select_placeholder")}</SelectItem>
                       {(expirationReasons ?? EXPIRATION_REASON_OPTIONS).map((r) => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
@@ -976,7 +978,7 @@ const DemandDetailSheet = ({
                     <div className="mt-2 flex gap-2">
                       <Input
                         ref={newReasonRef}
-                        placeholder="Nome do motivo"
+                        placeholder={t("demand.placeholder.reason_name")}
                         className="h-9 flex-1"
                         value={newReasonName}
                         onChange={(e) => setNewReasonName(e.target.value)}
@@ -1024,14 +1026,14 @@ const DemandDetailSheet = ({
                   className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-y min-h-[80px]"
                   rows={5}
                   maxLength={5000}
-                  placeholder="Descreva a resolução da demanda..."
+                  placeholder={t("demand.placeholder.resolution_description")}
                   value={demand.closure?.internalComment || ""}
                   onChange={(e) => onClosureChange(demand.id, { internalComment: e.target.value })}
                 />
                 <div className="flex items-center justify-between mt-0.5">
                   <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
                     <Paperclip size={12} />
-                    <span>Anexar arquivo</span>
+                    <span>{t("demand.action.attach_file")}</span>
                     <input
                       type="file"
                       multiple
@@ -1089,7 +1091,7 @@ const DemandDetailSheet = ({
                           href={att.dataUrl}
                           download={att.name}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Baixar"
+                          title={t("common.download")}
                         >
                           <Download size={13} className="text-muted-foreground hover:text-foreground" />
                         </a>
@@ -1099,7 +1101,7 @@ const DemandDetailSheet = ({
                             onClosureChange(demand.id, { attachments: updated });
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remover"
+                          title={t("common.remove")}
                         >
                           <Trash2 size={13} className="text-muted-foreground hover:text-destructive" />
                         </button>
