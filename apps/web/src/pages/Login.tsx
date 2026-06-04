@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -31,6 +32,7 @@ const Login = () => {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const { login, mustChangePassword, changePassword } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -45,7 +47,7 @@ const Login = () => {
     const result = await login(loginInput, password);
     setIsLoading(false);
     if (!result.success) {
-      toast({ title: "Erro ao entrar", description: result.error, variant: "destructive" });
+      toast({ title: t("login.toast.signin_error"), description: result.error, variant: "destructive" });
     }
     // Sucesso: NAO navega. A re-renderizacao do App vai mostrar a rota atual
     // (preservando ?openId=<id> etc) automaticamente quando isAuthenticated=true.
@@ -56,11 +58,11 @@ const Login = () => {
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) {
-      toast({ title: "Informe seu e-mail", variant: "destructive" });
+      toast({ title: t("login.toast.email_required"), variant: "destructive" });
       return;
     }
     if (!isJustEmail(forgotEmail)) {
-      toast({ title: "E-mail inválido", description: "Use um e-mail corporativo válido.", variant: "destructive" });
+      toast({ title: t("login.toast.invalid_email"), description: t("login.toast.use_corporate_email"), variant: "destructive" });
       return;
     }
     setForgotLoading(true);
@@ -69,7 +71,7 @@ const Login = () => {
     if (found) {
       setView("forgot_sent");
     } else {
-      toast({ title: "E-mail não encontrado", description: "Verifique o endereço e tente novamente.", variant: "destructive" });
+      toast({ title: t("login.toast.email_not_found"), description: t("login.toast.check_address"), variant: "destructive" });
     }
   };
 
@@ -78,18 +80,18 @@ const Login = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      toast({ title: "Preencha os dois campos de senha.", variant: "destructive" });
+      toast({ title: t("login.toast.fill_both_passwords"), variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "As senhas não coincidem.", description: "Verifique e tente novamente.", variant: "destructive" });
+      toast({ title: t("login.toast.passwords_mismatch"), description: t("login.toast.try_again"), variant: "destructive" });
       return;
     }
     const strength = getPasswordStrength(newPassword);
     if (!strength.isStrong) {
       toast({
-        title: "Senha muito fraca.",
-        description: "Use letras maiúsculas, minúsculas, números e símbolos.",
+        title: t("login.toast.weak_password"),
+        description: t("login.toast.password_requirements"),
         variant: "destructive",
       });
       return;
@@ -98,10 +100,10 @@ const Login = () => {
     const result = await changePassword(newPassword);
     setChangingPassword(false);
     if (!result.success) {
-      toast({ title: "Erro ao salvar senha.", description: result.error, variant: "destructive" });
+      toast({ title: t("login.toast.password_save_error"), description: result.error, variant: "destructive" });
       return;
     }
-    toast({ title: "Senha criada com sucesso!", description: `Bem-vindo ao ${branding.name}.` });
+    toast({ title: t("login.toast.password_created"), description: t("login.toast.welcome", { name: branding.name }) });
     // Igual ao login: re-render mostra a rota atual sem forcar dashboard
   };
 
@@ -148,17 +150,17 @@ const Login = () => {
         {currentView === "login" && (
           <Card className="border-border/50 shadow-lg">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Entrar</CardTitle>
-              <CardDescription className="text-xs">Use seu login e senha gerados pelo administrador</CardDescription>
+              <CardTitle className="text-lg">{t("login.title")}</CardTitle>
+              <CardDescription className="text-xs">{t("login.description")}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Login</label>
+                  <label className="text-sm font-medium">{t("login.username")}</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="seu.login"
+                      placeholder={t("login.username_placeholder")}
                       value={loginInput}
                       onChange={(e) => setLoginInput(e.target.value)}
                       className="pl-10"
@@ -171,12 +173,12 @@ const Login = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Senha</label>
+                  <label className="text-sm font-medium">{t("login.password")}</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Digite sua senha"
+                      placeholder={t("login.password_placeholder")}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -198,9 +200,9 @@ const Login = () => {
                   {isLoading ? (
                     <span className="flex items-center gap-2">
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Entrando...
+                      {t("login.submitting")}
                     </span>
-                  ) : "Entrar"}
+                  ) : t("login.submit")}
                 </Button>
 
                 <button
@@ -208,7 +210,7 @@ const Login = () => {
                   onClick={() => setView("forgot")}
                   className="w-full text-sm text-primary hover:underline transition-colors"
                 >
-                  Esqueci minha senha
+                  {t("login.forgot")}
                 </button>
               </form>
             </CardContent>
@@ -220,21 +222,21 @@ const Login = () => {
           <Card className="border-border/50 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
-                <KeyRound size={18} /> Recuperar Senha
+                <KeyRound size={18} /> {t("login.recover_title")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Informe seu e-mail para solicitar uma nova senha ao administrador.
+                {t("login.recover_description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleForgot} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">E-mail</label>
+                  <label className="text-sm font-medium">{t("login.email_label")}</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="email"
-                      placeholder="seu@empresa.com"
+                      placeholder={t("login.email_placeholder")}
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       className="pl-10"
@@ -245,7 +247,7 @@ const Login = () => {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={forgotLoading}>
-                  {forgotLoading ? "Enviando..." : "Solicitar nova senha"}
+                  {forgotLoading ? t("login.request_sending") : t("login.request_new_password")}
                 </Button>
 
                 <button
@@ -253,7 +255,7 @@ const Login = () => {
                   onClick={() => setView("login")}
                   className="w-full flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <ArrowLeft size={14} /> Voltar ao login
+                  <ArrowLeft size={14} /> {t("login.back_to_login")}
                 </button>
               </form>
             </CardContent>
@@ -266,13 +268,13 @@ const Login = () => {
             <CardContent className="pt-8 pb-6 text-center space-y-4">
               <CheckCircle2 size={40} className="text-success mx-auto" />
               <div>
-                <p className="font-semibold text-foreground">Solicitação enviada!</p>
+                <p className="font-semibold text-foreground">{t("login.request_sent")}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  O administrador foi notificado. Aguarde a nova senha temporária e acesse com ela — será necessário criar uma nova senha no primeiro acesso.
+                  {t("login.admin_notified")}
                 </p>
               </div>
               <Button variant="outline" className="w-full" onClick={() => { setView("login"); setForgotEmail(""); }}>
-                Voltar ao login
+                {t("login.back_to_login")}
               </Button>
             </CardContent>
           </Card>
@@ -283,21 +285,21 @@ const Login = () => {
           <Card className="border-border/50 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Lock size={18} /> Criar nova senha
+                <Lock size={18} /> {t("login.create_new_password")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Este é seu primeiro acesso. Crie uma senha forte para continuar.
+                {t("login.first_access_description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nova senha</label>
+                  <label className="text-sm font-medium">{t("login.new_password_label")}</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type={showNew ? "text" : "password"}
-                      placeholder="Crie uma senha forte"
+                      placeholder={t("login.create_strong_placeholder")}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -317,12 +319,12 @@ const Login = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Confirmar senha</label>
+                  <label className="text-sm font-medium">{t("login.confirm_password_label")}</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type={showConfirm ? "text" : "password"}
-                      placeholder="Repita a senha"
+                      placeholder={t("login.repeat_password_placeholder")}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="pl-10 pr-10"
@@ -338,18 +340,18 @@ const Login = () => {
                     </button>
                   </div>
                   {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">As senhas não coincidem</p>
+                    <p className="text-xs text-destructive">{t("login.passwords_mismatch_inline")}</p>
                   )}
                 </div>
 
                 <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                  <p className="font-medium text-foreground">Requisitos da senha forte:</p>
+                  <p className="font-medium text-foreground">{t("login.strong_requirements")}</p>
                   {[
-                    { label: "Pelo menos 6 caracteres", ok: newPassword.length >= 6 },
-                    { label: "Letras maiúsculas (A-Z)", ok: /[A-Z]/.test(newPassword) },
-                    { label: "Letras minúsculas (a-z)", ok: /[a-z]/.test(newPassword) },
-                    { label: "Números (0-9)", ok: /[0-9]/.test(newPassword) },
-                    { label: "Símbolos (!@#$%...)", ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword) },
+                    { label: t("login.req.min_chars"), ok: newPassword.length >= 6 },
+                    { label: t("login.req.uppercase"), ok: /[A-Z]/.test(newPassword) },
+                    { label: t("login.req.lowercase"), ok: /[a-z]/.test(newPassword) },
+                    { label: t("login.req.numbers"), ok: /[0-9]/.test(newPassword) },
+                    { label: t("login.req.symbols"), ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword) },
                   ].map((req) => (
                     <div key={req.label} className={`flex items-center gap-1.5 ${req.ok ? "text-success" : ""}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${req.ok ? "bg-success" : "bg-muted-foreground"}`} />
@@ -363,7 +365,7 @@ const Login = () => {
                   className="w-full"
                   disabled={changingPassword || !getPasswordStrength(newPassword).isStrong || newPassword !== confirmPassword}
                 >
-                  {changingPassword ? "Salvando..." : "Salvar e entrar"}
+                  {changingPassword ? t("login.saving") : t("login.save_and_enter")}
                 </Button>
               </form>
             </CardContent>
