@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { apiClient } from "@/lib/apiClient";
 import { NotificationItem, NotificationEvent } from "@/types/notification";
 import { showBrowserNotification, getPermission } from "@/lib/browserNotifications";
@@ -46,7 +47,7 @@ const EVENT_ICON: Record<NotificationEvent, typeof Bell> = {
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return "agora";
+  if (ms < 60_000) return "agora"; // util fora do componente — refactor i18n em PR futuro
   const min = Math.floor(ms / 60_000);
   if (min < 60) return `${min}min`;
   const h = Math.floor(min / 60);
@@ -62,6 +63,7 @@ interface NotificationBellSidebarProps {
 
 const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebarProps) => {
   const { currentUser } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -231,10 +233,12 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
         <div className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
             <Bell size={14} />
-            <span className="font-medium text-sm">Notificações</span>
+            <span className="font-medium text-sm">{t("notifications.title")}</span>
             {unreadCount > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                {unreadCount} nova{unreadCount > 1 ? "s" : ""}
+                {unreadCount === 1
+                  ? t("notifications.unread_count_one", { count: unreadCount })
+                  : t("notifications.unread_count_other", { count: unreadCount })}
               </span>
             )}
           </div>
@@ -245,7 +249,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
               className="h-7 text-[11px] gap-1"
               onClick={handleMarkAllRead}
             >
-              <CheckCheck size={11} /> Marcar todas
+              <CheckCheck size={11} /> {t("notifications.mark_all_read")}
             </Button>
           )}
         </div>
@@ -254,12 +258,12 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
         <div className="flex-1 overflow-y-auto">
           {loading && items.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
-              <Loader2 size={14} className="animate-spin inline mr-1.5" /> Carregando...
+              <Loader2 size={14} className="animate-spin inline mr-1.5" /> {t("notifications.loading")}
             </div>
           ) : items.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
               <Bell size={20} className="mx-auto mb-2 opacity-40" />
-              Nenhuma notificação ainda
+              {t("notifications.empty")}
             </div>
           ) : (
             <div className="divide-y">
@@ -293,7 +297,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
                       </p>
                       {n.actor && (
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          por {n.actor}
+                          {t("notifications.by_actor", { actor: n.actor })}
                         </p>
                       )}
                     </div>
@@ -316,7 +320,7 @@ const NotificationBellSidebar = ({ collapsed, onClick }: NotificationBellSidebar
               className="w-full text-xs"
               onClick={() => { setOpen(false); onClick?.(); navigate("/notificacoes"); }}
             >
-              Ver todas as notificações
+              {t("notifications.see_all")}
             </Button>
           </div>
         )}
