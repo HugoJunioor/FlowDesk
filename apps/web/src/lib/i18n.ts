@@ -682,6 +682,12 @@ const TRANSLATIONS: Translations = {
     "time.minutes_ago_short": "{count}min atrás",
     "time.hours_ago_short": "{count}h atrás",
     "time.days_ago_short": "{count}d atrás",
+    // Save view (filters as user preference)
+    "demands.view.save_tooltip": "Salvar visualização como minha padrão",
+    "demands.view.clear_tooltip": "Limpar visualização salva",
+    "demands.view.saved": "Visualização salva",
+    "demands.view.saved_desc": "Os filtros atuais carregarão na próxima vez que você entrar.",
+    "demands.view.cleared": "Visualização padrão removida",
   },
 
   "en-US": {
@@ -1315,6 +1321,11 @@ const TRANSLATIONS: Translations = {
     "time.minutes_ago_short": "{count}min ago",
     "time.hours_ago_short": "{count}h ago",
     "time.days_ago_short": "{count}d ago",
+    "demands.view.save_tooltip": "Save view as my default",
+    "demands.view.clear_tooltip": "Clear saved view",
+    "demands.view.saved": "View saved",
+    "demands.view.saved_desc": "Current filters will load the next time you visit.",
+    "demands.view.cleared": "Default view removed",
   },
 
   "es-ES": {
@@ -1948,6 +1959,11 @@ const TRANSLATIONS: Translations = {
     "time.minutes_ago_short": "hace {count}min",
     "time.hours_ago_short": "hace {count}h",
     "time.days_ago_short": "hace {count}d",
+    "demands.view.save_tooltip": "Guardar vista como mi predeterminada",
+    "demands.view.clear_tooltip": "Borrar vista guardada",
+    "demands.view.saved": "Vista guardada",
+    "demands.view.saved_desc": "Los filtros actuales se cargarán la próxima vez.",
+    "demands.view.cleared": "Vista predeterminada eliminada",
   },
 };
 
