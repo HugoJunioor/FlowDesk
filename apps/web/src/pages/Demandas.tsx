@@ -5,7 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Calendar, Signal, Users, List, Database } from "lucide-react";
+import { LayoutGrid, Calendar, Signal, Users, List, Database, Bookmark, BookmarkX } from "lucide-react";
+import { toast } from "sonner";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS } from "@/types/demand";
@@ -74,6 +75,38 @@ function loadScope(): DemandScope {
   } catch { return "mine"; }
 }
 
+// === Saved view (filter preferences per user) ===
+// Permite o user salvar o conjunto atual de filtros como sua "visao
+// padrao". Quando voltar/recarregar a pagina, o filtro carrega no estado
+// salvo automaticamente. Chave por email pra nao misturar entre usuarios
+// que compartilham o mesmo navegador.
+
+const SAVED_VIEW_PREFIX = "flowdesk:demandas:view:";
+
+function savedViewKey(email: string | undefined): string {
+  return SAVED_VIEW_PREFIX + (email || "anon").toLowerCase();
+}
+
+function loadSavedView(email: string | undefined): DemandFilterState | null {
+  try {
+    const raw = localStorage.getItem(savedViewKey(email));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Merge com EMPTY_FILTERS pra cobrir campos que possam ter sido
+    // adicionados depois que o user salvou.
+    return { ...EMPTY_FILTERS, ...parsed };
+  } catch { return null; }
+}
+
+function saveView(email: string | undefined, filters: DemandFilterState): void {
+  try { localStorage.setItem(savedViewKey(email), JSON.stringify(filters)); }
+  catch { /* localStorage cheio / desabilitado — silencia */ }
+}
+
+function clearSavedView(email: string | undefined): void {
+  try { localStorage.removeItem(savedViewKey(email)); } catch { /* ignore */ }
+}
+
 const Demandas = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -99,9 +132,31 @@ const Demandas = () => {
       unsubSync();
     };
   }, []);
-  const [filters, setFilters] = useState<DemandFilterState>({ ...EMPTY_FILTERS });
+  const [filters, setFilters] = useState<DemandFilterState>(() => {
+    // Carrega a visualização salva do usuário no primeiro render — assim a
+    // tela já abre com os filtros que ele costuma usar.
+    const saved = loadSavedView(currentUser?.email);
+    return saved ?? { ...EMPTY_FILTERS };
+  });
+  const [hasSavedView, setHasSavedView] = useState<boolean>(() => loadSavedView(currentUser?.email) !== null);
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Salva a visualização atual (filtros) como preferência do user.
+  const handleSaveView = useCallback(() => {
+    saveView(currentUser?.email, filters);
+    setHasSavedView(true);
+    toast.success(t("demands.view.saved"), {
+      description: t("demands.view.saved_desc"),
+    });
+  }, [currentUser?.email, filters, t]);
+
+  // Remove a visualização salva.
+  const handleClearSavedView = useCallback(() => {
+    clearSavedView(currentUser?.email);
+    setHasSavedView(false);
+    toast.success(t("demands.view.cleared"));
+  }, [currentUser?.email, t]);
 
   // Abre Sheet automaticamente se ?openId=<id> na URL (vindo de notificacao / email)
   useEffect(() => {
@@ -507,6 +562,19 @@ const Demandas = () => {
               assignees={assignees}
               clients={clients}
             />
+            {/* Salvar/limpar visualização — vira preferência do user e
+                carrega automaticamente no proximo acesso */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0 shrink-0"
+              onClick={hasSavedView ? handleClearSavedView : handleSaveView}
+              title={hasSavedView ? t("demands.view.clear_tooltip") : t("demands.view.save_tooltip")}
+            >
+              {hasSavedView
+                ? <BookmarkX size={14} className="text-primary" />
+                : <Bookmark size={14} />}
+            </Button>
             <ReportButton
               demands={sorted}
               source="demandas"
