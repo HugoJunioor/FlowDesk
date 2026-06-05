@@ -5,6 +5,7 @@ import { SlackDemand, PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
 import DemandList from "./DemandList";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { addBusinessHours, getBusinessMinutesBetween } from "@/lib/businessHours";
 
 interface DemandListGroupedProps {
   demands: SlackDemand[];
@@ -36,6 +37,39 @@ function groupByDate(demands: SlackDemand[], t: T): { label: string; items: Slac
     });
 }
 
+/**
+ * Minutos uteis ate o prazo. Negativo = estourado.
+ * Null pra demandas sem prazo (concluida/expirada/sem_classificacao).
+ */
+function minutesToDue(d: SlackDemand, now: Date): number | null {
+  if (d.status === "concluida" || d.status === "expirada") return null;
+  if (d.priority === "sem_classificacao") return null;
+  const cfg = PRIORITY_CONFIG[d.priority];
+  if (!cfg?.sla) return null;
+  const dueDate = d.dueDate
+    ? new Date(d.dueDate)
+    : addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+  return getBusinessMinutesBetween(now, dueDate);
+}
+
+/**
+ * Ordena demandas pelo tempo de atuacao restante (cima = mais urgente):
+ *  1. Estouradas primeiro (mais estouradas → topo)
+ *  2. Depois por menos tempo restante → mais tempo
+ *  3. Sem prazo (concluida/expirada/sem_classificacao) por ultimo
+ */
+function sortByTimeToAct(demands: SlackDemand[]): SlackDemand[] {
+  const now = new Date();
+  return [...demands].sort((a, b) => {
+    const am = minutesToDue(a, now);
+    const bm = minutesToDue(b, now);
+    if (am === null && bm === null) return 0;
+    if (am === null) return 1;
+    if (bm === null) return -1;
+    return am - bm;
+  });
+}
+
 function groupByPriority(demands: SlackDemand[]): { label: string; items: SlackDemand[]; color: string; bg: string }[] {
   const order: DemandPriority[] = ["p1", "p2", "p3", "sem_classificacao"];
   return order
@@ -45,7 +79,10 @@ function groupByPriority(demands: SlackDemand[]): { label: string; items: SlackD
         label: cfg.label,
         color: cfg.color,
         bg: cfg.bg,
-        items: demands.filter((d) => d.priority === p),
+        // Sempre ordena pelo tempo de atuacao: estouradas no topo, depois
+        // menor tempo restante → maior tempo. Independente do toggle slaSort
+        // global — dentro do grupo de prioridade essa eh a ordem util.
+        items: sortByTimeToAct(demands.filter((d) => d.priority === p)),
       };
     })
     .filter((g) => g.items.length > 0);

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import DemandCard from "./DemandCard";
+import { addBusinessHours, getBusinessMinutesBetween } from "@/lib/businessHours";
 
 interface DemandByPriorityProps {
   demands: SlackDemand[];
@@ -9,11 +10,39 @@ interface DemandByPriorityProps {
 
 const priorities: DemandPriority[] = ["p1", "p2", "p3", "sem_classificacao"];
 
+/** Minutos uteis ate o prazo. Negativo = estourado. Null se sem prazo. */
+function minutesToDue(d: SlackDemand, now: Date): number | null {
+  if (d.status === "concluida" || d.status === "expirada") return null;
+  if (d.priority === "sem_classificacao") return null;
+  const cfg = PRIORITY_CONFIG[d.priority];
+  if (!cfg?.sla) return null;
+  const dueDate = d.dueDate
+    ? new Date(d.dueDate)
+    : addBusinessHours(new Date(d.createdAt), cfg.sla.resolutionHours);
+  return getBusinessMinutesBetween(now, dueDate);
+}
+
+/** Ordena: estouradas no topo, depois menor tempo restante, sem-prazo no fim. */
+function sortByTimeToAct(arr: SlackDemand[]): SlackDemand[] {
+  const now = new Date();
+  return [...arr].sort((a, b) => {
+    const am = minutesToDue(a, now);
+    const bm = minutesToDue(b, now);
+    if (am === null && bm === null) return 0;
+    if (am === null) return 1;
+    if (bm === null) return -1;
+    return am - bm;
+  });
+}
+
 const DemandByPriority = ({ demands, onSelect }: DemandByPriorityProps) => {
   return (
     <div className="space-y-8">
       {priorities.map((p) => {
-        const items = demands.filter((d) => d.priority === p);
+        // Dentro de cada quadro de prioridade, ordena pelo tempo de atuacao:
+        // estouradas primeiro (mais urgente no topo), depois por menos tempo
+        // restante. Sem-prazo no fim.
+        const items = sortByTimeToAct(demands.filter((d) => d.priority === p));
         const config = PRIORITY_CONFIG[p];
         if (items.length === 0) return null;
 
