@@ -161,7 +161,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
             )}
             <StickyNote size={20} className={location.pathname === "/notas" || location.pathname === "/notas-v2" ? "text-sidebar-primary" : ""} />
-            {!collapsed && <span>Notas</span>}
+            {!collapsed && <span>{t("nav.notes")}</span>}
           </NavLink>
 
           {/* Master-only: Users */}
@@ -218,7 +218,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-sidebar-primary rounded-r-full" />
               )}
               <Hash size={20} className={location.pathname === "/grupos-demandas" ? "text-sidebar-primary" : ""} />
-              {!collapsed && <span>Grupos de Demandas</span>}
+              {!collapsed && <span>{t("nav.channel_routing")}</span>}
             </NavLink>
           )}
         </nav>
@@ -233,7 +233,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/50"
               }`
             }
-            title="Meu perfil"
+            title={t("nav.profile_tooltip")}
           >
             <div className="w-8 h-8 rounded-full bg-sidebar-primary/20 flex items-center justify-center text-sidebar-primary text-xs font-bold shrink-0">
               {initials}
@@ -244,7 +244,7 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                   {username}
                 </span>
                 <span className="text-[10px] text-sidebar-muted">
-                  {currentUser?.role === "master" ? "Master" : "Usuário"}
+                  {currentUser?.role === "master" ? t("users.role.master") : t("users.role.user")}
                 </span>
               </div>
             )}
@@ -269,10 +269,10 @@ const AppSidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }: AppS
                 }
               }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
-              title="Ativar notificações do navegador"
+              title={t("nav.enable_notifications_tooltip")}
             >
               <BellRing size={20} />
-              {!collapsed && <span className="text-left">Ativar notificações</span>}
+              {!collapsed && <span className="text-left">{t("nav.enable_notifications")}</span>}
             </button>
           )}
           <NavLink
