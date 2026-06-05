@@ -558,6 +558,18 @@ const TRANSLATIONS: Translations = {
     "users.toast.user_deleted": "Usuário excluído",
     "users.toast.group_taken": "Grupo já existe",
     "users.toast.group_created": "Grupo criado",
+    // Sidebar (extras alem das chaves nav.* ja existentes)
+    "nav.notes": "Notas",
+    "nav.channel_routing": "Grupos de Demandas",
+    "nav.profile_tooltip": "Meu perfil",
+    "nav.enable_notifications": "Ativar notificações",
+    "nav.enable_notifications_tooltip": "Ativar notificações do navegador",
+    // Demo banner
+    "demo.label": "MODO DEMO",
+    "demo.fake_data": "dados fictícios",
+    "demo.login_label": "login:",
+    "demo.password_label": "senha:",
+    "demo.close_banner": "Fechar banner",
   },
 
   "en-US": {
@@ -1076,6 +1088,16 @@ const TRANSLATIONS: Translations = {
     "users.toast.user_deleted": "User deleted",
     "users.toast.group_taken": "Group already exists",
     "users.toast.group_created": "Group created",
+    "nav.notes": "Notes",
+    "nav.channel_routing": "Demand Groups",
+    "nav.profile_tooltip": "My profile",
+    "nav.enable_notifications": "Enable notifications",
+    "nav.enable_notifications_tooltip": "Enable browser notifications",
+    "demo.label": "DEMO MODE",
+    "demo.fake_data": "mock data",
+    "demo.login_label": "login:",
+    "demo.password_label": "password:",
+    "demo.close_banner": "Close banner",
   },
 
   "es-ES": {
@@ -1594,6 +1616,16 @@ const TRANSLATIONS: Translations = {
     "users.toast.user_deleted": "Usuario eliminado",
     "users.toast.group_taken": "Grupo ya existe",
     "users.toast.group_created": "Grupo creado",
+    "nav.notes": "Notas",
+    "nav.channel_routing": "Grupos de Demandas",
+    "nav.profile_tooltip": "Mi perfil",
+    "nav.enable_notifications": "Activar notificaciones",
+    "nav.enable_notifications_tooltip": "Activar notificaciones del navegador",
+    "demo.label": "MODO DEMO",
+    "demo.fake_data": "datos ficticios",
+    "demo.login_label": "login:",
+    "demo.password_label": "contraseña:",
+    "demo.close_banner": "Cerrar banner",
   },
 };
 
