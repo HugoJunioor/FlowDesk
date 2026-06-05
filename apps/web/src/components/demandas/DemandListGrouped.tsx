@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { SlackDemand, PRIORITY_CONFIG, DemandPriority } from "@/types/demand";
 import { extractClientName } from "@/data/mockDemands";
 import DemandList from "./DemandList";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DemandListGroupedProps {
   demands: SlackDemand[];
@@ -12,8 +13,12 @@ interface DemandListGroupedProps {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+// `t` eh injetada pelos consumers porque hooks nao podem rodar fora do componente.
+// Labels de data (Hoje/Ontem) e de "sem responsavel" reagem ao idioma.
 
-function groupByDate(demands: SlackDemand[]): { label: string; items: SlackDemand[] }[] {
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+function groupByDate(demands: SlackDemand[], t: T): { label: string; items: SlackDemand[] }[] {
   const map: Record<string, SlackDemand[]> = {};
   for (const d of demands) {
     const key = format(new Date(d.createdAt), "yyyy-MM-dd");
@@ -25,8 +30,8 @@ function groupByDate(demands: SlackDemand[]): { label: string; items: SlackDeman
     .map((key) => {
       const date = new Date(key);
       let label = format(date, "EEEE, dd 'de' MMMM", { locale: ptBR });
-      if (isToday(date)) label = "Hoje";
-      else if (isYesterday(date)) label = "Ontem";
+      if (isToday(date)) label = t("common.today");
+      else if (isYesterday(date)) label = t("common.yesterday");
       return { label, items: map[key] };
     });
 }
@@ -46,10 +51,11 @@ function groupByPriority(demands: SlackDemand[]): { label: string; items: SlackD
     .filter((g) => g.items.length > 0);
 }
 
-function groupByAssignee(demands: SlackDemand[]): { label: string; items: SlackDemand[] }[] {
+function groupByAssignee(demands: SlackDemand[], t: T): { label: string; items: SlackDemand[] }[] {
+  const noAssigneeLabel = t("demand.label.no_assignee_select");
   const map: Record<string, SlackDemand[]> = {};
   for (const d of demands) {
-    const key = d.assignee?.name || "Sem responsável";
+    const key = d.assignee?.name || noAssigneeLabel;
     if (!map[key]) map[key] = [];
     map[key].push(d);
   }
@@ -61,12 +67,13 @@ function groupByAssignee(demands: SlackDemand[]): { label: string; items: SlackD
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const DemandListGrouped = ({ demands, onSelect, groupBy }: DemandListGroupedProps) => {
+  const { t } = useLanguage();
   const groups =
     groupBy === "date"
-      ? groupByDate(demands)
+      ? groupByDate(demands, t)
       : groupBy === "priority"
       ? groupByPriority(demands)
-      : groupByAssignee(demands);
+      : groupByAssignee(demands, t);
 
   if (groups.length === 0) {
     return (

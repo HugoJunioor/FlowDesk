@@ -7,10 +7,13 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Smile } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
+// Categorias com chaves i18n — label resolvida em render via t().
+// O campo `name` original (pt-BR) virou `nameKey` apontando pra dict.
 const CATEGORIES = [
   {
-    name: "Reações",
+    nameKey: "emoji.category.reactions",
     emojis: [
       ["thumbsup", "👍"], ["thumbsdown", "👎"], ["heart", "❤️"], ["fire", "🔥"],
       ["white_check_mark", "✅"], ["x", "❌"], ["warning", "⚠️"], ["100", "💯"],
@@ -18,7 +21,7 @@ const CATEGORIES = [
     ],
   },
   {
-    name: "Status",
+    nameKey: "emoji.category.status",
     emojis: [
       ["rocket", "🚀"], ["bug", "🐛"], ["construction", "🚧"], ["tada", "🎉"],
       ["sparkles", "✨"], ["zap", "⚡"], ["bell", "🔔"], ["mag", "🔍"],
@@ -26,7 +29,7 @@ const CATEGORIES = [
     ],
   },
   {
-    name: "Pessoas",
+    nameKey: "emoji.category.people",
     emojis: [
       ["smile", "😄"], ["joy", "😂"], ["thinking_face", "🤔"], ["cry", "😢"],
       ["sob", "😭"], ["wink", "😉"], ["sweat_smile", "😅"], ["facepalm", "🤦"],
@@ -34,7 +37,7 @@ const CATEGORIES = [
     ],
   },
   {
-    name: "Objetos",
+    nameKey: "emoji.category.objects",
     emojis: [
       ["computer", "💻"], ["calendar", "📅"], ["chart_with_upwards_trend", "📈"], ["chart_with_downwards_trend", "📉"],
       ["bar_chart", "📊"], ["bookmark", "🔖"], ["pin", "📌"], ["paperclip", "📎"],
@@ -49,6 +52,7 @@ interface EmojiPickerProps {
 }
 
 const EmojiPicker = ({ onSelect, trigger }: EmojiPickerProps) => {
+  const { t } = useLanguage();
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -61,9 +65,9 @@ const EmojiPicker = ({ onSelect, trigger }: EmojiPickerProps) => {
       <PopoverContent className="w-72 p-2" align="start" side="top">
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {CATEGORIES.map((cat) => (
-            <div key={cat.name}>
+            <div key={cat.nameKey}>
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1 px-1">
-                {cat.name}
+                {t(cat.nameKey)}
               </p>
               <div className="grid grid-cols-6 gap-0.5">
                 {cat.emojis.map(([name, char]) => (

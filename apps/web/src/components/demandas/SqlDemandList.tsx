@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { ExternalLink, Clock } from "lucide-react";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 import { formatHandlingTime, getHandlingMinutes, getApprovedAt } from "@/lib/sqlSla";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SqlDemandListProps {
   demands: SlackDemand[];
@@ -15,10 +16,11 @@ interface SqlDemandListProps {
  * em horario comercial: Seg-Sex 8-18, excluindo feriados).
  */
 const SqlDemandList = ({ demands, onSelect }: SqlDemandListProps) => {
+  const { t } = useLanguage();
   if (demands.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-sm text-muted-foreground border rounded-lg">
-        Nenhuma demanda encontrada
+        {t("sql_list.empty")}
       </div>
     );
   }
@@ -27,13 +29,13 @@ const SqlDemandList = ({ demands, onSelect }: SqlDemandListProps) => {
     <div className="rounded-lg border border-border overflow-hidden">
       {/* Header */}
       <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-background border-b border-border/60">
-        <span className="flex-1 min-w-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Título</span>
-        <span className="w-[120px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Solicitante</span>
-        <span className="w-[110px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Responsável</span>
-        <span className="w-[95px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Status</span>
-        <span className="w-[85px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Criado</span>
-        <span className="w-[100px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Concluído</span>
-        <span className="w-[115px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">SLA (útil)</span>
+        <span className="flex-1 min-w-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.title")}</span>
+        <span className="w-[120px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.requester")}</span>
+        <span className="w-[110px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.assignee")}</span>
+        <span className="w-[95px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.status")}</span>
+        <span className="w-[85px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.created")}</span>
+        <span className="w-[100px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.completed")}</span>
+        <span className="w-[115px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{t("sql_list.col.sla_business")}</span>
       </div>
 
       {/* Rows */}
@@ -62,7 +64,7 @@ const SqlDemandList = ({ demands, onSelect }: SqlDemandListProps) => {
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="text-muted-foreground hover:text-primary shrink-0"
-                    title="Abrir no Slack"
+                    title={t("demands.list.open_in_slack")}
                   >
                     <ExternalLink size={12} />
                   </a>
@@ -102,7 +104,7 @@ const SqlDemandList = ({ demands, onSelect }: SqlDemandListProps) => {
               {/* SLA - tempo de atendimento em horas uteis */}
               <div
                 className="w-full md:w-[115px] shrink-0 flex items-center gap-1"
-                title={approvedLabel ? `Aprovada em ${approvedLabel}` : "Aguardando aprovação"}
+                title={approvedLabel ? t("sql_list.approved_at", { time: approvedLabel }) : t("sql_list.pending_approval")}
               >
                 <Clock
                   size={11}
@@ -123,7 +125,7 @@ const SqlDemandList = ({ demands, onSelect }: SqlDemandListProps) => {
                       : "text-warning"
                   }`}
                 >
-                  {d.status === "aberta" ? "aguardando" : formatHandlingTime(handlingMin)}
+                  {d.status === "aberta" ? t("sql_list.waiting") : formatHandlingTime(handlingMin)}
                 </span>
               </div>
             </div>

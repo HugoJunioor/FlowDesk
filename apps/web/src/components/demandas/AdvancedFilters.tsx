@@ -28,6 +28,7 @@ import {
   EMPTY_FILTERS,
 } from "@/components/demandas/DemandFilters";
 import { DemandPriority, DemandStatus } from "@/types/demand";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AdvancedFiltersProps {
   filters: DemandFilterState;
@@ -52,6 +53,7 @@ const AdvancedFilters = ({
   assignees,
   clients,
 }: AdvancedFiltersProps) => {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
@@ -102,7 +104,7 @@ const AdvancedFilters = ({
         onClick={() => handleOpen(true)}
       >
         <SlidersHorizontal size={14} />
-        Filtros
+        {t("demands.filters.button")}
         {activeCount > 0 && (
           <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-[10px] leading-4">
             {activeCount}
@@ -115,23 +117,23 @@ const AdvancedFilters = ({
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <SlidersHorizontal size={16} />
-              Filtros avancados
+              {t("demands.filters.title")}
             </SheetTitle>
           </SheetHeader>
 
           <div className="flex-1 space-y-5 py-6">
             {/* Cliente */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Cliente (canal Slack)</Label>
+              <Label className="text-xs font-medium">{t("demands.filters.client_label")}</Label>
               <Select
                 value={draft.client || "_all_"}
                 onValueChange={(v) => updateDraft({ client: v === "_all_" ? "" : v })}
               >
                 <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os clientes" />
+                  <SelectValue placeholder={t("demands.filters.all_clients")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all_">Todos os clientes</SelectItem>
+                  <SelectItem value="_all_">{t("demands.filters.all_clients")}</SelectItem>
                   {clients.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
@@ -141,30 +143,30 @@ const AdvancedFilters = ({
 
             {/* Prioridade */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Prioridade</Label>
+              <Label className="text-xs font-medium">{t("common.priority")}</Label>
               <Select
                 value={draft.priority}
                 onValueChange={(v) => updateDraft({ priority: v as DemandPriority | "all" })}
               >
                 <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todas as prioridades" />
+                  <SelectValue placeholder={t("demands.filters.all_priorities")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as prioridades</SelectItem>
-                  <SelectItem value="p1">P1 - Critico</SelectItem>
-                  <SelectItem value="p2">P2 - Alta</SelectItem>
-                  <SelectItem value="p3">P3 - Media</SelectItem>
-                  <SelectItem value="sem_classificacao">Sem classificacao</SelectItem>
+                  <SelectItem value="all">{t("demands.filters.all_priorities")}</SelectItem>
+                  <SelectItem value="p1">{t("priority.p1")}</SelectItem>
+                  <SelectItem value="p2">{t("priority.p2")}</SelectItem>
+                  <SelectItem value="p3">{t("priority.p3")}</SelectItem>
+                  <SelectItem value="sem_classificacao">{t("priority.unclassified")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Periodo */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Periodo</Label>
+              <Label className="text-xs font-medium">{t("demands.filters.period_label")}</Label>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-8 shrink-0">De:</span>
+                  <span className="text-xs text-muted-foreground w-8 shrink-0">{t("dashboard.from_label")}</span>
                   <Popover open={fromOpen} onOpenChange={setFromOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -173,7 +175,7 @@ const AdvancedFilters = ({
                         className="flex-1 h-9 justify-start text-xs font-normal"
                       >
                         <CalendarDays size={14} className="mr-2 text-muted-foreground" />
-                        {draft.dateFrom ? formatDate(draft.dateFrom) : "Selecionar"}
+                        {draft.dateFrom ? formatDate(draft.dateFrom) : t("common.select")}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -201,7 +203,7 @@ const AdvancedFilters = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-8 shrink-0">Ate:</span>
+                  <span className="text-xs text-muted-foreground w-8 shrink-0">{t("dashboard.to_label")}</span>
                   <Popover open={toOpen} onOpenChange={setToOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -241,16 +243,16 @@ const AdvancedFilters = ({
 
             {/* Responsavel */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Responsavel</Label>
+              <Label className="text-xs font-medium">{t("common.assignee")}</Label>
               <Select
                 value={draft.assignee || "_all_"}
                 onValueChange={(v) => updateDraft({ assignee: v === "_all_" ? "" : v })}
               >
                 <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os responsaveis" />
+                  <SelectValue placeholder={t("demands.filters.all_assignees")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all_">Todos os responsaveis</SelectItem>
+                  <SelectItem value="_all_">{t("demands.filters.all_assignees")}</SelectItem>
                   {assignees.map((a) => (
                     <SelectItem key={a} value={a}>{a}</SelectItem>
                   ))}
@@ -260,20 +262,20 @@ const AdvancedFilters = ({
 
             {/* Status */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Status</Label>
+              <Label className="text-xs font-medium">{t("common.status")}</Label>
               <Select
                 value={draft.status}
                 onValueChange={(v) => updateDraft({ status: v as DemandStatus | "all" })}
               >
                 <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Todos os status" />
+                  <SelectValue placeholder={t("demands.filters.all_statuses")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="aberta">Aberta</SelectItem>
-                  <SelectItem value="em_andamento">Em andamento</SelectItem>
-                  <SelectItem value="concluida">Concluida</SelectItem>
-                  <SelectItem value="expirada">Expirada</SelectItem>
+                  <SelectItem value="all">{t("demands.filters.all_statuses")}</SelectItem>
+                  <SelectItem value="aberta">{t("status.open")}</SelectItem>
+                  <SelectItem value="em_andamento">{t("status.in_progress")}</SelectItem>
+                  <SelectItem value="concluida">{t("status.completed")}</SelectItem>
+                  <SelectItem value="expirada">{t("status.expired")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -287,10 +289,10 @@ const AdvancedFilters = ({
               onClick={handleClear}
             >
               <X size={14} className="mr-1" />
-              Limpar tudo
+              {t("demands.filters.clear_all")}
             </Button>
             <Button size="sm" className="flex-1 sm:flex-none" onClick={handleApply}>
-              Aplicar
+              {t("demands.filters.apply")}
             </Button>
           </SheetFooter>
         </SheetContent>
