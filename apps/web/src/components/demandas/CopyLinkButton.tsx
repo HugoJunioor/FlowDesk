@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { copyToClipboard } from "@/lib/clipboard";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CopyLinkButtonProps {
   url: string;
@@ -12,23 +13,24 @@ interface CopyLinkButtonProps {
 const CopyLinkButton = ({ url, size = 14, className = "" }: CopyLinkButtonProps) => {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (!url) {
-      toast({ title: "Link indisponível", variant: "destructive" });
+      toast({ title: t("copy_link.unavailable"), variant: "destructive" });
       return;
     }
     const ok = await copyToClipboard(url);
     if (ok) {
       setCopied(true);
-      toast({ title: "Link copiado!", description: "Cole onde precisar (Ctrl+V)." });
+      toast({ title: t("copy_link.copied"), description: t("copy_link.copied_hint") });
       setTimeout(() => setCopied(false), 2000);
     } else {
       toast({
-        title: "Não foi possível copiar",
-        description: "Copie manualmente o texto do link.",
+        title: t("copy_link.failed_title"),
+        description: t("copy_link.failed_desc"),
         variant: "destructive",
       });
     }
@@ -39,7 +41,7 @@ const CopyLinkButton = ({ url, size = 14, className = "" }: CopyLinkButtonProps)
       onClick={handleCopy}
       type="button"
       className={`text-muted-foreground hover:text-primary transition-colors cursor-pointer ${className}`}
-      title={copied ? "Link copiado!" : "Copiar link"}
+      title={copied ? t("copy_link.copied") : t("copy_link.copy_tooltip")}
     >
       {copied ? <Check size={size} className="text-success" /> : <Copy size={size} />}
     </button>

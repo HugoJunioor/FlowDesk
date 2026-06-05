@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { UserCircle, Lock, Eye, EyeOff, Save, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { updateUser, validateCPF, hashPassword, getUserById, changeUserPassword, getPasswordStrength } from "@/lib/authStorage";
 import PasswordStrength from "@/components/auth/PasswordStrength";
@@ -29,6 +30,7 @@ function formatPhone(value: string): string {
 
 const Profile = () => {
   const { currentUser, refreshUser } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
 
   // Personal data
@@ -57,12 +59,12 @@ const Profile = () => {
 
   const handleSaveProfile = async () => {
     if (!name.trim()) {
-      toast({ title: "Nome é obrigatório", variant: "destructive" });
+      toast({ title: t("profile.toast.name_required"), variant: "destructive" });
       return;
     }
     const rawCpf = cpf.replace(/\D/g, "");
     if (rawCpf && !validateCPF(rawCpf)) {
-      toast({ title: "CPF inválido", variant: "destructive" });
+      toast({ title: t("profile.toast.cpf_invalid"), variant: "destructive" });
       return;
     }
     setSavingProfile(true);
@@ -75,23 +77,23 @@ const Profile = () => {
     setSavingProfile(false);
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2500);
-    toast({ title: "Perfil atualizado" });
+    toast({ title: t("profile.toast.updated") });
   };
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      toast({ title: t("profile.toast.fill_all"), variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "As senhas não coincidem", variant: "destructive" });
+      toast({ title: t("profile.toast.passwords_mismatch"), variant: "destructive" });
       return;
     }
     const strength = getPasswordStrength(newPassword);
     if (!strength.isStrong) {
       toast({
-        title: "Senha muito fraca",
-        description: "Use letras maiúsculas, minúsculas, números e símbolos.",
+        title: t("profile.toast.weak_password"),
+        description: t("profile.toast.password_requirements"),
         variant: "destructive",
       });
       return;
@@ -103,7 +105,7 @@ const Profile = () => {
     const fresh = getUserById(currentUser!.id);
     if (!fresh || fresh.passwordHash !== currentHash) {
       setSavingPassword(false);
-      toast({ title: "Senha atual incorreta", variant: "destructive" });
+      toast({ title: t("profile.toast.wrong_current_password"), variant: "destructive" });
       return;
     }
 
@@ -112,7 +114,7 @@ const Profile = () => {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    toast({ title: "Senha alterada com sucesso!" });
+    toast({ title: t("profile.toast.password_changed") });
   };
 
   if (!currentUser) return null;
@@ -123,9 +125,9 @@ const Profile = () => {
         {/* Header */}
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <UserCircle size={22} className="text-primary" /> Meu Perfil
+            <UserCircle size={22} className="text-primary" /> {t("profile.title")}
           </h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus dados pessoais e senha</p>
+          <p className="text-sm text-muted-foreground">{t("profile.subtitle")}</p>
         </div>
 
         {/* User info banner */}
@@ -138,9 +140,9 @@ const Profile = () => {
               <p className="font-semibold text-foreground">{currentUser.name}</p>
               <p className="text-sm text-muted-foreground">{currentUser.email}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Login: <span className="font-mono">{currentUser.login}</span> •{" "}
+                {t("profile.login_label")} <span className="font-mono">{currentUser.login}</span> •{" "}
                 <span className={currentUser.role === "master" ? "text-primary font-medium" : ""}>
-                  {currentUser.role === "master" ? "Master" : "Usuário"}
+                  {currentUser.role === "master" ? t("users.role.master") : t("users.role.user")}
                 </span>
               </p>
             </div>
@@ -151,26 +153,26 @@ const Profile = () => {
         <Card className="border border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <UserCircle size={16} /> Dados Pessoais
+              <UserCircle size={16} /> {t("profile.personal_data")}
             </CardTitle>
             <CardDescription className="text-xs">
-              Preencha seus dados. CPF e telefone são opcionais.
+              {t("profile.personal_description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Nome completo *</label>
+              <label className="text-sm font-medium">{t("profile.name_label")}</label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={80}
-                placeholder="Seu nome completo"
+                placeholder={t("profile.name_placeholder")}
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">CPF</label>
+                <label className="text-sm font-medium">{t("profile.cpf_label")}</label>
                 <Input
                   value={cpf}
                   onChange={(e) => setCpf(formatCPF(e.target.value))}
@@ -178,12 +180,12 @@ const Profile = () => {
                   maxLength={14}
                 />
                 {cpf && cpf.replace(/\D/g, "").length === 11 && !validateCPF(cpf.replace(/\D/g, "")) && (
-                  <p className="text-xs text-destructive">CPF inválido</p>
+                  <p className="text-xs text-destructive">{t("profile.cpf_invalid")}</p>
                 )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Telefone</label>
+                <label className="text-sm font-medium">{t("profile.phone_label")}</label>
                 <Input
                   value={phone}
                   onChange={(e) => setPhone(formatPhone(e.target.value))}
@@ -194,21 +196,21 @@ const Profile = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">E-mail</label>
+              <label className="text-sm font-medium text-muted-foreground">{t("profile.email_label")}</label>
               <Input value={currentUser.email} disabled className="bg-muted" />
-              <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado.</p>
+              <p className="text-xs text-muted-foreground">{t("profile.email_disabled_hint")}</p>
             </div>
 
             <Button onClick={handleSaveProfile} disabled={savingProfile} className="gap-2">
               {profileSaved ? (
                 <>
-                  <Check size={16} /> Salvo!
+                  <Check size={16} /> {t("profile.saved")}
                 </>
               ) : savingProfile ? (
-                "Salvando..."
+                t("profile.saving")
               ) : (
                 <>
-                  <Save size={16} /> Salvar dados
+                  <Save size={16} /> {t("profile.save_data")}
                 </>
               )}
             </Button>
@@ -221,22 +223,22 @@ const Profile = () => {
         <Card className="border border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Lock size={16} /> Alterar Senha
+              <Lock size={16} /> {t("profile.change_password_title")}
             </CardTitle>
             <CardDescription className="text-xs">
-              Use uma senha forte com letras maiúsculas, minúsculas, números e símbolos.
+              {t("profile.change_password_description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Senha atual</label>
+              <label className="text-sm font-medium">{t("profile.current_password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type={showCurrent ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Sua senha atual"
+                  placeholder={t("profile.current_password_placeholder")}
                   className="pl-10 pr-10"
                   maxLength={100}
                 />
@@ -251,14 +253,14 @@ const Profile = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Nova senha</label>
+              <label className="text-sm font-medium">{t("profile.new_password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Crie uma senha forte"
+                  placeholder={t("profile.new_password_placeholder")}
                   className="pl-10 pr-10"
                   maxLength={100}
                 />
@@ -274,14 +276,14 @@ const Profile = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Confirmar nova senha</label>
+              <label className="text-sm font-medium">{t("profile.confirm_password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repita a nova senha"
+                  placeholder={t("profile.confirm_password_placeholder")}
                   className="pl-10 pr-10"
                   maxLength={100}
                 />
@@ -294,7 +296,7 @@ const Profile = () => {
                 </button>
               </div>
               {confirmPassword && newPassword !== confirmPassword && (
-                <p className="text-xs text-destructive">As senhas não coincidem</p>
+                <p className="text-xs text-destructive">{t("profile.passwords_mismatch")}</p>
               )}
             </div>
 
@@ -304,7 +306,7 @@ const Profile = () => {
               variant="outline"
               className="gap-2"
             >
-              {savingPassword ? "Salvando..." : <><Lock size={16} /> Alterar senha</>}
+              {savingPassword ? t("profile.saving") : <><Lock size={16} /> {t("profile.change_password_button")}</>}
             </Button>
           </CardContent>
         </Card>

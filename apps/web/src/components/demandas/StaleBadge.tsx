@@ -4,6 +4,7 @@ import {
   getHoursSinceLastInteraction,
   formatStaleTime,
 } from "@/lib/staleInteraction";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface StaleBadgeProps {
   demand: SlackDemand;
@@ -25,6 +26,7 @@ const StaleBadge = ({
   compact = false,
   className = "",
 }: StaleBadgeProps) => {
+  const { t } = useLanguage();
   const hours = getHoursSinceLastInteraction(demand);
   if (hours === null || hours <= thresholdHours) return null;
 
@@ -33,10 +35,10 @@ const StaleBadge = ({
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/15 text-destructive border border-destructive/30 animate-pulse shrink-0 ${className}`}
-      title={`Sem interação há ${label} (horário comercial, exclui fds e feriados)`}
+      title={t("stale.tooltip", { time: label })}
     >
       <AlertCircle size={10} />
-      {compact ? label : `${label} sem interação`}
+      {compact ? label : `${label} ${t("stale.without_interaction")}`}
     </span>
   );
 };
