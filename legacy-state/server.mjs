@@ -89,6 +89,112 @@ function removeTgLink(email) {
   writeJson(LINKS_FILE, all);
 }
 
+// ============ Email i18n ============
+// Dict de traducao pros emails (daily reminder + notificacoes).
+// Idioma resolvido por usuario via fd_users_v2[user].language; fallback pt-BR.
+// Mantenha sincronizado com apps/web/src/lib/i18n.ts quando possivel.
+const EMAIL_TRANSLATIONS = {
+  'pt-BR': {
+    'daily.header': 'JUST FLOW · RESUMO DIÁRIO',
+    'daily.greeting': 'Bom dia, <strong>{name}</strong>!',
+    'daily.count_singular': 'Você tem <strong>{count} demanda em aberto</strong>:',
+    'daily.count_plural': 'Você tem <strong>{count} demandas em aberto</strong>:',
+    'daily.col.prio': 'Prio',
+    'daily.col.demand': 'Demanda',
+    'daily.col.deadline': 'Prazo',
+    'daily.col.slack': 'Slack',
+    'daily.open_app': 'Abrir Just Flow',
+    'daily.footer_team': 'Just Flow &mdash; Atenciosamente, equipe Just.',
+    'daily.footer_unsubscribe': 'Desative em Configurações → Notificações → "Resumo diário".',
+    'daily.subject_singular': 'Just Flow — {count} demanda em aberto',
+    'daily.subject_plural': 'Just Flow — {count} demandas em aberto',
+    'daily.text_body_singular': 'Você tem {count} demanda em aberto. Abra {url}',
+    'daily.text_body_plural': 'Você tem {count} demandas em aberto. Abra {url}',
+    'sla.overdue_min': 'estourado há {min}min',
+    'sla.overdue_hours': 'estourado há {hours}h',
+    'sla.remaining_min': '{min}min restantes',
+    'sla.remaining_hours': '{hours}h restantes',
+    'sla.no_deadline': '—',
+    'notif_email.actor_prefix': 'Por',
+    'notif_email.open_app': 'Abrir no Just Flow',
+    'notif_email.subject_prefix': '[Just Flow]',
+    'notif_email.fallback_title': 'Notificação',
+  },
+  'en-US': {
+    'daily.header': 'JUST FLOW · DAILY SUMMARY',
+    'daily.greeting': 'Good morning, <strong>{name}</strong>!',
+    'daily.count_singular': 'You have <strong>{count} open demand</strong>:',
+    'daily.count_plural': 'You have <strong>{count} open demands</strong>:',
+    'daily.col.prio': 'Prio',
+    'daily.col.demand': 'Demand',
+    'daily.col.deadline': 'Deadline',
+    'daily.col.slack': 'Slack',
+    'daily.open_app': 'Open Just Flow',
+    'daily.footer_team': 'Just Flow &mdash; Best regards, Just team.',
+    'daily.footer_unsubscribe': 'Disable in Settings → Notifications → "Daily summary".',
+    'daily.subject_singular': 'Just Flow — {count} open demand',
+    'daily.subject_plural': 'Just Flow — {count} open demands',
+    'daily.text_body_singular': 'You have {count} open demand. Open {url}',
+    'daily.text_body_plural': 'You have {count} open demands. Open {url}',
+    'sla.overdue_min': 'overdue by {min}min',
+    'sla.overdue_hours': 'overdue by {hours}h',
+    'sla.remaining_min': '{min}min remaining',
+    'sla.remaining_hours': '{hours}h remaining',
+    'sla.no_deadline': '—',
+    'notif_email.actor_prefix': 'By',
+    'notif_email.open_app': 'Open in Just Flow',
+    'notif_email.subject_prefix': '[Just Flow]',
+    'notif_email.fallback_title': 'Notification',
+  },
+  'es-ES': {
+    'daily.header': 'JUST FLOW · RESUMEN DIARIO',
+    'daily.greeting': '¡Buenos días, <strong>{name}</strong>!',
+    'daily.count_singular': 'Tiene <strong>{count} demanda abierta</strong>:',
+    'daily.count_plural': 'Tiene <strong>{count} demandas abiertas</strong>:',
+    'daily.col.prio': 'Prio',
+    'daily.col.demand': 'Demanda',
+    'daily.col.deadline': 'Plazo',
+    'daily.col.slack': 'Slack',
+    'daily.open_app': 'Abrir Just Flow',
+    'daily.footer_team': 'Just Flow &mdash; Atentamente, equipo Just.',
+    'daily.footer_unsubscribe': 'Desactive en Configuración → Notificaciones → "Resumen diario".',
+    'daily.subject_singular': 'Just Flow — {count} demanda abierta',
+    'daily.subject_plural': 'Just Flow — {count} demandas abiertas',
+    'daily.text_body_singular': 'Tiene {count} demanda abierta. Abra {url}',
+    'daily.text_body_plural': 'Tiene {count} demandas abiertas. Abra {url}',
+    'sla.overdue_min': 'vencido hace {min}min',
+    'sla.overdue_hours': 'vencido hace {hours}h',
+    'sla.remaining_min': '{min}min restantes',
+    'sla.remaining_hours': '{hours}h restantes',
+    'sla.no_deadline': '—',
+    'notif_email.actor_prefix': 'Por',
+    'notif_email.open_app': 'Abrir en Just Flow',
+    'notif_email.subject_prefix': '[Just Flow]',
+    'notif_email.fallback_title': 'Notificación',
+  },
+};
+
+const DEFAULT_EMAIL_LANG = 'pt-BR';
+
+/** Resolve a string traduzida com interpolação de {var}. Fallback pra pt-BR. */
+function tEmail(key, lang, params = {}) {
+  const dict = EMAIL_TRANSLATIONS[lang] || EMAIL_TRANSLATIONS[DEFAULT_EMAIL_LANG];
+  const raw = dict[key] ?? EMAIL_TRANSLATIONS[DEFAULT_EMAIL_LANG][key] ?? key;
+  return raw.replace(/\{(\w+)\}/g, (_m, name) =>
+    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : `{${name}}`
+  );
+}
+
+/** Busca user.language em fd_users_v2 pelo email. Fallback pt-BR. */
+function resolveUserLanguage(email, users) {
+  if (!email) return DEFAULT_EMAIL_LANG;
+  const lc = String(email).toLowerCase();
+  const u = (users || []).find((x) => String(x.email || '').toLowerCase() === lc);
+  const lang = u?.language;
+  if (lang === 'pt-BR' || lang === 'en-US' || lang === 'es-ES') return lang;
+  return DEFAULT_EMAIL_LANG;
+}
+
 async function sendTelegramFor(notification, prefs) {
   if (!process.env.TELEGRAM_BOT_TOKEN) return;
   if (!prefs?.channels?.telegram) return;
@@ -145,21 +251,27 @@ async function sendEmailFor(notification, prefs) {
   const ok = chOverride !== undefined ? chOverride : (globalEv !== false);
   if (!ok) return;
 
+  // Resolve lang do destinatario via fd_users_v2
+  const state = readJson('shared-state.json', {});
+  const users = state.fd_users_v2 || [];
+  const lang = resolveUserLanguage(notification.userEmail, users);
+
   const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
   const link = notification.demandId
     ? `${base}/demandas?openId=${encodeURIComponent(notification.demandId)}`
     : base;
   const ator = notification.actor
-    ? `<p style="margin:8px 0;color:#64748b;">Por: <strong>${escapeHtml(notification.actor)}</strong></p>`
+    ? `<p style="margin:8px 0;color:#64748b;">${tEmail('notif_email.actor_prefix', lang)}: <strong>${escapeHtml(notification.actor)}</strong></p>`
     : '';
+  const fallbackTitle = tEmail('notif_email.fallback_title', lang);
   const html = `<!doctype html>
 <html><body style="font-family:system-ui,Arial,sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
-    <div style="font-size:13px;color:#3b82f6;font-weight:600;text-transform:uppercase;">FlowDesk</div>
+    <div style="font-size:13px;color:#3b82f6;font-weight:600;text-transform:uppercase;">Just Flow</div>
     <h2 style="margin:8px 0 12px;font-size:18px;">${escapeHtml(notification.title || '')}</h2>
     <p style="margin:0 0 12px;line-height:1.5;color:#334155;">${escapeHtml(notification.message || '')}</p>
     ${ator}
-    <a href="${link}" style="display:inline-block;margin-top:16px;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Abrir no FlowDesk</a>
+    <a href="${link}" style="display:inline-block;margin-top:16px;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">${tEmail('notif_email.open_app', lang)}</a>
   </div>
 </body></html>`;
 
@@ -167,11 +279,11 @@ async function sendEmailFor(notification, prefs) {
     await m.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: notification.userEmail,
-      subject: `[FlowDesk] ${notification.title || 'Notificação'}`,
+      subject: `${tEmail('notif_email.subject_prefix', lang)} ${notification.title || fallbackTitle}`,
       text: `${notification.title || ''}\n\n${notification.message || ''}\n\n${link}`,
       html,
     });
-    console.log(`[email] enviado pra ${notification.userEmail} - ${notification.event}`);
+    console.log(`[email] enviado pra ${notification.userEmail} - ${notification.event} (lang=${lang})`);
   } catch (err) {
     console.warn('[email] falha:', err.message);
   }
@@ -1022,26 +1134,30 @@ function computeDueDate(d) {
   return due;
 }
 
-function computeSla(due, now) {
-  if (!due) return { status: 'sem_prazo', label: '—', minutes: null };
+function computeSla(due, now, lang = DEFAULT_EMAIL_LANG) {
+  if (!due) return { status: 'sem_prazo', label: tEmail('sla.no_deadline', lang), minutes: null };
   const mins = businessMinutesBetween(now, due);
   if (mins < 0) {
     const e = Math.abs(mins);
-    const lbl = e < 60 ? `estourado ha ${e}min` : `estourado ha ${Math.round(e / 60)}h`;
+    const lbl = e < 60
+      ? tEmail('sla.overdue_min', lang, { min: e })
+      : tEmail('sla.overdue_hours', lang, { hours: Math.round(e / 60) });
     return { status: 'estourado', label: lbl, minutes: mins };
   }
-  const lbl = mins < 60 ? `${mins}min restantes` : `${Math.round(mins / 60)}h restantes`;
+  const lbl = mins < 60
+    ? tEmail('sla.remaining_min', lang, { min: mins })
+    : tEmail('sla.remaining_hours', lang, { hours: Math.round(mins / 60) });
   return { status: mins <= 240 ? 'proximo' : 'no_prazo', label: lbl, minutes: mins };
 }
 
-function buildDailySummary(userName, demands) {
+function buildDailySummary(userName, demands, lang = DEFAULT_EMAIL_LANG) {
   const base = process.env.APP_BASE_URL || `https://${process.env.DOMAIN || ''}`;
   const now = new Date();
   const nomeDisplay = (userName || '').split(' ')[0] || userName || 'time';
 
   // Enrich + sort: estourados primeiro (mais negativos), depois por
   // minutos restantes ASC. Sem-prazo no fim.
-  const enriched = demands.map((d) => ({ d, sla: computeSla(computeDueDate(d), now) }));
+  const enriched = demands.map((d) => ({ d, sla: computeSla(computeDueDate(d), now, lang) }));
   enriched.sort((a, b) => {
     const am = a.sla.minutes, bm = b.sla.minutes;
     if (am === null && bm === null) return 0;
@@ -1066,33 +1182,37 @@ function buildDailySummary(userName, demands) {
     </tr>`;
   }).join('');
 
+  const countLabel = demands.length === 1
+    ? tEmail('daily.count_singular', lang, { count: demands.length })
+    : tEmail('daily.count_plural', lang, { count: demands.length });
+
   return `<!doctype html>
 <html><body style="font-family:system-ui,Arial,sans-serif;background:#f9fafb;margin:0;padding:24px;color:#111827;">
   <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
     <div style="background:#1e3a5f;padding:20px 28px;">
-      <span style="color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;opacity:.8;">JUST FLOW · RESUMO DIÁRIO</span>
+      <span style="color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;opacity:.8;">${tEmail('daily.header', lang)}</span>
     </div>
     <div style="padding:28px;">
-      <p style="margin:0 0 6px;font-size:16px;color:#111827;">Bom dia, <strong>${escapeHtml(nomeDisplay)}</strong>!</p>
-      <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">Você tem <strong>${demands.length} demanda${demands.length !== 1 ? 's' : ''} em aberto</strong>:</p>
+      <p style="margin:0 0 6px;font-size:16px;color:#111827;">${tEmail('daily.greeting', lang, { name: escapeHtml(nomeDisplay) })}</p>
+      <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">${countLabel}</p>
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr style="background:#f9fafb;">
-            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;width:48px;">Prio</th>
-            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Demanda</th>
-            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Prazo</th>
-            <th style="text-align:center;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Slack</th>
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;width:48px;">${tEmail('daily.col.prio', lang)}</th>
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">${tEmail('daily.col.demand', lang)}</th>
+            <th style="text-align:left;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">${tEmail('daily.col.deadline', lang)}</th>
+            <th style="text-align:center;padding:8px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">${tEmail('daily.col.slack', lang)}</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
       <div style="margin-top:24px;text-align:center;">
-        <a href="${base}/demandas" style="display:inline-block;background:#1e3a5f;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 24px;border-radius:6px;">Abrir Just Flow</a>
+        <a href="${base}/demandas" style="display:inline-block;background:#1e3a5f;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 24px;border-radius:6px;">${tEmail('daily.open_app', lang)}</a>
       </div>
     </div>
     <div style="padding:16px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center;">
-      Just Flow &mdash; Atenciosamente, equipe Just.<br/>
-      Desative em Configurações → Notificações → "Resumo diário".
+      ${tEmail('daily.footer_team', lang)}<br/>
+      ${tEmail('daily.footer_unsubscribe', lang)}
     </div>
   </div>
 </body></html>`;
@@ -1144,13 +1264,19 @@ async function runDailyReminder({ onlyEmail = null } = {}) {
     }
     console.log(`[daily] ${email}: ${minhas.length} demanda(s) — ${minhas.map((d) => d.title.slice(0, 30)).join(' | ')}`);
 
+    const lang = resolveUserLanguage(email, users);
+    const subjectKey = minhas.length === 1 ? 'daily.subject_singular' : 'daily.subject_plural';
+    const textKey = minhas.length === 1 ? 'daily.text_body_singular' : 'daily.text_body_plural';
     try {
       await mailer.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: email,
-        subject: `Just Flow — ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto`,
-        html: buildDailySummary(user.name || email, minhas),
-        text: `Você tem ${minhas.length} demanda${minhas.length !== 1 ? 's' : ''} em aberto. Abra ${process.env.APP_BASE_URL || ''}/demandas`,
+        subject: tEmail(subjectKey, lang, { count: minhas.length }),
+        html: buildDailySummary(user.name || email, minhas, lang),
+        text: tEmail(textKey, lang, {
+          count: minhas.length,
+          url: `${process.env.APP_BASE_URL || ''}/demandas`,
+        }),
       });
       enviados++;
       console.log(`[daily] enviado pra ${email} (${minhas.length} demandas)`);
