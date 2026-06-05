@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ExpirationCountdown from "./ExpirationCountdown";
 import StaleBadge from "./StaleBadge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DemandCardProps {
   demand: SlackDemand;
@@ -16,6 +17,7 @@ interface DemandCardProps {
 }
 
 const DemandCard = ({ demand, onClick }: DemandCardProps) => {
+  const { t } = useLanguage();
   const priority = PRIORITY_CONFIG[demand.priority];
   const status = STATUS_CONFIG[demand.status];
   const client = extractClientName(demand.slackChannel);
@@ -161,7 +163,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
 
         {/* Footer: assignee + slack link + copy */}
         <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
-          <span>{demand.assignee?.name || "Sem responsavel"}</span>
+          <span>{demand.assignee?.name || t("demand.label.no_assignee_select")}</span>
           <div className="flex items-center gap-1.5">
             <CopyLinkButton url={demand.slackPermalink} size={10} />
             <a
