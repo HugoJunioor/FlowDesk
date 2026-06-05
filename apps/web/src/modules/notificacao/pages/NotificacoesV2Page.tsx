@@ -18,6 +18,7 @@ import {
   type Notificacao, type NotificationEvent,
 } from '@/modules/notificacao';
 import { toApiError } from '@/lib/api/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const EVENT_ICON: Record<NotificationEvent, typeof Bell> = {
   demand_assigned: UserCheck,
@@ -30,30 +31,35 @@ const EVENT_ICON: Record<NotificationEvent, typeof Bell> = {
   demand_created: Plus,
 };
 
-const EVENT_LABEL: Record<NotificationEvent, string> = {
-  demand_assigned: 'Atribuída',
-  demand_replied: 'Resposta',
-  demand_started: 'Iniciada',
-  demand_completed: 'Concluída',
-  demand_reopened: 'Reaberta',
-  demand_overdue: 'SLA estourado',
-  demand_due_soon: 'SLA vencendo',
-  demand_created: 'Nova',
+// Mapa de evento -> chave i18n curta (label compacto pra badge).
+// O label completo vive em notifications.event.* (usado pelo bell).
+const EVENT_LABEL_KEY: Record<NotificationEvent, string> = {
+  demand_assigned: 'notif_short.demand_assigned',
+  demand_replied: 'notif_short.demand_replied',
+  demand_started: 'notif_short.demand_started',
+  demand_completed: 'notif_short.demand_completed',
+  demand_reopened: 'notif_short.demand_reopened',
+  demand_overdue: 'notif_short.demand_overdue',
+  demand_due_soon: 'notif_short.demand_due_soon',
+  demand_created: 'notif_short.demand_created',
 };
 
 type Filter = 'pendentes' | 'registro' | 'todas';
 
-function timeAgo(iso: string): string {
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+function timeAgo(iso: string, t: T): string {
   const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return 'agora';
+  if (ms < 60_000) return t('time.now');
   const min = Math.floor(ms / 60_000);
-  if (min < 60) return `${min}min atrás`;
+  if (min < 60) return t('time.minutes_ago_short', { count: min });
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h atrás`;
-  return `${Math.floor(h / 24)}d atrás`;
+  if (h < 24) return t('time.hours_ago_short', { count: h });
+  return t('time.days_ago_short', { count: Math.floor(h / 24) });
 }
 
 const NotificacoesV2Page = () => {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState<Filter>('pendentes');
   // Polling a cada 30s pra refletir notificacoes recem-criadas
   const { data: notificacoes, isLoading, error } = useNotificacoes({
@@ -82,12 +88,14 @@ const NotificacoesV2Page = () => {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Bell size={22} className="text-primary" /> Notificações (v2)
+              <Bell size={22} className="text-primary" /> {t('notif_page.title')}
             </h1>
             <p className="text-sm text-muted-foreground">
               {items.length === 0
-                ? 'Sem notificações'
-                : `${unread} pendente${unread !== 1 ? 's' : ''} · ${read} no registro`}
+                ? t('notif_page.empty_status')
+                : `${unread === 1
+                    ? t('notif_page.status_pending_one', { count: unread })
+                    : t('notif_page.status_pending_other', { count: unread })} · ${t('notif_page.status_in_history', { count: read })}`}
             </p>
           </div>
           {unread > 0 && (
@@ -98,7 +106,7 @@ const NotificacoesV2Page = () => {
               disabled={markAllRead.isPending}
               className="gap-2"
             >
-              <CheckCheck size={14} /> Marcar todas
+              <CheckCheck size={14} /> {t('notifications.mark_all_read')}
             </Button>
           )}
         </div>
@@ -106,20 +114,20 @@ const NotificacoesV2Page = () => {
         <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
           <TabsList>
             <TabsTrigger value="pendentes">
-              Pendentes <span className="ml-2 text-xs text-muted-foreground">({unread})</span>
+              {t('notif_page.tab.pending')} <span className="ml-2 text-xs text-muted-foreground">({unread})</span>
             </TabsTrigger>
             <TabsTrigger value="registro">
-              Registro <span className="ml-2 text-xs text-muted-foreground">({read})</span>
+              {t('notif_page.tab.history')} <span className="ml-2 text-xs text-muted-foreground">({read})</span>
             </TabsTrigger>
             <TabsTrigger value="todas">
-              Todas <span className="ml-2 text-xs text-muted-foreground">({items.length})</span>
+              {t('notif_page.tab.all')} <span className="ml-2 text-xs text-muted-foreground">({items.length})</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 size={16} className="animate-spin mr-2" /> Carregando...
+            <Loader2 size={16} className="animate-spin mr-2" /> {t('notifications.loading')}
           </div>
         ) : error ? (
           <Card>
@@ -132,9 +140,9 @@ const NotificacoesV2Page = () => {
             <CardContent className="py-12 text-center">
               <Inbox size={32} className="text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
-                {filter === 'pendentes' && 'Tudo lido ✨'}
-                {filter === 'registro' && 'Nenhuma no registro'}
-                {filter === 'todas' && 'Nenhuma notificação'}
+                {filter === 'pendentes' && t('notif_page.empty_pending')}
+                {filter === 'registro' && t('notif_page.empty_history')}
+                {filter === 'todas' && t('notif_page.empty_all')}
               </p>
             </CardContent>
           </Card>
@@ -155,14 +163,14 @@ const NotificacoesV2Page = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border">
-                            {EVENT_LABEL[n.evento] ?? n.evento}
+                            {EVENT_LABEL_KEY[n.evento] ? t(EVENT_LABEL_KEY[n.evento]) : n.evento}
                           </span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground border">
                             {n.origem}
                           </span>
                           {!n.lida && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary text-primary-foreground font-medium">
-                              novo
+                              {t('notif_page.new_badge')}
                             </span>
                           )}
                         </div>
@@ -174,7 +182,7 @@ const NotificacoesV2Page = () => {
                         )}
                         <div className="flex items-center justify-between gap-2 mt-2">
                           <span className="text-[10px] text-muted-foreground">
-                            {timeAgo(n.criadoEm)} {n.ator && `· por ${n.ator}`}
+                            {timeAgo(n.criadoEm, t)} {n.ator && `· ${t('notifications.by_actor', { actor: n.ator })}`}
                           </span>
                           {n.lida ? (
                             <Button
@@ -183,7 +191,7 @@ const NotificacoesV2Page = () => {
                               onClick={() => handleMarkRead(n, false)}
                               className="h-7 text-[11px] gap-1"
                             >
-                              <RotateCcw size={11} /> Pendente
+                              <RotateCcw size={11} /> {t('notif_page.mark_unread')}
                             </Button>
                           ) : (
                             <Button
@@ -192,7 +200,7 @@ const NotificacoesV2Page = () => {
                               onClick={() => handleMarkRead(n, true)}
                               className="h-7 text-[11px] gap-1"
                             >
-                              <Check size={11} /> Marcar lida
+                              <Check size={11} /> {t('notif_page.mark_read')}
                             </Button>
                           )}
                         </div>
@@ -205,9 +213,7 @@ const NotificacoesV2Page = () => {
           </div>
         )}
 
-        <p className="text-[10px] text-center text-muted-foreground">
-          Esta tela usa a API Express. Versão legacy em <code>/notificacoes</code>.
-        </p>
+        {/* hint dev removido — pagina v2 ja eh a oficial */}
       </div>
     </AppLayout>
   );
