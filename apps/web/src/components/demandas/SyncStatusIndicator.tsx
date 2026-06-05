@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
 const SyncStatusIndicator = () => {
+  const { t } = useLanguage();
   const [lastSync, setLastSync] = useState(new Date());
   const [isSyncing, setIsSyncing] = useState(false);
   const [minutesAgo, setMinutesAgo] = useState(0);
@@ -42,14 +44,14 @@ const SyncStatusIndicator = () => {
       onClick={doSync}
       disabled={isSyncing}
     >
-      <span className="sm:hidden">Sincronizar</span>
+      <span className="sm:hidden">{t("sync.label_mobile")}</span>
       <RefreshCw size={13} className={isSyncing ? "animate-spin" : ""} />
       <span className="hidden sm:inline">
         {isSyncing
-          ? "Sincronizando..."
+          ? t("sync.syncing")
           : minutesAgo === 0
-          ? "Atualizado agora"
-          : `Ha ${minutesAgo} min`}
+          ? t("sync.just_now")
+          : t("sync.minutes_ago", { minutes: minutesAgo })}
       </span>
       <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
     </Button>

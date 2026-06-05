@@ -3,6 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { getBusinessTimeInfo, addBusinessHours } from "@/lib/businessHours";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ExpirationCountdownProps {
   dueDate: string;
@@ -25,6 +26,7 @@ const ExpirationCountdown = ({
   completedAt,
   expirationReason,
 }: ExpirationCountdownProps) => {
+  const { t } = useLanguage();
   // Concluida: verifica se estourou SLA (tempo de conclusao > prazo)
   if (status === "concluida") {
     let breachedWhenCompleted = false;
@@ -40,11 +42,11 @@ const ExpirationCountdown = ({
         <div className="flex flex-col gap-0.5">
           <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] w-fit">
             <AlertTriangle size={10} className="mr-1" />
-            Concluída fora do SLA
+            {t("expiration.completed_after_sla")}
           </Badge>
           {expirationReason && (
             <span className="text-[10px] text-destructive/80 italic">
-              Motivo: {expirationReason}
+              {t("expiration.reason", { reason: expirationReason })}
             </span>
           )}
         </div>
@@ -53,7 +55,7 @@ const ExpirationCountdown = ({
     return (
       <Badge variant="secondary" className="bg-success/10 text-success text-[10px]">
         <CheckCircle2 size={10} className="mr-1" />
-        Concluída
+        {t("expiration.completed")}
       </Badge>
     );
   }
@@ -79,11 +81,11 @@ const ExpirationCountdown = ({
       <div className="flex flex-col gap-0.5">
         <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] animate-pulse w-fit">
           <AlertTriangle size={10} className="mr-1" />
-          SLA Expirado
+          {t("expiration.sla_expired")}
         </Badge>
         {expirationReason && (
           <span className="text-[10px] text-destructive/80 italic">
-            Motivo: {expirationReason}
+            {t("expiration.reason", { reason: expirationReason })}
           </span>
         )}
       </div>
