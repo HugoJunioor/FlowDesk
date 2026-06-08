@@ -1,12 +1,15 @@
 # Just Flow API — Dockerfile multi-stage (monorepo-aware).
 #
 # Build precisa do root do monorepo porque o api depende de workspaces.
-# Por isso o docker-compose passa context=. e dockerfile=apps/api/Dockerfile.
+# docker-compose passa context=. e dockerfile=apps/api/Dockerfile.
 
-# ─── Stage 1: install deps ───────────────────────────────────────────────────
+# ─── Stage 1: deps (instala TUDO incluindo dev pra rodar build) ──────────────
 FROM node:20-alpine AS deps
 
 WORKDIR /app
+
+# build-tools pra deps nativas (bcrypt etc.) — removidas no runner.
+RUN apk add --no-cache python3 make g++
 
 # Manifests do monorepo (root + apps/api) — necessario pra resolver workspaces.
 COPY package.json package-lock.json ./
@@ -25,7 +28,9 @@ COPY apps/api ./apps/api
 
 RUN npm run build -w @flowdesk/api
 
-# ─── Stage 3: runner (slim, prod deps only) ─────────────────────────────────
+# ─── Stage 3: runner (reusa node_modules do build, sem reinstalar) ──────────
+# Trade-off: imagem um pouco maior por incluir devDeps, mas elimina
+# falha de re-install em alpine sem build-tools. Aceitavel pro escopo atual.
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -35,15 +40,10 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 flowdesk
 
-# Manifests pra `npm ci --omit=dev` no contexto api
-COPY --chown=flowdesk:nodejs package.json package-lock.json ./
-COPY --chown=flowdesk:nodejs apps/api/package.json ./apps/api/
-
-# Instala so prod deps (image final menor)
-RUN npm ci --workspace=@flowdesk/api --include-workspace-root --omit=dev \
- && chown -R flowdesk:nodejs /app/node_modules /app/apps/api
-
-# Codigo compilado
+COPY --from=build --chown=flowdesk:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=flowdesk:nodejs /app/package.json ./
+COPY --from=build --chown=flowdesk:nodejs /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build --chown=flowdesk:nodejs /app/apps/api/package.json ./apps/api/
 COPY --from=build --chown=flowdesk:nodejs /app/apps/api/dist ./apps/api/dist
 
 USER flowdesk
