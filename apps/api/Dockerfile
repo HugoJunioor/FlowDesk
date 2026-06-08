@@ -18,11 +18,12 @@ COPY apps/api/package.json ./apps/api/
 RUN npm ci --workspace=@flowdesk/api --include-workspace-root
 
 # ─── Stage 2: build ─────────────────────────────────────────────────────────
+# npm ci em workspace hoista tudo pro node_modules da raiz — nao tem
+# apps/api/node_modules separado. Por isso so o root eh copiado.
 FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package.json package-lock.json ./
 COPY apps/api ./apps/api
 
@@ -42,7 +43,6 @@ RUN addgroup --system --gid 1001 nodejs \
 
 COPY --from=build --chown=flowdesk:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=flowdesk:nodejs /app/package.json ./
-COPY --from=build --chown=flowdesk:nodejs /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build --chown=flowdesk:nodejs /app/apps/api/package.json ./apps/api/
 COPY --from=build --chown=flowdesk:nodejs /app/apps/api/dist ./apps/api/dist
 
