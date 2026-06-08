@@ -104,12 +104,17 @@ const UserManagement = () => {
     reload();
   }, [reload]);
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.login.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filtra pelo termo de busca e ordena por nome (case-insensitive, locale-aware).
+  // localeCompare lida com acentos e ç corretamente: "Ágatha" vem antes de "Bruno",
+  // não depois (que seria a ordem ASCII).
+  const filteredUsers = users
+    .filter(
+      (u) =>
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        u.login.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 
   // ── Create ────────────────────────────────────────────────────────────────────
 
