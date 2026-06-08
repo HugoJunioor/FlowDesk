@@ -45,7 +45,12 @@ services:
       - "traefik.http.routers.flowdesk-api.tls=true"
       - "traefik.http.routers.flowdesk-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.flowdesk-api.priority=10"
-      # IP whitelist (definido no router web pra reusar a mesma middleware)
+      # IP whitelist (VPN-only). A middleware eh declarada AQUI E no web
+      # com o mesmo nome — Traefik dedupe, mas declarar nos dois evita
+      # o router api ser desativado quando web cai/recarrega primeiro.
+      # Antes: erro "middleware flowdesk-vpn@docker does not exist" se
+      # web ainda nao tinha registrado labels — dropava /api inteiro.
+      - "traefik.http.middlewares.flowdesk-vpn.ipallowlist.sourcerange=${VPN_IPS}"
       - "traefik.http.routers.flowdesk-api.middlewares=flowdesk-vpn@docker"
     networks:
       # cfo_default = rede onde o Postgres (postgres) esta + Traefik consegue ler
