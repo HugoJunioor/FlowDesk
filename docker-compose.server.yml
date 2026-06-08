@@ -12,8 +12,10 @@
 services:
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      # Contexto = root do monorepo (igual ao web). O Dockerfile precisa
+      # do package-lock.json da raiz pra resolver workspaces @flowdesk/*.
+      context: .
+      dockerfile: apps/api/Dockerfile
     container_name: flowdesk-api
     restart: unless-stopped
     env_file:
