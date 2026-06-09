@@ -70,6 +70,13 @@ services:
         VITE_BUILD_DATE: "${BUILD_DATE:-}"
     container_name: flowdesk-web
     restart: unless-stopped
+    # Disable image HEALTHCHECK — nginx listens on IPv6/bridge but `localhost`
+    # in the image's `wget http://localhost/` resolves to IPv4 127.0.0.1 and
+    # fails. Traefik Docker provider drops unhealthy containers, so a bogus
+    # healthcheck blackholes the entire web router (404 on /). Real health is
+    # already covered by Traefik's own backend probing.
+    healthcheck:
+      disable: true
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=cfo_default"
