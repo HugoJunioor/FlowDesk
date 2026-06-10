@@ -16,10 +16,12 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { COLOR_THEMES } from "@/config/themes";
 import { AVAILABLE_LANGUAGES } from "@/lib/i18n";
 import { getAllUsers } from "@/lib/authStorage";
+import { hasPermission } from "@/lib/permissionsStorage";
 import type { Language } from "@/types/auth";
 import NotificationPreferencesCard from "@/components/notifications/NotificationPreferencesCard";
 import { TelegramConnect } from "@/modules/configuracoes/components/TelegramConnect";
 import ReplyTemplatesCard from "@/components/settings/ReplyTemplatesCard";
+import AutoAssignRulesCard from "@/components/settings/AutoAssignRulesCard";
 
 function loadApprovers(): string[] {
   try {
@@ -37,6 +39,8 @@ const Configuracoes = () => {
   const { username, currentUser } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const isMaster = currentUser?.role === "master";
+  // Permissão pra cards "admin": master + qualquer user em grupo com edit em configuracoes.
+  const canAdminConfig = hasPermission(currentUser, "configuracoes", "edit");
   const allUsers = getAllUsers().filter((u) => u.status === "active");
   const [approvers, setApprovers] = useState<string[]>(loadApprovers);
 
@@ -208,6 +212,9 @@ const Configuracoes = () => {
 
         {/* Templates de resposta — CRUD usado pelo composer */}
         <ReplyTemplatesCard />
+
+        {/* Regras de atribuição automática — master + grupos com edit em configuracoes */}
+        {canAdminConfig && <AutoAssignRulesCard />}
 
         {/* Master-only: Configuração de Operações SQL */}
         {isMaster ? (

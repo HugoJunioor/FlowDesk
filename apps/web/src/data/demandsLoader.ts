@@ -3,6 +3,7 @@ import { mockDemands as demoData, extractClientName } from "./mockDemands";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import { classifyClosureFields } from "@/lib/closureClassifier";
+import { loadAutoAssignRules } from "@/lib/autoAssignRules";
 
 /**
  * Carrega demandas: tenta realDemands (dados reais, gitignored),
@@ -52,14 +53,6 @@ export const isRealData = !!realModule;
 
 // === PROCESSAMENTO COMPARTILHADO ===
 
-// Regras de auto-atribuição configuráveis via localStorage
-function loadAutoAssignRules(): { pattern: string; field: "title" | "workflow"; match: "includes" | "equals"; assignee: string; priority?: string }[] {
-  try {
-    const stored = localStorage.getItem("fd_auto_assign_rules");
-    return stored ? JSON.parse(stored) : [];
-  } catch { return []; }
-}
-
 // Workflows que sao sempre P3 por definicao operacional (independente do texto).
 // Mantemos em lower-case pra comparar sem se preocupar com acento/caixa.
 const FORCED_P3_WORKFLOWS = [
@@ -68,6 +61,8 @@ const FORCED_P3_WORKFLOWS = [
 
 function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
   const rules = loadAutoAssignRules();
+  const textRules = rules.filter((r) => r.condition === "text_match");
+  const fallbackRule = rules.find((r) => r.condition === "no_assignee");
 
   return demands.map((d) => {
     const titleLower = d.title.toLowerCase();
@@ -87,23 +82,33 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
       };
     }
 
-    // Regras dinâmicas de auto-atribuição (configuradas localmente)
-    for (const rule of rules) {
-      const value = rule.field === "title" ? titleLower : workflowLower;
+    // 1) Regras dinâmicas por texto (título/workflow)
+    for (const rule of textRules) {
+      const pattern = rule.pattern ?? "";
+      if (!pattern) continue;
+      const value = rule.field === "workflow" ? workflowLower : titleLower;
       const matched = rule.match === "equals"
-        ? value === rule.pattern.toLowerCase()
-        : value.includes(rule.pattern.toLowerCase());
+        ? value === pattern.toLowerCase()
+        : value.includes(pattern.toLowerCase());
       if (matched) {
         return {
           ...d,
           assignee: { name: rule.assignee, avatar: "" },
-          priority: (rule.priority as any) || d.priority,
+          priority: (rule.priority as SlackDemand["priority"]) || d.priority,
         };
       }
     }
 
     const classification = classifyDemand(d.title, d.description);
-    const result = { ...d, autoClassification: classification };
+    const result: SlackDemand = { ...d, autoClassification: classification };
+
+    // 2) Fallback: demanda sem responsável → aplica regra "no_assignee" se houver
+    if (fallbackRule && (!result.assignee || !result.assignee.name)) {
+      result.assignee = { name: fallbackRule.assignee, avatar: "" };
+      if (fallbackRule.priority) {
+        result.priority = fallbackRule.priority as SlackDemand["priority"];
+      }
+    }
 
     // Sem_classificacao: se o classificador encontrou um p1/p2/p3, adota.
     // Senao, mantem sem_classificacao mesmo.
