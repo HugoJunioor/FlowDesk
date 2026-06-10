@@ -20,6 +20,7 @@ import type { Language } from "@/types/auth";
 import NotificationPreferencesCard from "@/components/notifications/NotificationPreferencesCard";
 import { TelegramConnect } from "@/modules/configuracoes/components/TelegramConnect";
 import ReplyTemplatesCard from "@/components/settings/ReplyTemplatesCard";
+import AutoAssignRulesCard from "@/components/settings/AutoAssignRulesCard";
 
 function loadApprovers(): string[] {
   try {
@@ -208,6 +209,9 @@ const Configuracoes = () => {
 
         {/* Templates de resposta — CRUD usado pelo composer */}
         <ReplyTemplatesCard />
+
+        {/* Master-only: Regras de atribuição automática (default p/ demandas sem responsável) */}
+        {isMaster && <AutoAssignRulesCard />}
 
         {/* Master-only: Configuração de Operações SQL */}
         {isMaster ? (
