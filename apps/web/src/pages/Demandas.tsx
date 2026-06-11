@@ -76,30 +76,49 @@ function loadScope(): DemandScope {
 }
 
 // === Saved view (filter preferences per user) ===
-// Permite o user salvar o conjunto atual de filtros como sua "visao
-// padrao". Quando voltar/recarregar a pagina, o filtro carrega no estado
-// salvo automaticamente. Chave por email pra nao misturar entre usuarios
-// que compartilham o mesmo navegador.
+// Permite o user salvar o conjunto atual de visualizacao (filtros, modo
+// cards/lista e agrupamento) como sua "visao padrao". Quando voltar/recarregar
+// a pagina, o estado e restaurado automaticamente. Chave por email pra nao
+// misturar entre usuarios que compartilham o mesmo navegador.
+
+type ViewMode = "cards" | "lista";
+type GroupingTab = "kanban" | "date" | "priority" | "assignee";
+
+interface SavedView {
+  filters: DemandFilterState;
+  viewMode: ViewMode;
+  activeTab: GroupingTab;
+}
 
 const SAVED_VIEW_PREFIX = "flowdesk:demandas:view:";
+const VALID_TABS: GroupingTab[] = ["kanban", "date", "priority", "assignee"];
+const VALID_VIEW_MODES: ViewMode[] = ["cards", "lista"];
 
 function savedViewKey(email: string | undefined): string {
   return SAVED_VIEW_PREFIX + (email || "anon").toLowerCase();
 }
 
-function loadSavedView(email: string | undefined): DemandFilterState | null {
+function loadSavedView(email: string | undefined): SavedView | null {
   try {
     const raw = localStorage.getItem(savedViewKey(email));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Merge com EMPTY_FILTERS pra cobrir campos que possam ter sido
-    // adicionados depois que o user salvou.
-    return { ...EMPTY_FILTERS, ...parsed };
+    // Retrocompat: versoes antigas salvavam apenas DemandFilterState (sem
+    // wrapper). Detecta pela ausencia da chave `filters` e migra in-memory.
+    const isLegacy = parsed && typeof parsed === "object" && !("filters" in parsed);
+    const filters = isLegacy ? parsed : (parsed.filters ?? {});
+    const viewMode: ViewMode = VALID_VIEW_MODES.includes(parsed.viewMode) ? parsed.viewMode : "cards";
+    const activeTab: GroupingTab = VALID_TABS.includes(parsed.activeTab) ? parsed.activeTab : "kanban";
+    return {
+      filters: { ...EMPTY_FILTERS, ...filters },
+      viewMode,
+      activeTab,
+    };
   } catch { return null; }
 }
 
-function saveView(email: string | undefined, filters: DemandFilterState): void {
-  try { localStorage.setItem(savedViewKey(email), JSON.stringify(filters)); }
+function saveView(email: string | undefined, view: SavedView): void {
+  try { localStorage.setItem(savedViewKey(email), JSON.stringify(view)); }
   catch { /* localStorage cheio / desabilitado — silencia */ }
 }
 
@@ -132,24 +151,30 @@ const Demandas = () => {
       unsubSync();
     };
   }, []);
-  const [filters, setFilters] = useState<DemandFilterState>(() => {
-    // Carrega a visualização salva do usuário no primeiro render — assim a
-    // tela já abre com os filtros que ele costuma usar.
-    const saved = loadSavedView(currentUser?.email);
-    return saved ?? { ...EMPTY_FILTERS };
-  });
-  const [hasSavedView, setHasSavedView] = useState<boolean>(() => loadSavedView(currentUser?.email) !== null);
+  // Carrega visualizacao salva uma unica vez no mount (filters + viewMode + activeTab).
+  // Se o user trocar de conta no mesmo browser, o load roda de novo pelo email.
+  const initialSavedView = useMemo(() => loadSavedView(currentUser?.email), [currentUser?.email]);
+  const [filters, setFilters] = useState<DemandFilterState>(() =>
+    initialSavedView?.filters ?? { ...EMPTY_FILTERS }
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialSavedView?.viewMode
+      ?? (localStorage.getItem("fd_view_mode") as ViewMode)
+      ?? "cards"
+  );
+  const [activeTab, setActiveTab] = useState<GroupingTab>(() => initialSavedView?.activeTab ?? "kanban");
+  const [hasSavedView, setHasSavedView] = useState<boolean>(() => initialSavedView !== null);
   const [selected, setSelected] = useState<SlackDemand | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Salva a visualização atual (filtros) como preferência do user.
+  // Salva a visualização atual (filtros + viewMode + activeTab) como preferência do user.
   const handleSaveView = useCallback(() => {
-    saveView(currentUser?.email, filters);
+    saveView(currentUser?.email, { filters, viewMode, activeTab });
     setHasSavedView(true);
     toast.success(t("demands.view.saved"), {
       description: t("demands.view.saved_desc"),
     });
-  }, [currentUser?.email, filters, t]);
+  }, [currentUser?.email, filters, viewMode, activeTab, t]);
 
   // Remove a visualização salva.
   const handleClearSavedView = useCallback(() => {
@@ -170,10 +195,6 @@ const Demandas = () => {
       setSearchParams(next, { replace: true });
     }
   }, [demands, searchParams, setSearchParams]);
-  const [viewMode, setViewMode] = useState<"cards" | "lista">(() =>
-    (localStorage.getItem("fd_view_mode") as "cards" | "lista") ?? "cards"
-  );
-  const [activeTab, setActiveTab] = useState("kanban");
   const [customAssignees, setCustomAssignees] = useState<string[]>(loadCustomAssignees);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("fd_custom_categories") || "[]"); } catch { return []; }
@@ -623,7 +644,7 @@ const Demandas = () => {
         </div>
 
         {/* View mode + Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GroupingTab)}>
           {/* Row 1: Cards / Lista toggle */}
           <div className="flex items-center gap-2 mb-2">
             <Button
