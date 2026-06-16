@@ -79,6 +79,10 @@ const Login = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!password) {
+      toast({ title: t("login.toast.current_password_required"), variant: "destructive" });
+      return;
+    }
     if (!newPassword || !confirmPassword) {
       toast({ title: t("login.toast.fill_both_passwords"), variant: "destructive" });
       return;
@@ -295,6 +299,26 @@ const Login = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleChangePassword} className="space-y-4">
+                {/* Current password — pre-filled when this view follows a fresh
+                    login in the same component instance; required again when
+                    the user reloads or returns to this screen with state lost. */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{t("login.current_password_label")}</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="password"
+                      placeholder={t("login.current_password_placeholder")}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10"
+                      disabled={changingPassword}
+                      maxLength={200}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">{t("login.new_password_label")}</label>
                   <div className="relative">
