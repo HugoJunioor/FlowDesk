@@ -1,7 +1,7 @@
 /**
- * Testes do usuarios.service — anonimização LGPD.
+ * Unit tests for usuariosService — business guards for update, delete, and anonimizarLgpd.
  *
- * Mockamos repository e authRepository — testes unitários sem banco.
+ * Repository and authRepository are mocked — no DB required.
  */
 import { usuariosService } from '../usuarios.service';
 import { usuariosRepository } from '../usuarios.repository';
@@ -19,6 +19,8 @@ const TARGET_ID = 'target-id-111';
 
 function fakeUsuario(overrides: Partial<{
   id: string;
+  perfil: 'master' | 'user';
+  status: 'active' | 'blocked';
   excluido_em: Date | null;
 }> = {}): any {
   return {
@@ -39,6 +41,122 @@ function fakeUsuario(overrides: Partial<{
   };
 }
 
+// ---------------------------------------------------------------------------
+// usuariosService.update
+// ---------------------------------------------------------------------------
+describe('usuariosService.update', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('updates user successfully', async () => {
+    const updated = fakeUsuario({ id: TARGET_ID });
+    repoMock.findById.mockResolvedValue(fakeUsuario());
+    repoMock.update.mockResolvedValue(updated);
+
+    const result = await usuariosService.update(TARGET_ID, { nome: 'Novo Nome' }, MASTER_ID);
+
+    expect(result).toBeDefined();
+    expect(repoMock.update).toHaveBeenCalledWith(TARGET_ID, { nome: 'Novo Nome' });
+  });
+
+  it('throws ForbiddenError when master tries to block own account', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ id: MASTER_ID }));
+
+    await expect(
+      usuariosService.update(MASTER_ID, { status: 'blocked' }, MASTER_ID),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(repoMock.update).not.toHaveBeenCalled();
+  });
+
+  it('throws ForbiddenError when master tries to demote own account', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ id: MASTER_ID, perfil: 'master' }));
+
+    await expect(
+      usuariosService.update(MASTER_ID, { perfil: 'user' }, MASTER_ID),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(repoMock.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError when user does not exist', async () => {
+    repoMock.findById.mockResolvedValue(null);
+
+    await expect(
+      usuariosService.update(TARGET_ID, { nome: 'X' }, MASTER_ID),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  it('throws NotFoundError when user is soft-deleted', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ excluido_em: new Date() }));
+
+    await expect(
+      usuariosService.update(TARGET_ID, { nome: 'X' }, MASTER_ID),
+    ).rejects.toThrow(NotFoundError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usuariosService.delete
+// ---------------------------------------------------------------------------
+describe('usuariosService.delete', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    authRepoMock.revokeAllUserRefreshTokens.mockResolvedValue(undefined);
+  });
+
+  it('soft-deletes user successfully', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ perfil: 'user' }));
+    repoMock.softDelete.mockResolvedValue(fakeUsuario());
+
+    await expect(
+      usuariosService.delete(TARGET_ID, MASTER_ID),
+    ).resolves.toBeUndefined();
+
+    expect(repoMock.softDelete).toHaveBeenCalledWith(TARGET_ID);
+  });
+
+  it('throws ForbiddenError when trying to delete own account', async () => {
+    await expect(
+      usuariosService.delete(MASTER_ID, MASTER_ID),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(repoMock.findById).not.toHaveBeenCalled();
+  });
+
+  it('throws ForbiddenError when target is a master account', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ perfil: 'master' }));
+
+    await expect(
+      usuariosService.delete(TARGET_ID, MASTER_ID),
+    ).rejects.toThrow(ForbiddenError);
+
+    expect(repoMock.softDelete).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError when user does not exist', async () => {
+    repoMock.findById.mockResolvedValue(null);
+
+    await expect(
+      usuariosService.delete(TARGET_ID, MASTER_ID),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  it('revokes refresh tokens before soft-deleting', async () => {
+    repoMock.findById.mockResolvedValue(fakeUsuario({ perfil: 'user' }));
+    repoMock.softDelete.mockResolvedValue(fakeUsuario());
+
+    await usuariosService.delete(TARGET_ID, MASTER_ID);
+
+    expect(authRepoMock.revokeAllUserRefreshTokens).toHaveBeenCalledWith(
+      TARGET_ID,
+      'usuario_excluido',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// usuariosService.anonimizarLgpd
+// ---------------------------------------------------------------------------
 describe('usuariosService.anonimizarLgpd', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -80,7 +198,6 @@ describe('usuariosService.anonimizarLgpd', () => {
     expect(chamada?.[1].email).toMatch(/^anonimo-[0-9a-f-]{36}@deleted\.local$/);
     expect(chamada?.[1].nome).toBe('Usuário Anonimizado');
     expect(chamada?.[1].login).toMatch(/^anon_\d+$/);
-    // Senha é bcrypt hash — começa com $2b$
     expect(chamada?.[1].senhaHash).toMatch(/^\$2[ab]\$/);
   });
 

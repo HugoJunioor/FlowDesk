@@ -97,7 +97,9 @@ const Login = () => {
       return;
     }
     setChangingPassword(true);
-    const result = await changePassword(newPassword);
+    // password is the provisional password the user typed on the login form,
+    // required by the API's /auth/change-password endpoint as senhaAtual.
+    const result = await changePassword(newPassword, password);
     setChangingPassword(false);
     if (!result.success) {
       toast({ title: t("login.toast.password_save_error"), description: result.error, variant: "destructive" });

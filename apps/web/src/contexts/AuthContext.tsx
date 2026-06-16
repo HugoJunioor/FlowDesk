@@ -3,12 +3,9 @@ import type { FlowDeskUser } from "@/types/auth";
 import {
   initializeAuth,
   getUserById,
-  getUserByLogin,
-  checkPasswordAndMigrate,
   setSession,
   getSession,
   clearSession,
-  changeUserPassword,
   getPasswordStrength,
   isWeakPassword,
 } from "@/lib/authStorage";
@@ -16,6 +13,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { authApi } from "@/modules/auth/api";
 import { setAccessToken } from "@/lib/api/client";
+import { toApiError } from "@/lib/api/client";
+import type { AuthenticatedUser } from "@/modules/auth/types";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -25,12 +24,36 @@ interface AuthContextType {
   username: string;
   login: (login: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  /**
+   * Changes the current user's password.
+   * `currentPassword` is required by the API. On first-access flows,
+   * pass the provisional password the user typed on the login form.
+   */
+  changePassword: (newPassword: string, currentPassword: string) => Promise<{ success: boolean; error?: string }>;
   refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const useAuth = () => useContext(AuthContext);
+
+/** Maps the API AuthenticatedUser shape to the local FlowDeskUser shape used by legacy UI. */
+function apiUserToLocal(apiUser: AuthenticatedUser): FlowDeskUser {
+  return {
+    id: apiUser.id,
+    login: apiUser.login,
+    email: apiUser.email,
+    name: apiUser.nome,
+    role: apiUser.perfil,
+    status: apiUser.status,
+    // passwordHash is not needed client-side; using a placeholder keeps the type satisfied
+    passwordHash: "",
+    isFirstAccess: apiUser.primeiroAcesso,
+    passwordResetRequested: false,
+    groups: apiUser.grupos,
+    createdAt: new Date().toISOString(),
+    createdBy: "api",
+  };
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
@@ -43,18 +66,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth().then(() => {
       const session = getSession();
       if (session) {
-        const user = getUserById(session.userId);
-        if (user && user.status === "active") {
-          setCurrentUser(user);
-          setMustChangePassword(user.isFirstAccess);
-          loadForUser(user.id, user.themePreferences);
-          loadLangForUser(user.id, user.language);
-          // Tenta restaurar accessToken da API via refresh cookie.
-          // Se nao tiver cookie valido, fica sem token (features de API offline).
-          authApi.refresh().catch(() => setAccessToken(null));
-        } else {
-          clearSession();
-        }
+        // Restore access token via refresh cookie; if cookie is gone, force logout.
+        authApi.refresh()
+          .then((authResponse) => {
+            const user = apiUserToLocal(authResponse.usuario);
+            // Sync local session so legacy reads still work
+            const localUser = getUserById(session.userId) ?? user;
+            setCurrentUser({ ...user, themePreferences: localUser.themePreferences, language: localUser.language });
+            setMustChangePassword(user.isFirstAccess);
+            loadForUser(user.id, localUser.themePreferences);
+            loadLangForUser(user.id, localUser.language);
+          })
+          .catch(() => {
+            // Refresh token gone/expired — clear session and show login
+            clearSession();
+            setAccessToken(null);
+          })
+          .finally(() => {
+            // Signal app ready only after refresh settles (success or failure)
+            setInitialized(true);
+          });
+        return;
       }
       setInitialized(true);
     });
@@ -65,64 +97,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: "Preencha todos os campos" };
     }
 
-    // Rate limit: 5 tentativas / 5 min por login (anti brute-force)
-    const RL_KEY = `fd_login_rl_${loginInput.toLowerCase().trim()}`;
-    const RL_MAX = 5;
-    const RL_WINDOW = 15 * 60 * 1000; // 15min de lockout apos 5 tentativas falhas
     try {
-      const raw = localStorage.getItem(RL_KEY);
-      if (raw) {
-        const rl = JSON.parse(raw) as { count: number; until: number };
-        if (rl.until && Date.now() < rl.until) {
-          const secs = Math.ceil((rl.until - Date.now()) / 1000);
-          return { success: false, error: `Muitas tentativas. Tente novamente em ${secs}s.` };
-        }
+      const authResponse = await authApi.login({ login: loginInput, senha: password });
+      const user = apiUserToLocal(authResponse.usuario);
+
+      // Preserve local theme/language prefs if the user already existed locally
+      const localUser = getUserById(user.id);
+      const mergedUser: FlowDeskUser = {
+        ...user,
+        themePreferences: localUser?.themePreferences,
+        language: localUser?.language,
+      };
+
+      setSession(mergedUser);
+      setCurrentUser(mergedUser);
+      setMustChangePassword(user.isFirstAccess);
+      loadForUser(user.id, mergedUser.themePreferences);
+      loadLangForUser(user.id, mergedUser.language);
+
+      return { success: true };
+    } catch (err) {
+      const apiErr = toApiError(err);
+      if (apiErr.status === 429) {
+        return { success: false, error: "Muitas tentativas. Aguarde e tente novamente." };
       }
-    } catch { /* ignore */ }
-
-    const user = getUserByLogin(loginInput);
-    const recordFail = () => {
-      try {
-        const raw = localStorage.getItem(RL_KEY);
-        const rl = raw ? (JSON.parse(raw) as { count: number; until: number }) : { count: 0, until: 0 };
-        rl.count = (rl.count || 0) + 1;
-        if (rl.count >= RL_MAX) {
-          rl.until = Date.now() + RL_WINDOW;
-          rl.count = 0;
-        }
-        localStorage.setItem(RL_KEY, JSON.stringify(rl));
-      } catch { /* ignore */ }
-    };
-
-    if (!user) {
-      recordFail();
+      if (apiErr.status === 403) {
+        return { success: false, error: apiErr.message || "Conta bloqueada. Contate o administrador." };
+      }
+      // 401 or network error
       return { success: false, error: "Usuário ou senha inválidos" };
     }
-    if (user.status === "blocked") {
-      return { success: false, error: "Conta bloqueada. Contate o administrador." };
-    }
-    const valid = await checkPasswordAndMigrate(user, password);
-    if (!valid) {
-      recordFail();
-      return { success: false, error: "Usuário ou senha inválidos" };
-    }
-    try { localStorage.removeItem(RL_KEY); } catch { /* ignore */ }
-    setSession(user);
-    setCurrentUser(user);
-    setMustChangePassword(user.isFirstAccess);
-    loadForUser(user.id, user.themePreferences);
-    loadLangForUser(user.id, user.language);
-
-    // Bridge: tenta login na API nova tambem pra setar JWT + refresh cookie.
-    // Silencioso — se usuario nao existir na API (so legacy), segue normal.
-    authApi.login({ login: loginInput, senha: password }).catch(() => {
-      /* sem conta na API; v1 features que dependem de API ficam indisponiveis */
-    });
-
-    return { success: true };
   }, [loadForUser, loadLangForUser]);
 
   const logout = useCallback(() => {
+    // Fire-and-forget: revoke refresh token server-side
+    authApi.logout().catch(() => { /* best-effort */ });
     clearSession();
     setCurrentUser(null);
     setMustChangePassword(false);
@@ -131,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [clearUserTheme, clearUserLang]);
 
   const changePassword = useCallback(
-    async (newPassword: string) => {
+    async (newPassword: string, currentPassword: string) => {
       if (!currentUser) return { success: false, error: "Sessão expirada. Faça login novamente." };
       if (isWeakPassword(newPassword)) {
         return { success: false, error: "Senha muito comum. Escolha uma senha mais segura." };
@@ -140,22 +149,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!strength.isStrong) {
         return { success: false, error: "Senha fraca. Use ao menos 10 caracteres com maiúscula, minúscula, número e símbolo." };
       }
-      const saved = await changeUserPassword(currentUser.id, newPassword);
-      if (!saved) return { success: false, error: "Não foi possível salvar a senha. Tente novamente." };
-      const updated = getUserById(currentUser.id);
-      if (!updated) return { success: false, error: "Erro ao atualizar sessão. Faça login novamente." };
-      setCurrentUser(updated);
-      setSession(updated);
-      setMustChangePassword(false);
-      return { success: true };
+
+      try {
+        await authApi.changePassword({ senhaAtual: currentPassword, novaSenha: newPassword });
+        // Re-fetch user state from API after password change
+        const updated = await authApi.me();
+        const updatedUser = apiUserToLocal(updated);
+        const localUser = getUserById(currentUser.id);
+        const mergedUser: FlowDeskUser = {
+          ...updatedUser,
+          themePreferences: localUser?.themePreferences,
+          language: localUser?.language,
+        };
+        setCurrentUser(mergedUser);
+        setSession(mergedUser);
+        setMustChangePassword(false);
+        return { success: true };
+      } catch (err) {
+        const apiErr = toApiError(err);
+        if (apiErr.status === 401) {
+          return { success: false, error: "Senha atual incorreta." };
+        }
+        return { success: false, error: apiErr.message || "Não foi possível salvar a senha. Tente novamente." };
+      }
     },
     [currentUser]
   );
 
   const refreshUser = useCallback(() => {
     if (!currentUser) return;
-    const updated = getUserById(currentUser.id);
-    if (updated) setCurrentUser(updated);
+    authApi.me()
+      .then((updated) => {
+        const user = apiUserToLocal(updated);
+        const localUser = getUserById(currentUser.id);
+        setCurrentUser({ ...user, themePreferences: localUser?.themePreferences, language: localUser?.language });
+      })
+      .catch(() => { /* ignore — best-effort refresh */ });
   }, [currentUser]);
 
   return (

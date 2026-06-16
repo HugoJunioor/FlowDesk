@@ -1,5 +1,6 @@
 import type { FlowDeskUser, UserRole } from "@/types/auth";
 import { hashPassword as cryptoHashPassword, verifyPassword, generateUUID } from "@/lib/crypto";
+import { usuariosApi, type UsuarioApi } from "@/modules/auth/api";
 
 const USERS_KEY = "fd_users_v2";
 const GROUPS_KEY = "fd_groups";
@@ -177,16 +178,52 @@ export async function initializeAuth(): Promise<void> {
   }
 }
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+// ── API ↔ local shape conversion ──────────────────────────────────────────────
 
-export function getAllUsers(): FlowDeskUser[] {
-  return getUsers();
+function apiToLocal(u: UsuarioApi): FlowDeskUser {
+  // Merge with any locally-stored prefs (theme, language) if available
+  const local = getUsers().find((l) => l.id === u.id);
+  return {
+    id: u.id,
+    login: u.login,
+    email: u.email,
+    name: u.nome,
+    role: u.perfil,
+    status: u.status,
+    passwordHash: local?.passwordHash ?? "",
+    isFirstAccess: u.primeiroAcesso,
+    passwordResetRequested: u.resetSenhaSolicitado,
+    groups: local?.groups ?? [],
+    themePreferences: local?.themePreferences,
+    language: local?.language,
+    createdAt: u.criadoEm,
+    createdBy: local?.createdBy ?? "api",
+    updatedAt: u.atualizadoEm,
+  };
 }
 
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns all users. Fetches from API (source of truth).
+ * Falls back to the local legacy snapshot if the API call fails
+ * (e.g., network offline) so the UI doesn't crash.
+ */
+export async function getAllUsers(): Promise<FlowDeskUser[]> {
+  try {
+    const apiUsers = await usuariosApi.list();
+    return apiUsers.map(apiToLocal);
+  } catch {
+    return getUsers();
+  }
+}
+
+/** Sync local cache lookup — used by AuthContext only after session restore. */
 export function getUserById(id: string): FlowDeskUser | undefined {
   return getUsers().find((u) => u.id === id);
 }
 
+/** Removed from the API-first flow; kept for backward compat with legacy reads. */
 export function getUserByLogin(login: string): FlowDeskUser | undefined {
   return getUsers().find((u) => u.login.toLowerCase() === login.trim().toLowerCase());
 }
@@ -202,91 +239,49 @@ export async function createUser(data: {
   groups: string[];
   createdBy: string;
 }): Promise<{ user: FlowDeskUser; tempPassword: string }> {
-  const users = getUsers();
-  const login = generateLogin(
-    data.name,
-    users.map((u) => u.login)
-  );
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
-
-  const user: FlowDeskUser = {
-    id: generateUUID(),
-    login,
-    email: data.email.toLowerCase().trim(),
-    name: data.name.trim(),
-    role: data.role,
-    status: "active",
-    passwordHash,
-    isFirstAccess: true,
-    passwordResetRequested: false,
-    groups: data.groups,
-    createdAt: new Date().toISOString(),
-    createdBy: data.createdBy,
-  };
-
-  saveUsers([...users, user]);
-  return { user, tempPassword };
+  const { usuario, senhaTempOraria } = await usuariosApi.create({
+    nome: data.name,
+    email: data.email,
+    perfil: data.role,
+  });
+  return { user: apiToLocal(usuario), tempPassword: senhaTempOraria };
 }
 
-export function updateUser(
+export async function updateUser(
   id: string,
   data: Partial<Omit<FlowDeskUser, "id" | "passwordHash" | "createdAt" | "createdBy">>
-): boolean {
-  const users = getUsers();
-  const idx = users.findIndex((u) => u.id === id);
-  if (idx === -1) return false;
-  users[idx] = { ...users[idx], ...data, updatedAt: new Date().toISOString() };
-  saveUsers(users);
-  return true;
-}
-
-export function deleteUser(id: string): boolean {
-  const users = getUsers();
-  const filtered = users.filter((u) => u.id !== id && u.role !== "master");
-  if (filtered.length === users.length) return false; // não encontrado ou é master
-  const target = users.find((u) => u.id === id);
-  if (target?.role === "master") return false; // protege master
-  saveUsers(users.filter((u) => u.id !== id));
-  return true;
-}
-
-export async function changeUserPassword(
-  id: string,
-  newPassword: string
 ): Promise<boolean> {
-  const users = getUsers();
-  const idx = users.findIndex((u) => u.id === id);
-  if (idx === -1) return false;
-  const passwordHash = await hashPassword(newPassword);
-  users[idx] = {
-    ...users[idx],
-    passwordHash,
-    isFirstAccess: false,
-    passwordResetRequested: false,
-    updatedAt: new Date().toISOString(),
-  };
-  saveUsers(users);
-  return true;
+  try {
+    await usuariosApi.update(id, {
+      nome: data.name,
+      perfil: data.role,
+      status: data.status,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteUser(id: string): Promise<boolean> {
+  try {
+    await usuariosApi.delete(id);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function generateResetPassword(userId: string): Promise<string> {
-  const users = getUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx === -1) return "";
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
-  users[idx] = {
-    ...users[idx],
-    passwordHash,
-    isFirstAccess: true,
-    passwordResetRequested: false,
-    updatedAt: new Date().toISOString(),
-  };
-  saveUsers(users);
-  return tempPassword;
+  try {
+    const { senhaTempOraria } = await usuariosApi.resetPassword(userId);
+    return senhaTempOraria;
+  } catch {
+    return "";
+  }
 }
 
+/** Legacy: kept for the forgot-password flow in Login.tsx (not yet migrated). */
 export function requestPasswordReset(email: string): boolean {
   const users = getUsers();
   const idx = users.findIndex(
