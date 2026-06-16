@@ -6,6 +6,15 @@ const path = require('path');
 
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
+// Channels where the bot is intentionally not invited.
+// Errors from these are silently skipped — no alert is fired.
+const IGNORED_CHANNELS = new Set([
+  'cliente-convenios',
+  'cliente-cashtime',
+  'cliente-keshbank',
+  'cliente-bc-teste',
+]);
+
 // April 1st 2026 00:00 UTC-3
 const OLDEST = new Date('2026-04-01T00:00:00-03:00').getTime() / 1000;
 const NOW = Date.now() / 1000;
@@ -167,6 +176,11 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   let cursor;
   let cacheHits = 0;
   let cacheMisses = 0;
+  // Contadores auxiliares — usados pra esclarecer no log quando um canal
+  // termina com 0 demandas. Sem isso, "0 demandas encontradas" parece bug;
+  // com isso fica claro que o canal so tem bate-papo humano (ex: bcgestao).
+  let totalRead = 0;
+  let humanMessages = 0;
 
   do {
     const result = await client.conversations.history({
@@ -178,11 +192,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
     });
 
     for (const msg of result.messages) {
+      totalRead++;
       const hasText = msg.text && msg.text.length > 20;
       if (!hasText) continue;
 
       const isBot = msg.subtype === 'bot_message' || !!msg.bot_id;
-      if (!isBot) continue;
+      if (!isBot) { humanMessages++; continue; }
 
       const textCheck = (msg.text || '').toLowerCase();
       const isDemand = textCheck.includes('nova demanda') ||
@@ -431,7 +446,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   if (cacheHits + cacheMisses > 0) {
     console.log(`  cache replies: ${cacheHits} hits, ${cacheMisses} misses`);
   }
-  return demands;
+  return { demands, totalRead, humanMessages };
 }
 
 // === PRESERVAR ESTADO CONCLUIDA DO SYNC ANTERIOR ===
@@ -508,14 +523,54 @@ async function main() {
 
   let allDemands = [];
 
+  // Tracks channels that already fired a not_in_channel alert this run.
+  // Prevents duplicate emails if the same error repeats across retries.
+  const alertedChannels = new Set();
+
   for (const channel of clientChannels) {
+    // Skip channels where the bot is intentionally absent — no error logged.
+    if (IGNORED_CHANNELS.has(channel.name)) {
+      console.log(`Pulando #${channel.name} (na lista de ignorados)`);
+      continue;
+    }
+
     console.log(`Buscando #${channel.name}...`);
     try {
-      const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
-      console.log(`  ${demands.length} demandas encontradas`);
+      const { demands, totalRead, humanMessages } = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
+      if (demands.length === 0 && totalRead > 0) {
+        // Explica que canal tem mensagens mas nenhuma com formato de workflow —
+        // ex: cliente usa o canal so pra bate-papo, sem abrir demanda via bot.
+        console.log(`  0 demandas encontradas (${totalRead} mensagens lidas, ${humanMessages} humanas, nenhuma com formato de workflow)`);
+      } else {
+        console.log(`  ${demands.length} demandas encontradas`);
+      }
       allDemands = allDemands.concat(demands);
     } catch (err) {
-      console.error(`  Erro: ${err.message}`);
+      const isNotInChannel = err.message && err.message.includes('not_in_channel');
+      if (isNotInChannel) {
+        // WARN only — not an error we can act on at sync time
+        console.warn(`  [WARN] Bot nao esta em #${channel.name} (not_in_channel) — verificar convite`);
+        if (!alertedChannels.has(channel.name)) {
+          alertedChannels.add(channel.name);
+          // Fire-and-forget alert to legacy-state; failure here must not break sync.
+          // Set INTERNAL_ALERT_TOKEN in both legacy-state and sync cron env files; must match.
+          fetch('http://flowdesk-legacy-state:8090/internal-alert', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Internal-Token': process.env.INTERNAL_ALERT_TOKEN || '',
+            },
+            body: JSON.stringify({
+              subject: `[FlowDesk] Bot perdeu acesso ao canal #${channel.name}`,
+              body: `O bot @justflow nao esta no canal #${channel.name} e nao conseguiu buscar mensagens.\n\nAcao necessaria: convidar o bot no Slack com "/invite @justflow" dentro do canal #${channel.name}.`,
+            }),
+          }).catch((fetchErr) => {
+            console.warn(`  [WARN] Falha ao enviar alerta para legacy-state: ${fetchErr.message}`);
+          });
+        }
+      } else {
+        console.error(`  Erro: ${err.message}`);
+      }
     }
     await new Promise(r => setTimeout(r, 500));
   }
