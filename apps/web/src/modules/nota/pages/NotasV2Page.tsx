@@ -65,6 +65,7 @@ import {
   type ChecklistItem,
 } from '@/modules/nota';
 import { toApiError } from '@/lib/api/client';
+import { linkify } from '@/lib/linkify';
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -513,7 +514,7 @@ function NoteCard({ nota, compact, onEdit, onMove, onDelete, onToggleItem }: Not
 
         {nota.conteudo && (
           <p className="text-xs text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">
-            {nota.conteudo}
+            {linkify(nota.conteudo)}
           </p>
         )}
 
@@ -552,7 +553,7 @@ function NoteCard({ nota, compact, onEdit, onMove, onDelete, onToggleItem }: Not
                       it.feito ? 'line-through text-muted-foreground' : ''
                     }`}
                   >
-                    {it.texto}
+                    {linkify(it.texto)}
                   </span>
                 </li>
               ))}
