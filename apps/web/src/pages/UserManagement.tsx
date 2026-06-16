@@ -96,7 +96,7 @@ const UserManagement = () => {
   const [newGroupName, setNewGroupName] = useState("");
 
   const reload = useCallback(() => {
-    setUsers(getAllUsers());
+    getAllUsers().then(setUsers).catch(() => { /* keep previous list on error */ });
     setGroups(getGroups());
   }, []);
 
@@ -151,16 +151,21 @@ const UserManagement = () => {
     }
 
     setCreating(true);
-    const { user, tempPassword } = await createUser({
-      name: createName,
-      email: createEmail,
-      role: createRole,
-      groups: createGroups,
-      createdBy: currentUser?.id || "master",
-    });
-    setCreating(false);
-    setCreatedResult({ login: user.login, tempPassword });
-    reload();
+    try {
+      const { user, tempPassword } = await createUser({
+        name: createName,
+        email: createEmail,
+        role: createRole,
+        groups: createGroups,
+        createdBy: currentUser?.id || "master",
+      });
+      setCreatedResult({ login: user.login, tempPassword });
+      reload();
+    } catch {
+      toast({ title: t("users.toast.create_failed") ?? "Erro ao criar usuário", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleCopyTempPass = async () => {
@@ -190,8 +195,12 @@ const UserManagement = () => {
       return;
     }
     setSaving(true);
-    updateUser(editTarget.id, { name: editName.trim(), role: editRole, groups: editGroups });
+    const ok = await updateUser(editTarget.id, { name: editName.trim(), role: editRole, groups: editGroups });
     setSaving(false);
+    if (!ok) {
+      toast({ title: t("users.toast.update_failed") ?? "Erro ao salvar", variant: "destructive" });
+      return;
+    }
     setEditTarget(null);
     reload();
     toast({ title: t("users.toast.user_updated") });
@@ -199,10 +208,14 @@ const UserManagement = () => {
 
   // ── Block/Unblock ─────────────────────────────────────────────────────────────
 
-  const handleToggleBlock = (user: FlowDeskUser) => {
+  const handleToggleBlock = async (user: FlowDeskUser) => {
     if (user.role === "master") return;
     const newStatus = user.status === "active" ? "blocked" : "active";
-    updateUser(user.id, { status: newStatus });
+    const ok = await updateUser(user.id, { status: newStatus });
+    if (!ok) {
+      toast({ title: t("users.toast.update_failed") ?? "Erro ao atualizar", variant: "destructive" });
+      return;
+    }
     reload();
     toast({
       title: newStatus === "blocked" ? t("users.toast.user_blocked") : t("users.toast.user_activated"),
@@ -211,9 +224,13 @@ const UserManagement = () => {
 
   // ── Delete ────────────────────────────────────────────────────────────────────
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    deleteUser(deleteTarget.id);
+    const ok = await deleteUser(deleteTarget.id);
+    if (!ok) {
+      toast({ title: t("users.toast.delete_failed") ?? "Erro ao excluir", variant: "destructive" });
+      return;
+    }
     setDeleteTarget(null);
     reload();
     toast({ title: t("users.toast.user_deleted") });

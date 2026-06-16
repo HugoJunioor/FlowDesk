@@ -8,7 +8,7 @@ import { UserCircle, Lock, Eye, EyeOff, Save, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
-import { updateUser, validateCPF, hashPassword, getUserById, changeUserPassword, getPasswordStrength } from "@/lib/authStorage";
+import { updateUser, validateCPF, getPasswordStrength } from "@/lib/authStorage";
 import PasswordStrength from "@/components/auth/PasswordStrength";
 import SlackConnection from "@/components/profile/SlackConnection";
 
@@ -29,7 +29,7 @@ function formatPhone(value: string): string {
 }
 
 const Profile = () => {
-  const { currentUser, refreshUser } = useAuth();
+  const { currentUser, refreshUser, changePassword } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
 
@@ -100,17 +100,19 @@ const Profile = () => {
     }
     setSavingPassword(true);
 
-    // Verify current password
-    const currentHash = await hashPassword(currentPassword);
-    const fresh = getUserById(currentUser!.id);
-    if (!fresh || fresh.passwordHash !== currentHash) {
-      setSavingPassword(false);
-      toast({ title: t("profile.toast.wrong_current_password"), variant: "destructive" });
+    // Current password check happens server-side via /auth/change-password —
+    // a wrong currentPassword returns success: false with the API's reason.
+    const result = await changePassword(newPassword, currentPassword);
+    setSavingPassword(false);
+
+    if (!result.success) {
+      toast({
+        title: result.error ?? t("profile.toast.wrong_current_password"),
+        variant: "destructive",
+      });
       return;
     }
 
-    await changeUserPassword(currentUser!.id, newPassword);
-    setSavingPassword(false);
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
