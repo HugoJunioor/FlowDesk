@@ -1,9 +1,20 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { DemandPriority, PRIORITY_CONFIG } from "@/types/demand";
 import { getBusinessTimeInfo, addBusinessHours } from "@/lib/businessHours";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+function formatDueAt(iso: string): string {
+  try {
+    return format(new Date(iso), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  } catch {
+    return iso;
+  }
+}
 
 interface ExpirationCountdownProps {
   dueDate: string;
@@ -98,26 +109,39 @@ const ExpirationCountdown = ({
     ? "text-warning"
     : "text-success";
 
+  const dueLabel = formatDueAt(effectiveDueDate);
+  const tooltipLabel = `Expira em ${dueLabel}`;
+
   if (compact) {
     return (
-      <span className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
-        <Clock size={12} />
-        {info.timeText}
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={`text-xs font-medium flex items-center gap-1 cursor-help ${colorClass}`}>
+            <Clock size={12} />
+            {info.timeText}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">{tooltipLabel}</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
-          <Clock size={12} className={info.isCritical ? "animate-pulse" : ""} />
-          <span>{info.timeText} restantes</span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="space-y-1.5 cursor-help">
+          <div className="flex items-center justify-between">
+            <div className={`text-xs font-medium flex items-center gap-1 ${colorClass}`}>
+              <Clock size={12} className={info.isCritical ? "animate-pulse" : ""} />
+              <span>{info.timeText} restantes</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground">horario util</span>
+          </div>
+          <Progress value={info.progress} className="h-1.5" />
         </div>
-        <span className="text-[10px] text-muted-foreground">horario util</span>
-      </div>
-      <Progress value={info.progress} className="h-1.5" />
-    </div>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltipLabel}</TooltipContent>
+    </Tooltip>
   );
 };
 
