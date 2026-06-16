@@ -36,7 +36,8 @@ export default function AutoAssignRulesCard() {
   const { toast } = useToast();
   const [items, setItems] = useState<AutoAssignRule[]>([]);
   const [editing, setEditing] = useState<AutoAssignRule | null>(null);
-  const activeUsers = getAllUsers().filter((u) => u.status === "active");
+  // getAllUsers virou async no PR #178 — hidrata em useEffect.
+  const [activeUsers, setActiveUsers] = useState<Awaited<ReturnType<typeof getAllUsers>>>([]);
 
   function reload() {
     setItems(loadAutoAssignRules());
@@ -44,6 +45,9 @@ export default function AutoAssignRulesCard() {
 
   useEffect(() => {
     reload();
+    getAllUsers()
+      .then((list) => setActiveUsers(list.filter((u) => u.status === "active")))
+      .catch(() => { /* keep empty list */ });
   }, []);
 
   const startNew = (condition: AutoAssignCondition) => setEditing(newRule(condition));

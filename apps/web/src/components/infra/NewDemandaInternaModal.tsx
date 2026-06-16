@@ -162,16 +162,17 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
       resetForm();
       refreshDatabases();
       // Carrega usuarios cadastrados — re-le toda vez que abre pra capturar
-      // novos cadastros (UserManagement) sem precisar de refresh.
-      try {
-        const users = getAllUsers()
-          .filter((u) => u.active !== false)
-          .map((u) => ({ name: u.name, email: u.email }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setSystemUsers(users);
-      } catch {
-        setSystemUsers([]);
-      }
+      // novos cadastros (UserManagement) sem precisar de refresh. getAllUsers
+      // virou async no PR #178, dai o then/catch.
+      getAllUsers()
+        .then((list) => {
+          const users = list
+            .filter((u) => u.active !== false)
+            .map((u) => ({ name: u.name, email: u.email }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setSystemUsers(users);
+        })
+        .catch(() => setSystemUsers([]));
       setSuporteUserSearch("");
     }
   }, [open, defaultKind, resetForm, refreshDatabases]);
