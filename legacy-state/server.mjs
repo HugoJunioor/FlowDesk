@@ -1346,5 +1346,60 @@ app.post('/daily-reminder/run-now', async (req, res) => {
   }
 });
 
+// ============ /internal-alert — internal use only (sync scripts) ============
+// Sends an email to the first user with role 'master' in fd_users_v2.
+// Intended to be called from within the Docker network (no public exposure).
+// REQUIRED: X-Internal-Token header must match INTERNAL_ALERT_TOKEN env var.
+// If INTERNAL_ALERT_TOKEN is not set, the server refuses to start serving this
+// endpoint and returns 500 on every call — prevents open-relay abuse if the
+// legacy container is accidentally exposed via Traefik.
+app.post('/internal-alert', async (req, res) => {
+  const secret = process.env.INTERNAL_ALERT_TOKEN;
+  // Token is mandatory — reject before touching body or mailer.
+  if (!secret) {
+    return res.status(500).json({ error: 'INTERNAL_ALERT_TOKEN is not configured — endpoint disabled' });
+  }
+  if (req.headers['x-internal-token'] !== secret) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const { subject, body } = req.body || {};
+  if (!subject || !body) {
+    return res.status(400).json({ error: 'subject and body are required' });
+  }
+  const mailer = getMailer();
+  if (!mailer) {
+    console.warn('[internal-alert] EMAIL_ENABLED off — alert not sent:', subject);
+    return res.json({ ok: false, reason: 'email_disabled' });
+  }
+  const state = readJson('shared-state.json', {});
+  const users = state.fd_users_v2 || [];
+  const master = users.find((u) => u.role === 'master' && u.email);
+  if (!master) {
+    console.warn('[internal-alert] No master user found in fd_users_v2');
+    return res.status(500).json({ error: 'no master user configured' });
+  }
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: master.email,
+      subject,
+      text: body,
+      html: `<pre style="font-family:monospace;white-space:pre-wrap;">${escapeHtml(body)}</pre>`,
+    });
+    console.log(`[internal-alert] sent to ${master.email}: ${subject}`);
+    res.json({ ok: true, sentTo: master.email });
+  } catch (err) {
+    console.warn('[internal-alert] send failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 8090;
-app.listen(PORT, () => console.log(`legacy-state on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`legacy-state on ${PORT}`);
+  // Warn loudly at boot if the internal-alert token is not set.
+  // Without it every call to POST /internal-alert will return 500.
+  if (!process.env.INTERNAL_ALERT_TOKEN) {
+    console.warn('[internal-alert] WARNING: INTERNAL_ALERT_TOKEN is not set — POST /internal-alert will return 500 on every request. Set it in the legacy-state .env file.');
+  }
+});
