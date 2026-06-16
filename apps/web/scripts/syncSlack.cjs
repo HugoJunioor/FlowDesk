@@ -6,6 +6,15 @@ const path = require('path');
 
 const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
+// Channels where the bot is intentionally not invited.
+// Errors from these are silently skipped — no alert is fired.
+const IGNORED_CHANNELS = new Set([
+  'cliente-convenios',
+  'cliente-cashtime',
+  'cliente-keshbank',
+  'cliente-bc-teste',
+]);
+
 // April 1st 2026 00:00 UTC-3
 const OLDEST = new Date('2026-04-01T00:00:00-03:00').getTime() / 1000;
 const NOW = Date.now() / 1000;
@@ -508,14 +517,44 @@ async function main() {
 
   let allDemands = [];
 
+  // Tracks channels that already fired a not_in_channel alert this run.
+  // Prevents duplicate emails if the same error repeats across retries.
+  const alertedChannels = new Set();
+
   for (const channel of clientChannels) {
+    // Skip channels where the bot is intentionally absent — no error logged.
+    if (IGNORED_CHANNELS.has(channel.name)) {
+      console.log(`Pulando #${channel.name} (na lista de ignorados)`);
+      continue;
+    }
+
     console.log(`Buscando #${channel.name}...`);
     try {
       const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
       console.log(`  ${demands.length} demandas encontradas`);
       allDemands = allDemands.concat(demands);
     } catch (err) {
-      console.error(`  Erro: ${err.message}`);
+      const isNotInChannel = err.message && err.message.includes('not_in_channel');
+      if (isNotInChannel) {
+        // WARN only — not an error we can act on at sync time
+        console.warn(`  [WARN] Bot nao esta em #${channel.name} (not_in_channel) — verificar convite`);
+        if (!alertedChannels.has(channel.name)) {
+          alertedChannels.add(channel.name);
+          // Fire-and-forget alert to legacy-state; failure here must not break sync
+          fetch('http://flowdesk-legacy-state:8090/internal-alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subject: `[FlowDesk] Bot perdeu acesso ao canal #${channel.name}`,
+              body: `O bot @justflow nao esta no canal #${channel.name} e nao conseguiu buscar mensagens.\n\nAcao necessaria: convidar o bot no Slack com "/invite @justflow" dentro do canal #${channel.name}.`,
+            }),
+          }).catch((fetchErr) => {
+            console.warn(`  [WARN] Falha ao enviar alerta para legacy-state: ${fetchErr.message}`);
+          });
+        }
+      } else {
+        console.error(`  Erro: ${err.message}`);
+      }
     }
     await new Promise(r => setTimeout(r, 500));
   }

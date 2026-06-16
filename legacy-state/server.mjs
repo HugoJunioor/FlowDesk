@@ -1346,5 +1346,46 @@ app.post('/daily-reminder/run-now', async (req, res) => {
   }
 });
 
+// ============ /internal-alert — internal use only (sync scripts) ============
+// Sends an email to the first user with role 'master' in fd_users_v2.
+// Intended to be called from within the Docker network (no public exposure).
+// Optional: protect with X-Internal-Token header matching INTERNAL_ALERT_TOKEN env var.
+app.post('/internal-alert', async (req, res) => {
+  const secret = process.env.INTERNAL_ALERT_TOKEN;
+  if (secret && req.headers['x-internal-token'] !== secret) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const { subject, body } = req.body || {};
+  if (!subject || !body) {
+    return res.status(400).json({ error: 'subject and body are required' });
+  }
+  const mailer = getMailer();
+  if (!mailer) {
+    console.warn('[internal-alert] EMAIL_ENABLED off — alert not sent:', subject);
+    return res.json({ ok: false, reason: 'email_disabled' });
+  }
+  const state = readJson('shared-state.json', {});
+  const users = state.fd_users_v2 || [];
+  const master = users.find((u) => u.role === 'master' && u.email);
+  if (!master) {
+    console.warn('[internal-alert] No master user found in fd_users_v2');
+    return res.status(500).json({ error: 'no master user configured' });
+  }
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: master.email,
+      subject,
+      text: body,
+      html: `<pre style="font-family:monospace;white-space:pre-wrap;">${escapeHtml(body)}</pre>`,
+    });
+    console.log(`[internal-alert] sent to ${master.email}: ${subject}`);
+    res.json({ ok: true, sentTo: master.email });
+  } catch (err) {
+    console.warn('[internal-alert] send failed:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 8090;
 app.listen(PORT, () => console.log(`legacy-state on ${PORT}`));
