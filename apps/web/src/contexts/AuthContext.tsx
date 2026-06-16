@@ -3,6 +3,8 @@ import type { FlowDeskUser } from "@/types/auth";
 import {
   initializeAuth,
   getUserById,
+  getUserByLogin,
+  checkPasswordAndMigrate,
   setSession,
   getSession,
   clearSession,
@@ -95,6 +97,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (loginInput: string, password: string) => {
     if (!loginInput || !password) {
       return { success: false, error: "Preencha todos os campos" };
+    }
+
+    // In demo mode (VITE_DEMO_MODE=true) the Express API is not running.
+    // Fall back to the localStorage-based flow so E2E tests and local demos
+    // work without a backend.
+    if (import.meta.env.VITE_DEMO_MODE === "true") {
+      const localUser = getUserByLogin(loginInput);
+      if (!localUser) return { success: false, error: "Usuário ou senha inválidos" };
+      if (localUser.status === "blocked") return { success: false, error: "Conta bloqueada. Contate o administrador." };
+      const valid = await checkPasswordAndMigrate(localUser, password);
+      if (!valid) return { success: false, error: "Usuário ou senha inválidos" };
+      setSession(localUser);
+      setCurrentUser(localUser);
+      setMustChangePassword(localUser.isFirstAccess);
+      loadForUser(localUser.id, localUser.themePreferences);
+      loadLangForUser(localUser.id, localUser.language);
+      return { success: true };
     }
 
     try {
