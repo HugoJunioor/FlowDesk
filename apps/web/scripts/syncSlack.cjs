@@ -540,10 +540,14 @@ async function main() {
         console.warn(`  [WARN] Bot nao esta em #${channel.name} (not_in_channel) — verificar convite`);
         if (!alertedChannels.has(channel.name)) {
           alertedChannels.add(channel.name);
-          // Fire-and-forget alert to legacy-state; failure here must not break sync
+          // Fire-and-forget alert to legacy-state; failure here must not break sync.
+          // Set INTERNAL_ALERT_TOKEN in both legacy-state and sync cron env files; must match.
           fetch('http://flowdesk-legacy-state:8090/internal-alert', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Internal-Token': process.env.INTERNAL_ALERT_TOKEN || '',
+            },
             body: JSON.stringify({
               subject: `[FlowDesk] Bot perdeu acesso ao canal #${channel.name}`,
               body: `O bot @justflow nao esta no canal #${channel.name} e nao conseguiu buscar mensagens.\n\nAcao necessaria: convidar o bot no Slack com "/invite @justflow" dentro do canal #${channel.name}.`,

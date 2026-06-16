@@ -1349,11 +1349,18 @@ app.post('/daily-reminder/run-now', async (req, res) => {
 // ============ /internal-alert — internal use only (sync scripts) ============
 // Sends an email to the first user with role 'master' in fd_users_v2.
 // Intended to be called from within the Docker network (no public exposure).
-// Optional: protect with X-Internal-Token header matching INTERNAL_ALERT_TOKEN env var.
+// REQUIRED: X-Internal-Token header must match INTERNAL_ALERT_TOKEN env var.
+// If INTERNAL_ALERT_TOKEN is not set, the server refuses to start serving this
+// endpoint and returns 500 on every call — prevents open-relay abuse if the
+// legacy container is accidentally exposed via Traefik.
 app.post('/internal-alert', async (req, res) => {
   const secret = process.env.INTERNAL_ALERT_TOKEN;
-  if (secret && req.headers['x-internal-token'] !== secret) {
-    return res.status(403).json({ error: 'forbidden' });
+  // Token is mandatory — reject before touching body or mailer.
+  if (!secret) {
+    return res.status(500).json({ error: 'INTERNAL_ALERT_TOKEN is not configured — endpoint disabled' });
+  }
+  if (req.headers['x-internal-token'] !== secret) {
+    return res.status(401).json({ error: 'unauthorized' });
   }
   const { subject, body } = req.body || {};
   if (!subject || !body) {
@@ -1388,4 +1395,11 @@ app.post('/internal-alert', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8090;
-app.listen(PORT, () => console.log(`legacy-state on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`legacy-state on ${PORT}`);
+  // Warn loudly at boot if the internal-alert token is not set.
+  // Without it every call to POST /internal-alert will return 500.
+  if (!process.env.INTERNAL_ALERT_TOKEN) {
+    console.warn('[internal-alert] WARNING: INTERNAL_ALERT_TOKEN is not set — POST /internal-alert will return 500 on every request. Set it in the legacy-state .env file.');
+  }
+});
