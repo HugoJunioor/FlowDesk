@@ -167,6 +167,11 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   let cursor;
   let cacheHits = 0;
   let cacheMisses = 0;
+  // Contadores auxiliares — usados pra esclarecer no log quando um canal
+  // termina com 0 demandas. Sem isso, "0 demandas encontradas" parece bug;
+  // com isso fica claro que o canal so tem bate-papo humano (ex: bcgestao).
+  let totalRead = 0;
+  let humanMessages = 0;
 
   do {
     const result = await client.conversations.history({
@@ -178,11 +183,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
     });
 
     for (const msg of result.messages) {
+      totalRead++;
       const hasText = msg.text && msg.text.length > 20;
       if (!hasText) continue;
 
       const isBot = msg.subtype === 'bot_message' || !!msg.bot_id;
-      if (!isBot) continue;
+      if (!isBot) { humanMessages++; continue; }
 
       const textCheck = (msg.text || '').toLowerCase();
       const isDemand = textCheck.includes('nova demanda') ||
@@ -431,7 +437,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   if (cacheHits + cacheMisses > 0) {
     console.log(`  cache replies: ${cacheHits} hits, ${cacheMisses} misses`);
   }
-  return demands;
+  return { demands, totalRead, humanMessages };
 }
 
 // === PRESERVAR ESTADO CONCLUIDA DO SYNC ANTERIOR ===
@@ -511,8 +517,14 @@ async function main() {
   for (const channel of clientChannels) {
     console.log(`Buscando #${channel.name}...`);
     try {
-      const demands = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
-      console.log(`  ${demands.length} demandas encontradas`);
+      const { demands, totalRead, humanMessages } = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
+      if (demands.length === 0 && totalRead > 0) {
+        // Explica que canal tem mensagens mas nenhuma com formato de workflow —
+        // ex: cliente usa o canal so pra bate-papo, sem abrir demanda via bot.
+        console.log(`  0 demandas encontradas (${totalRead} mensagens lidas, ${humanMessages} humanas, nenhuma com formato de workflow)`);
+      } else {
+        console.log(`  ${demands.length} demandas encontradas`);
+      }
       allDemands = allDemands.concat(demands);
     } catch (err) {
       console.error(`  Erro: ${err.message}`);
