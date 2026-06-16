@@ -32,14 +32,16 @@ test.describe('Telas v2 — render', () => {
   test('NotasV2Page carrega', async ({ page }) => {
     await loginAsMaster(page);
     await page.goto('/notas-v2');
-    await expect(page.getByRole('heading', { name: /Notas \(v2\)/i })).toBeVisible({ timeout: 10_000 });
+    // Heading was updated from "Notas (v2)" to "Bloco de Notas"
+    await expect(page.getByRole('heading', { name: /Bloco de Notas/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: /Nova nota/i })).toBeVisible();
   });
 
   test('NotificacoesV2Page carrega', async ({ page }) => {
     await loginAsMaster(page);
     await page.goto('/notificacoes-v2');
-    await expect(page.getByRole('heading', { name: /Notificações \(v2\)/i })).toBeVisible({ timeout: 10_000 });
+    // Heading is translated via i18n key "notif_page.title" which resolves to "Notificações"
+    await expect(page.getByRole('heading', { name: /Notificações/i })).toBeVisible({ timeout: 10_000 });
   });
 
   test('ConfiguracoesV2Page carrega', async ({ page }) => {
@@ -61,10 +63,12 @@ test.describe('Telas v2 — render', () => {
     await loginAsMaster(page);
     await page.goto('/notas-v2');
     await page.getByRole('button', { name: /Nova nota/i }).click();
-    await expect(page.getByPlaceholder('Título')).toBeVisible();
+    // Dialog opens — detect by its title rather than a placeholder that may change
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('heading', { name: /Nova nota/i })).toBeVisible();
     // Cancela
     await page.getByRole('button', { name: /Cancelar/i }).click();
-    await expect(page.getByPlaceholder('Título')).not.toBeVisible();
+    await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 });
 
