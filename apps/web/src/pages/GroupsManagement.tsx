@@ -54,6 +54,11 @@ const GroupsManagement = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [groups, setGroups] = useState<GroupPermissions[]>([]);
+  // getAllUsers virou async no PR #178 — hidrata em useEffect.
+  const [users, setUsers] = useState<Awaited<ReturnType<typeof getAllUsers>>>([]);
+  useEffect(() => {
+    getAllUsers().then(setUsers).catch(() => { /* keep empty */ });
+  }, []);
   const [editing, setEditing] = useState<GroupPermissions | null>(null);
   const [editingOriginalName, setEditingOriginalName] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -86,8 +91,7 @@ const GroupsManagement = () => {
     );
   }
 
-  // Contagem de usuarios em cada grupo
-  const users = getAllUsers();
+  // Contagem de usuarios em cada grupo (users vem do state hidratado async).
   const userCountByGroup = (name: string) =>
     users.filter((u) => (u.groups || []).some((g) => g.toLowerCase() === name.toLowerCase())).length;
 

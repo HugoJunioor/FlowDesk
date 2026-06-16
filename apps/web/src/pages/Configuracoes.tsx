@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { FlowDeskUser } from "@/types/auth";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,11 @@ const Configuracoes = () => {
   const isMaster = currentUser?.role === "master";
   // Permissão pra cards "admin": master + qualquer user em grupo com edit em configuracoes.
   const canAdminConfig = hasPermission(currentUser, "configuracoes", "edit");
-  const allUsers = getAllUsers().filter((u) => u.status === "active");
+  // getAllUsers virou async no PR #178 — carrega via useEffect e mantem em state.
+  const [allUsers, setAllUsers] = useState<FlowDeskUser[]>([]);
+  useEffect(() => {
+    getAllUsers().then((list) => setAllUsers(list.filter((u) => u.status === "active"))).catch(() => { /* keep empty */ });
+  }, []);
   const [approvers, setApprovers] = useState<string[]>(loadApprovers);
 
   const toggleApprover = (email: string) => {

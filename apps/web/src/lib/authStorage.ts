@@ -112,6 +112,15 @@ function getUsers(): FlowDeskUser[] {
   }
 }
 
+/**
+ * Sync read of the local user cache. Use in code paths where async is not
+ * an option (e.g. sync resolvers). Returns whatever was last hydrated by
+ * `getAllUsers()` / `initializeAuth()`; may be stale or empty.
+ */
+export function getCachedUsers(): FlowDeskUser[] {
+  return getUsers();
+}
+
 function saveUsers(users: FlowDeskUser[]): void {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }

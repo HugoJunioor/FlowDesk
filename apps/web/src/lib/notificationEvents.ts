@@ -14,7 +14,7 @@ import {
 } from "@/types/notification";
 import { showBrowserNotification, getPermission } from "./browserNotifications";
 import { SlackDemand } from "@/types/demand";
-import { getAllUsers, getSession } from "./authStorage";
+import { getCachedUsers, getSession } from "./authStorage";
 
 /**
  * Resolve email do assignee/requester a partir do nome.
@@ -23,7 +23,7 @@ import { getAllUsers, getSession } from "./authStorage";
 function emailFromName(name: string | undefined): string | null {
   if (!name) return null;
   try {
-    const users = getAllUsers();
+    const users = getCachedUsers();
     const u = users.find(
       (x) => x.name?.toLowerCase() === name.toLowerCase() ||
              x.login?.toLowerCase() === name.toLowerCase(),
