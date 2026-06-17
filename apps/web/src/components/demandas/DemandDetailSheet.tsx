@@ -165,14 +165,19 @@ const DemandDetailSheet = ({
   const status = STATUS_CONFIG[demand.status];
   const client = extractClientName(demand.slackChannel);
 
-  // Check if SLA is expired: usa slaResolutionStatus da planilha (historico) ou calcula em runtime
+  // Check if SLA is expired: usa slaResolutionStatus da planilha (historico) ou calcula em runtime.
+  // Demandas concluidas tambem contam como breach se completedAt > due — sem isso, o campo
+  // "Motivo de expiracao" sumia depois que o user concluia a demanda atrasada, impedindo classificar.
   const isSlaBreach = (() => {
     if (demand.slaResolutionStatus) return demand.slaResolutionStatus === "expirado";
     if (demand.priority === "sem_classificacao") return false;
-    if (demand.status === "concluida") return false;
     const config = PRIORITY_CONFIG[demand.priority];
     if (!config.sla) return false;
     const due = addBusinessHours(new Date(demand.createdAt), config.sla.resolutionHours);
+    if (demand.status === "concluida") {
+      const completedAt = demand.completedAt ? new Date(demand.completedAt) : null;
+      return completedAt ? completedAt > due : false;
+    }
     return new Date() > due;
   })();
 
