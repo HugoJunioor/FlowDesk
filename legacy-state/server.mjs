@@ -1134,20 +1134,38 @@ function computeDueDate(d) {
   return due;
 }
 
+// Render due timestamp as "dd/MM HH:mm" in BRT — short enough for an email
+// column, precise enough to know the exact deadline.
+function formatDueDateLabel(due) {
+  if (!due) return '';
+  try {
+    const d = new Date(due);
+    const fmt = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    });
+    // pt-BR returns "dd/MM, HH:mm" — drop the comma so it reads "dd/MM HH:mm"
+    return fmt.format(d).replace(',', '');
+  } catch {
+    return '';
+  }
+}
+
 function computeSla(due, now, lang = DEFAULT_EMAIL_LANG) {
-  if (!due) return { status: 'sem_prazo', label: tEmail('sla.no_deadline', lang), minutes: null };
+  if (!due) return { status: 'sem_prazo', label: tEmail('sla.no_deadline', lang), dateLabel: '', minutes: null };
+  const dateLabel = formatDueDateLabel(due);
   const mins = businessMinutesBetween(now, due);
   if (mins < 0) {
     const e = Math.abs(mins);
     const lbl = e < 60
       ? tEmail('sla.overdue_min', lang, { min: e })
       : tEmail('sla.overdue_hours', lang, { hours: Math.round(e / 60) });
-    return { status: 'estourado', label: lbl, minutes: mins };
+    return { status: 'estourado', label: lbl, dateLabel, minutes: mins };
   }
   const lbl = mins < 60
     ? tEmail('sla.remaining_min', lang, { min: mins })
     : tEmail('sla.remaining_hours', lang, { hours: Math.round(mins / 60) });
-  return { status: mins <= 240 ? 'proximo' : 'no_prazo', label: lbl, minutes: mins };
+  return { status: mins <= 240 ? 'proximo' : 'no_prazo', label: lbl, dateLabel, minutes: mins };
 }
 
 function buildDailySummary(userName, demands, lang = DEFAULT_EMAIL_LANG) {
@@ -1177,7 +1195,11 @@ function buildDailySummary(userName, demands, lang = DEFAULT_EMAIL_LANG) {
     return `<tr>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:13px;color:#111827;font-weight:600;vertical-align:top;width:48px;">${prio}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;"><a href="${link}" style="color:#1d4ed8;text-decoration:none;font-size:13px;">${titulo}</a></td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:500;white-space:nowrap;vertical-align:top;">${sla.label}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:500;white-space:nowrap;vertical-align:top;">${
+        sla.dateLabel
+          ? `<div style="font-weight:600;">${escapeHtml(sla.dateLabel)}</div><div style="font-weight:400;color:#6b7280;font-size:11px;margin-top:2px;">${sla.label}</div>`
+          : sla.label
+      }</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;text-align:center;vertical-align:top;white-space:nowrap;">${slackCell}</td>
     </tr>`;
   }).join('');
