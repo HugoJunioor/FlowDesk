@@ -11,6 +11,7 @@ import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS } from "@/types/demand";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
+import { setSyncedItem } from "@/lib/stateSync";
 
 function parseResponseSla(sla: string): number {
   const match = sla.match(/(\d+)\s*(min|hora|horas)/i);
@@ -52,7 +53,10 @@ function loadOverrides(): Record<string, DemandOverride> {
 }
 
 function saveOverrides(overrides: Record<string, DemandOverride>) {
-  localStorage.setItem("fd_demand_overrides", JSON.stringify(overrides));
+  // setSyncedItem also fires a PUT to /__state so the override propagates
+  // to legacy-state's shared-state.json — without it, the daily email and
+  // any other server-side consumer kept reading the raw priority/status.
+  setSyncedItem("fd_demand_overrides", JSON.stringify(overrides));
 }
 
 function loadCustomAssignees(): string[] {
