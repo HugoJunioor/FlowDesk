@@ -1195,10 +1195,8 @@ function buildDailySummary(userName, demands, lang = DEFAULT_EMAIL_LANG) {
     return `<tr>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:13px;color:#111827;font-weight:600;vertical-align:top;width:48px;">${prio}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;"><a href="${link}" style="color:#1d4ed8;text-decoration:none;font-size:13px;">${titulo}</a></td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:500;white-space:nowrap;vertical-align:top;">${
-        sla.dateLabel
-          ? `<div style="font-weight:600;">${escapeHtml(sla.dateLabel)}</div><div style="font-weight:400;color:#6b7280;font-size:11px;margin-top:2px;">${sla.label}</div>`
-          : sla.label
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:600;white-space:nowrap;vertical-align:top;">${
+        sla.dateLabel ? escapeHtml(sla.dateLabel) : sla.label
       }</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;text-align:center;vertical-align:top;white-space:nowrap;">${slackCell}</td>
     </tr>`;
