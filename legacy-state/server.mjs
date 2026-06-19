@@ -1116,22 +1116,49 @@ function businessMinutesBetween(from, to) {
 // SLA padrao por prioridade (em horas uteis). Espelha PRIORITY_CONFIG do web.
 const SLA_RESOLUTION_HOURS = { p1: 8, p2: 24, p3: 72 };
 
+// Adds N business hours (Mon-Fri, 8h-18h) to a date — same algorithm as
+// apps/web/src/lib/businessHours.ts so app and email show identical due times.
+// Holidays are not considered here (frontend has a richer calendar); good
+// enough for the daily summary.
+function addBusinessHoursLegacy(startDate, hours) {
+  let remaining = hours * 60;
+  const d = new Date(startDate);
+  const isBusinessDay = (dt) => dt.getDay() >= 1 && dt.getDay() <= 5;
+
+  if (!isBusinessDay(d) || d.getHours() >= BUSINESS_END_HOUR) {
+    d.setDate(d.getDate() + 1);
+    d.setHours(BUSINESS_START_HOUR, 0, 0, 0);
+    while (!isBusinessDay(d)) d.setDate(d.getDate() + 1);
+  } else if (d.getHours() < BUSINESS_START_HOUR) {
+    d.setHours(BUSINESS_START_HOUR, 0, 0, 0);
+  }
+
+  while (remaining > 0) {
+    if (!isBusinessDay(d)) {
+      d.setDate(d.getDate() + 1);
+      d.setHours(BUSINESS_START_HOUR, 0, 0, 0);
+      continue;
+    }
+    const curMin = d.getHours() * 60 + d.getMinutes();
+    const available = BUSINESS_END_HOUR * 60 - curMin;
+    if (remaining <= available) {
+      d.setMinutes(d.getMinutes() + remaining);
+      remaining = 0;
+    } else {
+      remaining -= available;
+      d.setDate(d.getDate() + 1);
+      d.setHours(BUSINESS_START_HOUR, 0, 0, 0);
+    }
+  }
+  return d;
+}
+
 function computeDueDate(d) {
-  // Se demanda ja tem dueDate explicito, usa. Caso contrario, deriva de
-  // createdAt + SLA da prioridade (horas uteis).
   if (d.dueDate) return new Date(d.dueDate);
   if (!d.createdAt || d.priority === 'sem_classificacao') return null;
   const hours = SLA_RESOLUTION_HOURS[d.priority];
   if (!hours) return null;
-  // Aproxima: adiciona N dias uteis equivalentes. 8h = 1 dia util.
-  const days = hours / 10; // 10h por dia util
-  const due = new Date(d.createdAt);
-  let added = 0;
-  while (added < days) {
-    due.setDate(due.getDate() + 1);
-    if (due.getDay() >= 1 && due.getDay() <= 5) added++;
-  }
-  return due;
+  return addBusinessHoursLegacy(new Date(d.createdAt), hours);
 }
 
 // Render due timestamp as "dd/MM HH:mm" in BRT — short enough for an email
@@ -1195,10 +1222,8 @@ function buildDailySummary(userName, demands, lang = DEFAULT_EMAIL_LANG) {
     return `<tr>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:13px;color:#111827;font-weight:600;vertical-align:top;width:48px;">${prio}</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;"><a href="${link}" style="color:#1d4ed8;text-decoration:none;font-size:13px;">${titulo}</a></td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:500;white-space:nowrap;vertical-align:top;">${
-        sla.dateLabel
-          ? `<div style="font-weight:600;">${escapeHtml(sla.dateLabel)}</div><div style="font-weight:400;color:#6b7280;font-size:11px;margin-top:2px;">${sla.label}</div>`
-          : sla.label
+      <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;font-size:12px;color:${prazoCor};font-weight:600;white-space:nowrap;vertical-align:top;">${
+        sla.dateLabel ? escapeHtml(sla.dateLabel) : sla.label
       }</td>
       <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;text-align:center;vertical-align:top;white-space:nowrap;">${slackCell}</td>
     </tr>`;
