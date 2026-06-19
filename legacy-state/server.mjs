@@ -1113,8 +1113,11 @@ function businessMinutesBetween(from, to) {
   return Math.round(total);
 }
 
-// SLA padrao por prioridade (em horas uteis). Espelha PRIORITY_CONFIG do web.
-const SLA_RESOLUTION_HOURS = { p1: 8, p2: 24, p3: 72 };
+// SLA padrao por prioridade (em horas uteis). Espelha PRIORITY_CONFIG do web
+// (apps/web/src/types/demand.ts) — manter alinhado: P1=4h, P2=8h, P3=24h.
+// Valores anteriores (8/24/72) estavam dobrados/triplicados — datas no
+// email diario apareciam alguns dias depois do que o tooltip do app mostrava.
+const SLA_RESOLUTION_HOURS = { p1: 4, p2: 8, p3: 24 };
 
 // Adds N business hours (Mon-Fri, 8h-18h) to a date — same algorithm as
 // apps/web/src/lib/businessHours.ts so app and email show identical due times.
