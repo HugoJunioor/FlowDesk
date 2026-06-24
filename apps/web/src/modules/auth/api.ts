@@ -7,6 +7,7 @@
 import { apiClient, setAccessToken } from '@/lib/api/client';
 import { unwrap } from '@/lib/api/response-mapper';
 import type { AuthResponse, AuthenticatedUser } from './types';
+import type { UserThemePreferences } from '@/types/auth';
 
 interface LoginPayload {
   login: string;
@@ -53,6 +54,8 @@ export const authApi = {
 
 // ── Tipos espelhando a API ────────────────────────────────────────────────────
 
+export type { UserThemePreferences as UsuarioThemePreferences };
+
 export interface UsuarioApi {
   id: string;
   login: string;
@@ -62,8 +65,15 @@ export interface UsuarioApi {
   status: 'active' | 'blocked';
   primeiroAcesso: boolean;
   resetSenhaSolicitado: boolean;
+  themePreferences: UsuarioThemePreferences | null;
+  language: string | null;
   criadoEm: string;
   atualizadoEm: string;
+}
+
+export interface UpdateMyPreferencesPayload {
+  themePreferences?: UsuarioThemePreferences | null;
+  language?: string | null;
 }
 
 export interface CreateUsuarioPayload {
@@ -105,6 +115,14 @@ export const usuariosApi = {
     const res = await apiClient.post<{ sucesso: true; dados: { senhaTempOraria: string } }>(
       `/usuarios/${id}/reset-password`,
       {},
+    );
+    return unwrap(res);
+  },
+
+  async updateMyPreferences(payload: UpdateMyPreferencesPayload): Promise<UsuarioApi> {
+    const res = await apiClient.patch<{ sucesso: true; dados: UsuarioApi }>(
+      '/usuarios/me/preferences',
+      payload,
     );
     return unwrap(res);
   },

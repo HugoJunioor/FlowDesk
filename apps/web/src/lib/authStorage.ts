@@ -1,4 +1,5 @@
 import type { FlowDeskUser, UserRole } from "@/types/auth";
+import { isValidLanguage } from "@/types/auth";
 import { hashPassword as cryptoHashPassword, verifyPassword, generateUUID } from "@/lib/crypto";
 import { usuariosApi, type UsuarioApi } from "@/modules/auth/api";
 
@@ -190,7 +191,8 @@ export async function initializeAuth(): Promise<void> {
 // ── API ↔ local shape conversion ──────────────────────────────────────────────
 
 function apiToLocal(u: UsuarioApi): FlowDeskUser {
-  // Merge with any locally-stored prefs (theme, language) if available
+  // API is the source of truth for prefs; fall back to local cache for compat
+  // (e.g. when the API returns null because the user never set prefs via new API)
   const local = getUsers().find((l) => l.id === u.id);
   return {
     id: u.id,
@@ -203,8 +205,8 @@ function apiToLocal(u: UsuarioApi): FlowDeskUser {
     isFirstAccess: u.primeiroAcesso,
     passwordResetRequested: u.resetSenhaSolicitado,
     groups: local?.groups ?? [],
-    themePreferences: local?.themePreferences,
-    language: local?.language,
+    themePreferences: u.themePreferences ?? local?.themePreferences,
+    language: (() => { const lang = u.language ?? local?.language; return isValidLanguage(lang) ? lang : undefined; })(),
     createdAt: u.criadoEm,
     createdBy: local?.createdBy ?? "api",
     updatedAt: u.atualizadoEm,
