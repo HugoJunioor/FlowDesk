@@ -12,6 +12,11 @@ export interface AnonimizacaoResult {
   anonimizadoEm: Date;
 }
 
+export interface ThemePreferences {
+  mode: 'light' | 'dark';
+  colorTheme: string;
+}
+
 export interface UsuarioPublico {
   id: string;
   login: string;
@@ -21,8 +26,15 @@ export interface UsuarioPublico {
   status: 'active' | 'blocked';
   primeiroAcesso: boolean;
   resetSenhaSolicitado: boolean;
+  themePreferences: ThemePreferences | null;
+  language: string | null;
   criadoEm: Date;
   atualizadoEm: Date;
+}
+
+export interface UpdatePreferencesData {
+  themePreferences?: ThemePreferences | null;
+  language?: string | null;
 }
 
 export interface CreateUsuarioData {
@@ -49,6 +61,8 @@ function toPublico(row: UsuarioRow): UsuarioPublico {
     status: row.status,
     primeiroAcesso: row.primeiro_acesso,
     resetSenhaSolicitado: row.reset_senha_solicitado,
+    themePreferences: row.theme_preferences ?? null,
+    language: row.language ?? null,
     criadoEm: row.criado_em,
     atualizadoEm: row.atualizado_em,
   };
@@ -157,6 +171,30 @@ export const usuariosRepository = {
           [email],
         );
     return (res.rowCount ?? 0) > 0;
+  },
+
+  async updatePreferences(id: string, data: UpdatePreferencesData): Promise<UsuarioPublico | null> {
+    const setClauses: string[] = ['atualizado_em = NOW()'];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (data.themePreferences !== undefined) {
+      setClauses.push(`theme_preferences = $${idx++}`);
+      values.push(data.themePreferences === null ? null : JSON.stringify(data.themePreferences));
+    }
+    if (data.language !== undefined) {
+      setClauses.push(`language = $${idx++}`);
+      values.push(data.language);
+    }
+
+    values.push(id);
+    const res = await pool.query<UsuarioRow>(
+      `UPDATE tb_usuario SET ${setClauses.join(', ')}
+       WHERE id = $${idx} AND excluido_em IS NULL
+       RETURNING *`,
+      values,
+    );
+    return res.rows[0] ? toPublico(res.rows[0]) : null;
   },
 
   async anonimizar(id: string, campos: {

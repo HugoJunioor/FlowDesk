@@ -16,7 +16,7 @@ import { randomInt, randomBytes, randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { NotFoundError, ForbiddenError, ConflictError } from '@shared/domain/errors';
 import { authRepository } from '@modules/auth/auth.repository';
-import { usuariosRepository, type AnonimizacaoResult, type UsuarioPublico } from './usuarios.repository';
+import { usuariosRepository, type AnonimizacaoResult, type UsuarioPublico, type ThemePreferences, type UpdatePreferencesData } from './usuarios.repository';
 
 export interface CreateUsuarioInput {
   nome: string;
@@ -32,6 +32,11 @@ export interface UpdateUsuarioInput {
 
 export interface ResetPasswordResult {
   senhaTempOraria: string;
+}
+
+export interface UpdateMyPreferencesInput {
+  themePreferences?: ThemePreferences | null;
+  language?: string | null;
 }
 
 /** Derives login from full name: "Maria Silva" → "maria.silva". */
@@ -157,6 +162,17 @@ export const usuariosService = {
     if (!ok) throw new NotFoundError('Usuário não encontrado');
 
     return { senhaTempOraria };
+  },
+
+  /** Any authenticated user can update their own theme/language preferences. */
+  async updateMyPreferences(userId: string, input: UpdateMyPreferencesInput): Promise<UsuarioPublico> {
+    const data: UpdatePreferencesData = {};
+    if (input.themePreferences !== undefined) data.themePreferences = input.themePreferences;
+    if (input.language !== undefined) data.language = input.language;
+
+    const updated = await usuariosRepository.updatePreferences(userId, data);
+    if (!updated) throw new NotFoundError('Usuário não encontrado');
+    return updated;
   },
 
   async anonimizarLgpd(

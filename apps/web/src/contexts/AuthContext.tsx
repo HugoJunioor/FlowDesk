@@ -39,7 +39,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const useAuth = () => useContext(AuthContext);
 
 /** Maps the API AuthenticatedUser shape to the local FlowDeskUser shape used by legacy UI. */
-function apiUserToLocal(apiUser: AuthenticatedUser): FlowDeskUser {
+function apiUserToLocal(apiUser: AuthenticatedUser, localFallback?: FlowDeskUser | null): FlowDeskUser {
   return {
     id: apiUser.id,
     login: apiUser.login,
@@ -52,6 +52,9 @@ function apiUserToLocal(apiUser: AuthenticatedUser): FlowDeskUser {
     isFirstAccess: apiUser.primeiroAcesso,
     passwordResetRequested: false,
     groups: apiUser.grupos,
+    // API is the source of truth; fall back to local cache for retro-compat when null
+    themePreferences: apiUser.themePreferences ?? localFallback?.themePreferences,
+    language: (apiUser.language ?? localFallback?.language) as FlowDeskUser['language'] | undefined,
     createdAt: new Date().toISOString(),
     createdBy: "api",
   };
@@ -71,13 +74,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Restore access token via refresh cookie; if cookie is gone, force logout.
         authApi.refresh()
           .then((authResponse) => {
-            const user = apiUserToLocal(authResponse.usuario);
-            // Sync local session so legacy reads still work
-            const localUser = getUserById(session.userId) ?? user;
-            setCurrentUser({ ...user, themePreferences: localUser.themePreferences, language: localUser.language });
+            const localUser = getUserById(session.userId);
+            const user = apiUserToLocal(authResponse.usuario, localUser);
+            setCurrentUser(user);
             setMustChangePassword(user.isFirstAccess);
-            loadForUser(user.id, localUser.themePreferences);
-            loadLangForUser(user.id, localUser.language);
+            loadForUser(user.id, user.themePreferences);
+            loadLangForUser(user.id, user.language);
           })
           .catch(() => {
             // Refresh token gone/expired — clear session and show login
@@ -118,21 +120,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const authResponse = await authApi.login({ login: loginInput, senha: password });
-      const user = apiUserToLocal(authResponse.usuario);
+      const localUser = getUserById(authResponse.usuario.id);
+      // API is source of truth for prefs; local cache is fallback for retro-compat
+      const user = apiUserToLocal(authResponse.usuario, localUser);
 
-      // Preserve local theme/language prefs if the user already existed locally
-      const localUser = getUserById(user.id);
-      const mergedUser: FlowDeskUser = {
-        ...user,
-        themePreferences: localUser?.themePreferences,
-        language: localUser?.language,
-      };
-
-      setSession(mergedUser);
-      setCurrentUser(mergedUser);
+      setSession(user);
+      setCurrentUser(user);
       setMustChangePassword(user.isFirstAccess);
-      loadForUser(user.id, mergedUser.themePreferences);
-      loadLangForUser(user.id, mergedUser.language);
+      loadForUser(user.id, user.themePreferences);
+      loadLangForUser(user.id, user.language);
 
       return { success: true };
     } catch (err) {
@@ -173,13 +169,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await authApi.changePassword({ senhaAtual: currentPassword, novaSenha: newPassword });
         // Re-fetch user state from API after password change
         const updated = await authApi.me();
-        const updatedUser = apiUserToLocal(updated);
         const localUser = getUserById(currentUser.id);
-        const mergedUser: FlowDeskUser = {
-          ...updatedUser,
-          themePreferences: localUser?.themePreferences,
-          language: localUser?.language,
-        };
+        const mergedUser = apiUserToLocal(updated, localUser);
         setCurrentUser(mergedUser);
         setSession(mergedUser);
         setMustChangePassword(false);
@@ -199,9 +190,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser) return;
     authApi.me()
       .then((updated) => {
-        const user = apiUserToLocal(updated);
         const localUser = getUserById(currentUser.id);
-        setCurrentUser({ ...user, themePreferences: localUser?.themePreferences, language: localUser?.language });
+        setCurrentUser(apiUserToLocal(updated, localUser));
       })
       .catch(() => { /* ignore — best-effort refresh */ });
   }, [currentUser]);

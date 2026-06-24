@@ -190,7 +190,8 @@ export async function initializeAuth(): Promise<void> {
 // ── API ↔ local shape conversion ──────────────────────────────────────────────
 
 function apiToLocal(u: UsuarioApi): FlowDeskUser {
-  // Merge with any locally-stored prefs (theme, language) if available
+  // API is the source of truth for prefs; fall back to local cache for compat
+  // (e.g. when the API returns null because the user never set prefs via new API)
   const local = getUsers().find((l) => l.id === u.id);
   return {
     id: u.id,
@@ -203,8 +204,8 @@ function apiToLocal(u: UsuarioApi): FlowDeskUser {
     isFirstAccess: u.primeiroAcesso,
     passwordResetRequested: u.resetSenhaSolicitado,
     groups: local?.groups ?? [],
-    themePreferences: local?.themePreferences,
-    language: local?.language,
+    themePreferences: u.themePreferences ?? local?.themePreferences,
+    language: (u.language ?? local?.language) as FlowDeskUser['language'] | undefined,
     createdAt: u.criadoEm,
     createdBy: local?.createdBy ?? "api",
     updatedAt: u.atualizadoEm,

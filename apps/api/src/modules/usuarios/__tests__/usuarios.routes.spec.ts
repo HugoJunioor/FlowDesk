@@ -16,6 +16,7 @@ jest.mock('../usuarios.service', () => ({
     delete: jest.fn(),
     resetPassword: jest.fn(),
     anonimizarLgpd: jest.fn(),
+    updateMyPreferences: jest.fn(),
   },
   _internals: {},
 }));
@@ -298,6 +299,51 @@ describe('POST /api/v1/usuarios/:id/reset-password', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.codigo).toBe('VALIDACAO_FALHOU');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/v1/usuarios/me/preferences
+// ---------------------------------------------------------------------------
+describe('PATCH /api/v1/usuarios/me/preferences', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('200 updates preferences for any authenticated user', async () => {
+    const { authHeader } = setupAuth('user');
+    const updatedUser = fakePublicUser({
+      themePreferences: { mode: 'dark', colorTheme: 'ocean' },
+      language: 'en-US',
+    });
+    serviceMock.updateMyPreferences.mockResolvedValue(updatedUser);
+
+    const res = await request(app)
+      .patch('/api/v1/usuarios/me/preferences')
+      .set('Authorization', authHeader)
+      .send({ themePreferences: { mode: 'dark', colorTheme: 'ocean' }, language: 'en-US' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sucesso).toBe(true);
+    expect(res.body.dados.themePreferences).toEqual({ mode: 'dark', colorTheme: 'ocean' });
+  });
+
+  it('400 when body is missing both fields', async () => {
+    const { authHeader } = setupAuth('user');
+
+    const res = await request(app)
+      .patch('/api/v1/usuarios/me/preferences')
+      .set('Authorization', authHeader)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.codigo).toBe('VALIDACAO_FALHOU');
+  });
+
+  it('401 when request is anonymous', async () => {
+    const res = await request(app)
+      .patch('/api/v1/usuarios/me/preferences')
+      .send({ language: 'en-US' });
+
+    expect(res.status).toBe(401);
   });
 });
 

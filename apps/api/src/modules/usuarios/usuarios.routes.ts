@@ -27,9 +27,27 @@ const updateBodySchema = z.object({
   status: z.enum(['active', 'blocked']).optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: 'Informe ao menos um campo para atualizar' });
 
+const preferencesBodySchema = z.object({
+  themePreferences: z.object({
+    mode: z.enum(['light', 'dark']),
+    colorTheme: z.string().min(1).max(50),
+  }).nullable().optional(),
+  language: z.string().max(10).nullable().optional(),
+}).refine((d) => d.themePreferences !== undefined || d.language !== undefined, {
+  message: 'Informe ao menos um campo para atualizar',
+});
+
 export const usuariosRoutes = Router();
 
-// All routes require authenticated master
+// Self-service: any authenticated user can update their own preferences
+usuariosRoutes.patch(
+  '/me/preferences',
+  authenticate,
+  validate({ body: preferencesBodySchema }),
+  usuariosController.updateMyPreferences,
+);
+
+// All routes below require authenticated master
 usuariosRoutes.use(authenticate, requirePerfil('master'));
 
 usuariosRoutes.get('/', usuariosController.list);

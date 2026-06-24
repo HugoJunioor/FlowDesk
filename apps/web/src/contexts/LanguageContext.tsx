@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import type { Language } from "@/types/auth";
 import { DEFAULT_LANGUAGE, translate } from "@/lib/i18n";
+import { usuariosApi } from "@/modules/auth/api";
 
 interface LanguageContextType {
   language: Language;
@@ -34,7 +35,8 @@ function readStoredLanguage(): Language {
   return DEFAULT_LANGUAGE;
 }
 
-function saveToUserProfile(userId: string, language: Language) {
+/** Keep local cache (fd_users_v2) in sync for other sync readers (e.g. notificationEvents). */
+function updateLocalCache(userId: string, language: Language) {
   try {
     const raw = localStorage.getItem("fd_users_v2");
     if (!raw) return;
@@ -56,7 +58,10 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
     document.documentElement.lang = language;
     localStorage.setItem(STORAGE_KEY, language);
     if (userIdRef.current) {
-      saveToUserProfile(userIdRef.current, language);
+      // Keep local cache in sync for sync readers
+      updateLocalCache(userIdRef.current, language);
+      // Persist to API (fire-and-forget; localStorage serves as fast cache)
+      usuariosApi.updateMyPreferences({ language }).catch(() => { /* ignore */ });
     }
   }, [language]);
 

@@ -6,6 +6,11 @@
  * podemos derivar daqui.
  */
 
+export interface UserThemePreferences {
+  mode: 'light' | 'dark';
+  colorTheme: string;
+}
+
 export interface AuthenticatedUser {
   id: string;
   login: string;
@@ -16,6 +21,8 @@ export interface AuthenticatedUser {
   primeiroAcesso: boolean;
   grupos: string[];
   permissoes: Array<{ modulo: string; acao: string }>;
+  themePreferences: UserThemePreferences | null;
+  language: string | null;
 }
 
 export interface AuthResponse {

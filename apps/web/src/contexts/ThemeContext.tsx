@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import type { ColorThemeId } from "@/config/themes";
 import { DEFAULT_COLOR_THEME, DEFAULT_MODE, THEME_STORAGE_KEY, COLOR_THEMES } from "@/config/themes";
 import type { UserThemePreferences } from "@/types/auth";
+import { usuariosApi } from "@/modules/auth/api";
 
 type Mode = "light" | "dark";
 
@@ -91,18 +92,15 @@ function applyThemeClasses(mode: Mode, colorTheme: ColorThemeId) {
   root.classList.add(mode, `theme-${colorTheme}`);
 }
 
-/** Save theme prefs to the user object in localStorage (authStorage) */
-function saveToUserProfile(userId: string, mode: Mode, colorTheme: ColorThemeId) {
+/** Persist theme prefs to local cache (fd_users_v2) for instant reads by other listeners. */
+function updateLocalCache(userId: string, mode: Mode, colorTheme: ColorThemeId) {
   try {
     const raw = localStorage.getItem("fd_users_v2");
     if (!raw) return;
     const users = JSON.parse(raw);
     const idx = users.findIndex((u: { id: string }) => u.id === userId);
     if (idx === -1) return;
-    users[idx] = {
-      ...users[idx],
-      themePreferences: { mode, colorTheme },
-    };
+    users[idx] = { ...users[idx], themePreferences: { mode, colorTheme } };
     localStorage.setItem("fd_users_v2", JSON.stringify(users));
   } catch { /* ignore */ }
 }
@@ -114,9 +112,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     applyThemeClasses(mode, colorTheme);
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ mode, colorTheme }));
-    // Also persist to user profile if logged in
     if (userIdRef.current) {
-      saveToUserProfile(userIdRef.current, mode, colorTheme);
+      // Keep local cache in sync for other listeners (e.g. notification events)
+      updateLocalCache(userIdRef.current, mode, colorTheme);
+      // Persist to API (fire-and-forget; localStorage is the fast cache for UX)
+      usuariosApi.updateMyPreferences({ themePreferences: { mode, colorTheme } }).catch(() => { /* ignore */ });
     }
   }, [mode, colorTheme]);
 
