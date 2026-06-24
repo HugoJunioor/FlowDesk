@@ -72,6 +72,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth().then(() => {
       const session = getSession();
       if (session) {
+        // In demo mode the Express API is not running, so authApi.refresh() would
+        // always fail and wipe the session on every hard navigation (page.goto in
+        // Playwright, F5, etc.). Restore the user directly from the local store.
+        if (import.meta.env.VITE_DEMO_MODE === "true") {
+          const localUser = getUserById(session.userId);
+          if (localUser) {
+            setCurrentUser(localUser);
+            setMustChangePassword(localUser.isFirstAccess);
+            loadForUser(localUser.id, localUser.themePreferences);
+            loadLangForUser(localUser.id, localUser.language);
+          } else {
+            // User record missing from localStorage — treat as logged out.
+            clearSession();
+          }
+          setInitialized(true);
+          return;
+        }
+
         // Restore access token via refresh cookie; if cookie is gone, force logout.
         authApi.refresh()
           .then((authResponse) => {
