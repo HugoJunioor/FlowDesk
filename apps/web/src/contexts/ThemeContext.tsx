@@ -116,7 +116,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       // Keep local cache in sync for other listeners (e.g. notification events)
       updateLocalCache(userIdRef.current, mode, colorTheme);
       // Persist to API (fire-and-forget; localStorage is the fast cache for UX)
-      usuariosApi.updateMyPreferences({ themePreferences: { mode, colorTheme } }).catch(() => { /* ignore */ });
+      usuariosApi.updateMyPreferences({ themePreferences: { mode, colorTheme } }).catch((err) => { console.warn('[prefs] failed to persist:', err); });
     }
   }, [mode, colorTheme]);
 

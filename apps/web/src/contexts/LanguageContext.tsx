@@ -61,7 +61,7 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
       // Keep local cache in sync for sync readers
       updateLocalCache(userIdRef.current, language);
       // Persist to API (fire-and-forget; localStorage serves as fast cache)
-      usuariosApi.updateMyPreferences({ language }).catch(() => { /* ignore */ });
+      usuariosApi.updateMyPreferences({ language }).catch((err) => { console.warn('[prefs] failed to persist:', err); });
     }
   }, [language]);
 

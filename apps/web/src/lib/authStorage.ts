@@ -1,4 +1,5 @@
 import type { FlowDeskUser, UserRole } from "@/types/auth";
+import { isValidLanguage } from "@/types/auth";
 import { hashPassword as cryptoHashPassword, verifyPassword, generateUUID } from "@/lib/crypto";
 import { usuariosApi, type UsuarioApi } from "@/modules/auth/api";
 
@@ -205,7 +206,7 @@ function apiToLocal(u: UsuarioApi): FlowDeskUser {
     passwordResetRequested: u.resetSenhaSolicitado,
     groups: local?.groups ?? [],
     themePreferences: u.themePreferences ?? local?.themePreferences,
-    language: (u.language ?? local?.language) as FlowDeskUser['language'] | undefined,
+    language: (() => { const lang = u.language ?? local?.language; return isValidLanguage(lang) ? lang : undefined; })(),
     createdAt: u.criadoEm,
     createdBy: local?.createdBy ?? "api",
     updatedAt: u.atualizadoEm,

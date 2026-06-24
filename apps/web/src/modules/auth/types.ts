@@ -6,10 +6,7 @@
  * podemos derivar daqui.
  */
 
-export interface UserThemePreferences {
-  mode: 'light' | 'dark';
-  colorTheme: string;
-}
+export type { UserThemePreferences } from '@/types/auth';
 
 export interface AuthenticatedUser {
   id: string;

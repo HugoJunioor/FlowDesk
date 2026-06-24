@@ -7,6 +7,7 @@
 import { apiClient, setAccessToken } from '@/lib/api/client';
 import { unwrap } from '@/lib/api/response-mapper';
 import type { AuthResponse, AuthenticatedUser } from './types';
+import type { UserThemePreferences } from '@/types/auth';
 
 interface LoginPayload {
   login: string;
@@ -53,10 +54,7 @@ export const authApi = {
 
 // ── Tipos espelhando a API ────────────────────────────────────────────────────
 
-export interface UsuarioThemePreferences {
-  mode: 'light' | 'dark';
-  colorTheme: string;
-}
+export type { UserThemePreferences as UsuarioThemePreferences };
 
 export interface UsuarioApi {
   id: string;

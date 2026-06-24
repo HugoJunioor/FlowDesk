@@ -6,15 +6,13 @@
  */
 import { pool } from '@config/database';
 import type { UsuarioRow } from '@modules/auth/auth.repository';
+import type { ThemePreferences } from '@modules/auth/auth.dto';
+
+export type { ThemePreferences };
 
 export interface AnonimizacaoResult {
   id: string;
   anonimizadoEm: Date;
-}
-
-export interface ThemePreferences {
-  mode: 'light' | 'dark';
-  colorTheme: string;
 }
 
 export interface UsuarioPublico {

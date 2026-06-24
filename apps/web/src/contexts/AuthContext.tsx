@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { FlowDeskUser } from "@/types/auth";
+import { isValidLanguage } from "@/types/auth";
 import {
   initializeAuth,
   getUserById,
@@ -54,7 +55,7 @@ function apiUserToLocal(apiUser: AuthenticatedUser, localFallback?: FlowDeskUser
     groups: apiUser.grupos,
     // API is the source of truth; fall back to local cache for retro-compat when null
     themePreferences: apiUser.themePreferences ?? localFallback?.themePreferences,
-    language: (apiUser.language ?? localFallback?.language) as FlowDeskUser['language'] | undefined,
+    language: (() => { const lang = apiUser.language ?? localFallback?.language; return isValidLanguage(lang) ? lang : undefined; })(),
     createdAt: new Date().toISOString(),
     createdBy: "api",
   };

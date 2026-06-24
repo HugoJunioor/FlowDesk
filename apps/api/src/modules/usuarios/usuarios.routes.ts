@@ -32,7 +32,7 @@ const preferencesBodySchema = z.object({
     mode: z.enum(['light', 'dark']),
     colorTheme: z.string().min(1).max(50),
   }).nullable().optional(),
-  language: z.string().max(10).nullable().optional(),
+  language: z.enum(['pt-BR', 'en-US', 'es-ES']).nullable().optional(),
 }).refine((d) => d.themePreferences !== undefined || d.language !== undefined, {
   message: 'Informe ao menos um campo para atualizar',
 });

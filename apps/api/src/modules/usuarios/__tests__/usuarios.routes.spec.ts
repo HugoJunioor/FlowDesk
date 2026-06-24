@@ -338,6 +338,18 @@ describe('PATCH /api/v1/usuarios/me/preferences', () => {
     expect(res.body.codigo).toBe('VALIDACAO_FALHOU');
   });
 
+  it('400 when language is not a valid locale code', async () => {
+    const { authHeader } = setupAuth('user');
+
+    const res = await request(app)
+      .patch('/api/v1/usuarios/me/preferences')
+      .set('Authorization', authHeader)
+      .send({ language: 'xx-ZZ' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.codigo).toBe('VALIDACAO_FALHOU');
+  });
+
   it('401 when request is anonymous', async () => {
     const res = await request(app)
       .patch('/api/v1/usuarios/me/preferences')
