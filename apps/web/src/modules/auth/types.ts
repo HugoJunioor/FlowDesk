@@ -6,6 +6,8 @@
  * podemos derivar daqui.
  */
 
+export type { UserThemePreferences } from '@/types/auth';
+
 export interface AuthenticatedUser {
   id: string;
   login: string;
@@ -16,6 +18,8 @@ export interface AuthenticatedUser {
   primeiroAcesso: boolean;
   grupos: string[];
   permissoes: Array<{ modulo: string; acao: string }>;
+  themePreferences: UserThemePreferences | null;
+  language: string | null;
 }
 
 export interface AuthResponse {

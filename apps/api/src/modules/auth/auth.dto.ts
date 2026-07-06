@@ -26,6 +26,11 @@ export interface AuthResponse {
   usuario: AuthenticatedUser;
 }
 
+export interface ThemePreferences {
+  mode: 'light' | 'dark';
+  colorTheme: string;
+}
+
 /** User retornado no contexto autenticado (sem senha hash). */
 export interface AuthenticatedUser {
   id: string;
@@ -37,4 +42,6 @@ export interface AuthenticatedUser {
   primeiroAcesso: boolean;
   grupos: string[];
   permissoes: Array<{ modulo: string; acao: string }>;
+  themePreferences: ThemePreferences | null;
+  language: string | null;
 }

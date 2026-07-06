@@ -17,6 +17,8 @@ export interface UsuarioRow {
   primeiro_acesso: boolean;
   reset_senha_solicitado: boolean;
   avatar_url: string | null;
+  theme_preferences: { mode: 'light' | 'dark'; colorTheme: string } | null;
+  language: string | null;
   criado_em: Date;
   atualizado_em: Date;
   excluido_em: Date | null;

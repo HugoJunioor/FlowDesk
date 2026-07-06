@@ -129,6 +129,8 @@ async function buildAuthenticatedUser(user: UsuarioRow): Promise<AuthenticatedUs
     primeiroAcesso: user.primeiro_acesso,
     grupos,
     permissoes,
+    themePreferences: user.theme_preferences ?? null,
+    language: user.language ?? null,
   };
 }
 

@@ -11,7 +11,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { auditService } from '@shared/audit/audit.service';
 import { usuariosService } from './usuarios.service';
-import type { CreateUsuarioInput, UpdateUsuarioInput } from './usuarios.service';
+import type { CreateUsuarioInput, UpdateUsuarioInput, UpdateMyPreferencesInput } from './usuarios.service';
 
 export const usuariosController = {
   async list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -92,6 +92,16 @@ export const usuariosController = {
         acao: 'reset_password',
       });
 
+      res.json({ sucesso: true, dados });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async updateMyPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = req.body as UpdateMyPreferencesInput;
+      const dados = await usuariosService.updateMyPreferences(req.user!.id, input);
       res.json({ sucesso: true, dados });
     } catch (err) {
       next(err);
