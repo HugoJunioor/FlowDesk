@@ -74,17 +74,40 @@ export async function initStateSync(): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const serverState = (await res.json()) as Partial<Record<SyncedKey, unknown>>;
 
+    // Keys that are ID-indexed dictionaries — merge server + local so entries
+    // written by any browser (past or present) are preserved. Blindly copying
+    // server → local here would silently drop overrides that were made offline
+    // or before the PR that started pushing them (see PR #187).
+    const MERGEABLE_DICT_KEYS: Set<string> = new Set(["fd_demand_overrides", "fd_sql_demand_overrides"]);
+
     for (const key of SYNCED_KEYS) {
-      const value = serverState[key];
-      if (value !== undefined && value !== null) {
-        localStorage.setItem(key, JSON.stringify(value));
-      } else {
-        const local = localStorage.getItem(key);
-        if (local) {
-          try {
-            await pushToServer(key, JSON.parse(local));
-          } catch { /* ignore */ }
+      const serverValue = serverState[key];
+      const localRaw = localStorage.getItem(key);
+
+      if (MERGEABLE_DICT_KEYS.has(key)) {
+        // Merge dictionaries. Local wins on conflict (the user's browser has
+        // the freshest edit that likely hasn't been pushed yet).
+        const serverDict = (serverValue && typeof serverValue === "object") ? (serverValue as Record<string, unknown>) : {};
+        let localDict: Record<string, unknown> = {};
+        try { localDict = localRaw ? (JSON.parse(localRaw) as Record<string, unknown>) : {}; }
+        catch { localDict = {}; }
+        const merged = { ...serverDict, ...localDict };
+        localStorage.setItem(key, JSON.stringify(merged));
+        // If merge introduced entries missing on the server, push them up.
+        const serverKeys = Object.keys(serverDict);
+        const mergedKeys = Object.keys(merged);
+        if (mergedKeys.length > serverKeys.length) {
+          try { await pushToServer(key, merged); } catch { /* ignore */ }
         }
+        continue;
+      }
+
+      if (serverValue !== undefined && serverValue !== null) {
+        localStorage.setItem(key, JSON.stringify(serverValue));
+      } else if (localRaw) {
+        try {
+          await pushToServer(key, JSON.parse(localRaw));
+        } catch { /* ignore */ }
       }
     }
     console.log("[stateSync] Estado sincronizado com servidor");
