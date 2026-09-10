@@ -118,31 +118,19 @@ function isTeamMemberSync(userId) {
 }
 
 // Parse user mentions <@U12345> to names (sincrono, usa cache)
+// Aceita as duas formas de mencao do Slack: <@U123> e <@U123|nome>.
+// A segunda aparece no formulario "Novo chamado" (linha c/c).
 function resolveUserMentions(text) {
-  return (text || '').replace(/<@(U[A-Z0-9]+)>/g, (_, uid) => `@${getUserName(uid)}`);
+  return (text || '').replace(/<@(U[A-Z0-9]+)(?:\|[^>]*)?>/g, (_, uid) => `@${getUserName(uid)}`);
 }
 
-function parseWorkflowMessage(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const fields = {};
-  let currentKey = null;
-
-  for (const line of lines) {
-    const boldMatch = line.match(/^\*(.+?)\*:?\s*(.*)/);
-    if (boldMatch) {
-      currentKey = boldMatch[1].replace(/\*/g, '').trim();
-      const value = boldMatch[2].trim();
-      if (value) fields[currentKey] = value;
-      continue;
-    }
-    if (currentKey && !fields[currentKey]) {
-      fields[currentKey] = line;
-      currentKey = null;
-    }
-  }
-
-  return fields;
-}
+const {
+  isNewTicketForm,
+  parseTicketMetaLine,
+  parseWorkflowMessage,
+  pickField,
+  composeTicketTitle,
+} = require('./lib/ticketParser.cjs');
 
 // === BUSCA TODAS AS REPLIES (com paginacao) ===
 async function fetchAllReplies(channelId, threadTs) {
@@ -205,7 +193,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
                        textCheck.includes('solicitacao') ||
                        textCheck.includes('título da demanda') ||
                        textCheck.includes('titulo da demanda') ||
-                       textCheck.includes('demanda enviada');
+                       textCheck.includes('demanda enviada') ||
+                       // Formulario "Novo chamado" (2026-08 em diante). Sem estes
+                       // marcadores o sync descartava todos os chamados novos.
+                       textCheck.includes('novo chamado') ||
+                       textCheck.includes('aberto via formulário') ||
+                       textCheck.includes('aberto via formulario');
       if (!isDemand) continue;
 
       const skipSubtypes = ['channel_join', 'channel_leave', 'channel_topic', 'channel_purpose', 'channel_name', 'channel_archive', 'group_join', 'group_leave'];
@@ -265,7 +258,20 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         }
       }
 
-      const title = fields['Título da demanda'] || fields['Titulo da demanda'] ||
+      // === Formulario "Novo chamado" ===
+      const ticketMeta = parseTicketMetaLine(resolvedText);
+      const isNewForm = isNewTicketForm(resolvedText);
+
+      const formModulo = pickField(fields, 'Produto/Módulo', 'Produto/Modulo');
+      const formTentou = pickField(fields, 'O que tentou fazer');
+      const formEsperado = pickField(fields, 'Resultado esperado');
+      const formObtido = pickField(fields, 'Resultado obtido');
+      const formCliente = pickField(fields, 'Cliente/Organização', 'Cliente/Organizacao');
+
+      const newFormTitle = isNewForm ? composeTicketTitle(formModulo, formTentou) : null;
+
+      const title = newFormTitle ||
+                    fields['Título da demanda'] || fields['Titulo da demanda'] ||
                     fields['Solicitação'] || fields['Solicitacao'] ||
                     resolvedText.split('\n').find(l => l.length > 10 && !l.startsWith('*'))?.slice(0, 100) ||
                     resolvedText.slice(0, 80);
@@ -284,7 +290,23 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         const body = stop ? after.slice(0, stop.index) : after;
         return body.trim();
       };
-      const description = extractDescriptionBody(resolvedText) ||
+      // No formulario novo o corpo esta repartido em 3 blocos narrativos.
+      // Junta os que vierem preenchidos, mantendo os rotulos como contexto.
+      const newFormDescription = (() => {
+        if (!isNewForm) return null;
+        const blocks = [
+          ['O que tentou fazer', formTentou],
+          ['Resultado esperado', formEsperado],
+          ['Resultado obtido', formObtido],
+        ].filter(([, v]) => v);
+        if (!blocks.length) return null;
+        const out = blocks.map(([label, v]) => `${label}:\n${v}`);
+        if (formCliente) out.push(`Cliente/Organização: ${formCliente}`);
+        return out.join('\n\n');
+      })();
+
+      const description = newFormDescription ||
+                          extractDescriptionBody(resolvedText) ||
                           fields['Descrição da demanda'] || fields['Descricao da demanda'] ||
                           fields['Descrição'] || fields['Descricao'] ||
                           resolvedText;
@@ -292,7 +314,10 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       // Prioridade explicita no campo do Slack
       const demandId = `slack_${channelId}_${msg.ts}`;
       const priority = (() => {
-        const p = (fields['Prioridade'] || '').toLowerCase();
+        // No formulario novo a prioridade vem na linha de meta
+        // (*Prioridade: P3-Média*) em vez de um campo proprio. Mesma regra:
+        // sem prioridade explicita, cai no fluxo de classificacao abaixo.
+        const p = (ticketMeta.priority || fields['Prioridade'] || '').toLowerCase();
         if (p.includes('p1') || p.includes('crítico') || p.includes('critico')) return 'p1';
         if (p.includes('p2') || p.includes('alta')) return 'p2';
         if (p.includes('p3') || p.includes('média') || p.includes('media')) return 'p3';
@@ -318,7 +343,8 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const demandType = (() => {
         if (isSitefWorkflow) return 'Sitef';
         if (isConciliacaoWorkflow) return 'Conciliacao';
-        const t = (fields['Tipo de demanda'] || fields['Tipo de execução'] || fields['Tipo de execucao'] || '').toLowerCase();
+        // Formulario novo: o tipo e um token da linha de meta (*Problema*, *Ajuda*).
+        const t = (ticketMeta.kind || fields['Tipo de demanda'] || fields['Tipo de execução'] || fields['Tipo de execucao'] || '').toLowerCase();
         if (t.includes('bug') || t.includes('problema')) return 'Problema/Bug';
         if (t.includes('update')) return 'Update';
         if (t.includes('remessa')) return 'Remessa';
@@ -340,20 +366,28 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         return null;
       })();
 
+      // "Aberto via formulário por *Amanda Ferreira* · <mailto:…> · protocolo `X`"
+      // Sem isto o solicitante virava o proprio bot que postou a mensagem.
+      const formOpenedBy = resolvedText.match(
+        /Aberto via formul[áa]rio por\s+\*?([^*·\n<]+?)\*?\s*(?:·|<|$)/i,
+      );
       const requesterMatch = resolvedText.match(/enviada por @(.+?)[\s\n]/i) ||
                               resolvedText.match(/Solicitante[:\s]*\n?@?(.+?)[\n$]/i);
-      const requesterName = fields['Solicitante']?.replace('@', '') ||
+      const requesterName = formOpenedBy?.[1]?.trim() ||
+                            fields['Solicitante']?.replace('@', '') ||
                             requesterMatch?.[1]?.trim() ||
                             (msg.user ? getUserName(msg.user) : 'Desconhecido');
 
       const assigneeField = fields['Responsável pela execução'] || fields['Responsavel pela execucao'] || '';
-      const ccMatch = resolvedText.match(/cc\s+@(.+?)$/im);
+      // Formato antigo: "cc @Fulano". Formulario novo: "c/c @Fulano"
+      // (o <@U…|nome> ja virou @nome no resolveUserMentions).
+      const ccMatch = resolvedText.match(/^\s*c\/?c\s+(.+)$/im);
 
       const assigneeName = assigneeField.replace(/@/g, '').trim() ||
-                           ccMatch?.[1]?.trim() || null;
+                           ccMatch?.[1]?.replace(/@/g, '').trim() || null;
 
       const cc = [];
-      if (ccMatch) cc.push(ccMatch[1].trim());
+      if (ccMatch) cc.push(ccMatch[1].replace(/@/g, '').trim());
       if (assigneeField) {
         assigneeField.split(',').forEach(a => {
           const name = a.replace(/@/g, '').trim();
@@ -376,7 +410,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       // pelo nome do workflow do bot (ex: "Nova solicitação KPI telemedicina"
       // → "Telemedicina"). Cobre KPI/Smartvale que tem 1 workflow por produto.
       const product = (() => {
-        const explicit = fields['Produto'];
+        const explicit = fields['Produto'] || formModulo;
         if (explicit) return explicit;
         const w = (msg.username || '').toLowerCase();
         if (w.includes('telemedic')) return 'Telemedicina';
@@ -408,6 +442,29 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const loadingReply = threadReplies.find(r => r.hasLoadingReaction);
       const serviceStartedAt = loadingReply ? loadingReply.timestamp : null;
 
+      // Campos do formulario novo que nao tem lugar proprio no modelo.
+      // Vao pra um bloco chave-valor exibido no detalhe da demanda.
+      const formFields = (() => {
+        if (!isNewForm) return undefined;
+        const out = {};
+        const put = (label, value) => { if (value && value.trim()) out[label] = value.trim(); };
+
+        put('Cliente/Organização', formCliente);
+        put('ID do usuário', pickField(fields, 'ID do usuário', 'ID do usuario'));
+        put('CNPJ', pickField(fields, 'CNPJ'));
+        put('Tipo de operação', pickField(fields, 'Tipo de operação', 'Tipo de operacao'));
+        put('ID da organização', pickField(fields, 'ID da organização', 'ID da organizacao'));
+        put('Navegador/versão', pickField(fields, 'Navegador/versão', 'Navegador/versao'));
+        put('Usuário/perfil afetado', pickField(fields, 'Usuário/perfil afetado', 'Usuario/perfil afetado'));
+        put('Bloqueio', ticketMeta.blocking);
+        put('Ambiente', ticketMeta.environment);
+        // Protocolo do formulario — chave de correlacao com o sistema de origem.
+        put('Protocolo', resolvedText.match(/protocolo\s*`([^`]+)`/i)?.[1]);
+        ticketMeta.flags.forEach((flag, i) => put(`Informação ${i + 1}`, flag));
+
+        return Object.keys(out).length ? out : undefined;
+      })();
+
       const demand = {
         id: demandId,
         title: title.replace(/\*/g, '').trim(),
@@ -435,6 +492,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         replies: msg.reply_count || 0,
         threadReplies,
         files: mapSlackFiles(msg.files),
+        ...(formFields ? { formFields } : {}),
       };
 
       demands.push(demand);
@@ -683,4 +741,9 @@ export function extractClientName(channel: string): string {
   console.log('\nArquivo src/data/realDemands.ts atualizado com dados reais (gitignored)!');
 }
 
-main().catch(console.error);
+// Executa so quando chamado direto (`node scripts/syncSlack.cjs`), pra que os
+// helpers de parse possam ser importados em testes sem disparar o sync.
+if (require.main === module) {
+  main().catch(console.error);
+}
+

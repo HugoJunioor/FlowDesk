@@ -605,6 +605,27 @@ const DemandDetailSheet = ({
             )}
           </div>
 
+          {/* Campos do formulario "Novo chamado" que nao tem lugar proprio no
+              modelo (CNPJ, IDs, navegador, protocolo…). */}
+          {demand.formFields && Object.keys(demand.formFields).length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-1.5">
+                  Dados do formulario
+                </p>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                  {Object.entries(demand.formFields).map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                      <dd className="text-sm text-foreground break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </>
+          )}
+
           <Separator />
 
           {/* Detalhes */}

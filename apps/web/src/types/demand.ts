@@ -273,6 +273,12 @@ export interface SlackDemand {
     confidence: "alta" | "media" | "baixa";
     detectedAt: string;
   };
+  /**
+   * Campos do formulário "Novo chamado" que não têm lugar próprio no modelo
+   * (CNPJ, IDs, navegador, protocolo, ambiente…). Exibidos como bloco
+   * chave-valor no detalhe da demanda.
+   */
+  formFields?: Record<string, string>;
   manualStatusOverride?: boolean;
   slaFirstResponse?: number | null;
   slaStatus?: string | null;
