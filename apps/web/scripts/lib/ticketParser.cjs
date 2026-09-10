@@ -3,114 +3,156 @@
  *
  * Convivem dois formatos:
  *
- *  1. Formularios antigos ("Nova demanda", "Solicitação…"), com campos
- *     "*Label*\nvalor" de uma linha so.
- *  2. Formulario "Novo chamado" (2026-08 em diante), com cabecalho
- *     ":ticket: Novo chamado · CLIENTE", uma linha de meta com tokens em
- *     negrito separados por "·", blocos narrativos de varios paragrafos e
- *     rodape "Aberto via formulário por *Fulano* · protocolo `X`".
+ *  1. Formularios antigos ("Nova demanda", "Solicitação…"): campos em linhas
+ *     separadas, no estilo "*Label*\nvalor".
  *
- * O comportamento do formato antigo e preservado byte a byte: a leitura
- * multi-linha e as regras novas so entram quando a mensagem e reconhecida
- * como do formulario novo.
+ *  2. Formulario de chamado (2026-08 em diante): o `msg.text` vem como UMA
+ *     linha so, sem negrito, com pares "Label: valor" colados em sequencia:
+ *
+ *       ABERTURA — BKO  Cliente/Organização: ACME ID do usuário: 00 CNPJ: 0
+ *       Produto/Módulo: Cadastro Tipo de operação: OUTROS Natureza: Problema
+ *       Impacto: Sem bloqueio Ambiente: Produção O que tentou fazer: …
+ *       _Aberto via formulário por Fulana · protocolo ABCDE-12345_
+ *
+ *     (quebras acima sao so pra leitura — no payload e tudo uma linha)
+ *
+ *     Como os valores sao texto livre, a unica forma confiavel de separar os
+ *     campos e cortar nos rotulos conhecidos — dai a lista TICKET_LABELS.
+ *
+ * O comportamento do formato antigo e preservado: parseWorkflowMessage nao
+ * mudou, e o parse novo so entra quando isNewTicketForm reconhece a mensagem.
  *
  * Modulo sem dependencias — carregado tanto pelo syncSlack.cjs (node puro,
  * dentro do container) quanto pelos testes.
  */
 
-// Linha de meta: emoji opcional + tokens em negrito separados por "·". Ex:
-//   :large_blue_circle: *Prioridade: P3-Média*  ·  *Problema*  ·  *Produção*
-// A quantidade de tokens varia entre versoes do formulario (chamados de 25/08
-// tem 3 e nenhuma prioridade; os de 27/08 em diante tem 5), entao a leitura
-// nao pode ser posicional.
-const TICKET_META_LINE_RE = /^(?::[a-z0-9_+-]+:\s*)?\*[^*]+\*(?:\s*·\s*\*[^*]+\*)+\s*$/;
-
-// Rodape do formulario — nunca faz parte do valor do campo anterior.
-const FIELD_STOP_RE = /^(?::[a-z0-9_+-]+:\s*)?(?:Aberto via formul[áa]rio|c\/c\b|:paperclip:)/i;
-
 const TITLE_MAX = 90;
 
-/** Reconhece o formulario "Novo chamado" pelos seus marcadores. */
+/**
+ * Rotulos do formulario de chamado, com e sem acento.
+ * Ordem nao importa (a mensagem pode trazer numa ordem qualquer), mas todos
+ * precisam estar aqui: um rotulo faltando faz o valor anterior engolir o
+ * campo seguinte, que foi exatamente o bug da primeira versao deste parser.
+ */
+const TICKET_LABELS = [
+  'Cliente/Organização', 'Cliente/Organizacao',
+  'ID do usuário', 'ID do usuario',
+  'CNPJ',
+  'Produto/Módulo', 'Produto/Modulo',
+  'Tipo de operação', 'Tipo de operacao',
+  'Natureza',
+  'Impacto',
+  'Existe contorno?', 'Existe contorno',
+  'Ambiente',
+  'Prioridade',
+  'ID da organização', 'ID da organizacao',
+  'Navegador/versão', 'Navegador/versao',
+  'Usuário/perfil afetado', 'Usuario/perfil afetado',
+  'O que tentou fazer',
+  'Resultado esperado',
+  'Resultado obtido',
+];
+
+/** Rodape em italico: _Aberto via formulário por Fulana · protocolo ABCDE-12345_ */
+const FOOTER_RE = /_?\s*Aberto via formul[áa]rio por\s/i;
+const REQUESTER_RE = /Aberto via formul[áa]rio por\s+([^·_\n]+?)\s*(?:·|_|$)/i;
+const PROTOCOL_RE = /protocolo\s*`?\s*([A-Z0-9][A-Z0-9-]{3,})\s*`?/i;
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+}
+
+// Alternancia dos rotulos, dos mais longos pros mais curtos — evita que
+// "Ambiente" case antes de um eventual rotulo que o contenha.
+const LABEL_ALTERNATION = TICKET_LABELS
+  .slice()
+  .sort((a, b) => b.length - a.length)
+  .map(escapeRegExp)
+  .join('|');
+
+/** Reconhece o formulario de chamado pelos marcadores que aparecem no payload. */
 function isNewTicketForm(text) {
   const t = text || '';
-  return /(?::ticket:|novo chamado)/i.test(t) || /aberto via formul[áa]rio/i.test(t);
+  return /Aberto via formul[áa]rio/i.test(t) || /(?::ticket:|novo chamado)/i.test(t);
 }
 
 /**
- * Classifica os tokens da linha de meta por semantica, nao por posicao.
- * Retorna campos nulos quando a mensagem nao tem linha de meta.
- */
-function parseTicketMetaLine(text) {
-  const meta = { priority: null, kind: null, blocking: null, environment: null, flags: [] };
-  const line = (text || '').split('\n').map((l) => l.trim()).find((l) => TICKET_META_LINE_RE.test(l));
-  if (!line) return meta;
-
-  for (const m of line.matchAll(/\*([^*]+)\*/g)) {
-    const token = m[1].trim();
-    const low = token.toLowerCase();
-    const prio = token.match(/^prioridade\s*:\s*(.+)$/i);
-    if (prio) { meta.priority = prio[1].trim(); continue; }
-    if (/bloque/.test(low)) { meta.blocking = token; continue; }
-    if (/produ[cç][aã]o|homolog|sandbox|staging|teste/.test(low)) { meta.environment = token; continue; }
-    if (/^(problema|bug|ajuda|d[uú]vida|melhoria|incidente|tarefa|solicita)/.test(low)) { meta.kind = token; continue; }
-    meta.flags.push(token);
-  }
-  return meta;
-}
-
-/**
- * Le os campos "*Label*\nvalor" da mensagem.
+ * Separa os pares "Label: valor" de uma mensagem do formulario de chamado.
  *
- * Formulario novo: acumula multi-linha ate o proximo label, porque os blocos
- * narrativos (Resultado esperado etc) tem varios paragrafos.
- * Formularios antigos: mantem o comportamento historico de pegar so a
- * primeira linha depois do label.
+ * Retorna tambem o cabecalho (o que vem antes do primeiro rotulo, ex:
+ * "ABERTURA — BKO"), o solicitante e o protocolo, que ficam no rodape.
  */
+function parseTicketForm(text) {
+  const raw = (text || '').replace(/\s+/g, ' ').trim();
+  const result = { header: '', fields: {}, requester: null, protocol: null };
+  if (!raw) return result;
+
+  // O rodape nao entra no scan de campos — senao o ultimo valor o engole.
+  const footerAt = raw.search(FOOTER_RE);
+  const body = footerAt >= 0 ? raw.slice(0, footerAt) : raw;
+  const footer = footerAt >= 0 ? raw.slice(footerAt) : '';
+
+  result.requester = footer.match(REQUESTER_RE)?.[1]?.trim() || null;
+  result.protocol = (footer.match(PROTOCOL_RE) || raw.match(PROTOCOL_RE))?.[1]?.trim() || null;
+
+  const re = new RegExp(`(?:^|\\s)(${LABEL_ALTERNATION})\\s*:\\s*`, 'gi');
+  const marks = [];
+  for (const m of body.matchAll(re)) {
+    marks.push({ label: m[1].trim(), start: m.index, valueAt: m.index + m[0].length });
+  }
+
+  result.header = (marks.length ? body.slice(0, marks[0].start) : body).trim();
+
+  marks.forEach((mark, i) => {
+    const end = i + 1 < marks.length ? marks[i + 1].start : body.length;
+    const value = body.slice(mark.valueAt, end).trim();
+    // Primeira ocorrencia vence — se o texto livre de um campo repetir um
+    // rotulo, a repeticao nao sobrescreve o valor original.
+    if (value && !result.fields[mark.label]) result.fields[mark.label] = value;
+  });
+
+  return result;
+}
+
+/**
+ * Junta o texto de todos os blocos do Block Kit.
+ *
+ * O `msg.text` e um achatamento com perdas: prioridade e "c/c" nao aparecem
+ * nele, so nos blocos. Percorre a arvore recolhendo qualquer `.text` string.
+ */
+function flattenBlockText(blocks) {
+  const out = [];
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (typeof node.text === 'string') out.push(node.text);
+    for (const value of Object.values(node)) {
+      if (value && typeof value === 'object') walk(value);
+    }
+  };
+  walk(blocks);
+  return out.join('\n');
+}
+
+/** Le os campos "*Label*\nvalor" dos formularios antigos. Comportamento historico. */
 function parseWorkflowMessage(text) {
-  const multiline = isNewTicketForm(text);
   const lines = (text || '').split('\n').map((l) => l.trim()).filter(Boolean);
   const fields = {};
   let currentKey = null;
-  let buffer = [];
-
-  const flush = () => {
-    if (currentKey && buffer.length) {
-      const joined = buffer.join('\n').trim();
-      if (joined && !fields[currentKey]) fields[currentKey] = joined;
-    }
-    currentKey = null;
-    buffer = [];
-  };
 
   for (const line of lines) {
-    if (multiline) {
-      // Rodape encerra o campo corrente sem virar valor dele.
-      if (FIELD_STOP_RE.test(line)) { flush(); continue; }
-      // A linha de meta tambem comeca com *...*; quem le ela e parseTicketMetaLine.
-      if (TICKET_META_LINE_RE.test(line)) { flush(); continue; }
-    }
-
     const boldMatch = line.match(/^\*(.+?)\*:?\s*(.*)/);
     if (boldMatch) {
-      if (multiline) flush();
       currentKey = boldMatch[1].replace(/\*/g, '').trim();
       const value = boldMatch[2].trim();
-      if (value) {
-        if (!fields[currentKey]) fields[currentKey] = value;
-        if (multiline) currentKey = null;
-      }
+      if (value) fields[currentKey] = value;
       continue;
     }
-
-    if (multiline) {
-      if (currentKey) buffer.push(line);
-    } else if (currentKey && !fields[currentKey]) {
-      // Comportamento historico: so a primeira linha apos o label.
+    if (currentKey && !fields[currentKey]) {
       fields[currentKey] = line;
       currentKey = null;
     }
   }
-  if (multiline) flush();
 
   return fields;
 }
@@ -134,10 +176,9 @@ function truncateTitle(s) {
 }
 
 /**
- * O formulario "Novo chamado" nao tem campo de titulo — o cabecalho
- * (":ticket: Novo chamado · VSPAY") e identico em todos os chamados do canal.
- * Compoe "Produto/Módulo — O que tentou fazer" (1a linha), que e o par que
- * distingue um chamado do outro na listagem.
+ * O formulario de chamado nao tem campo de titulo — o cabecalho ("ABERTURA —
+ * BKO") repete em todos os chamados. Compoe "Produto/Módulo — O que tentou
+ * fazer", que e o par que distingue um chamado do outro na listagem.
  *
  * Quando os dois dizem a mesma coisa (ex: modulo "RELATORIO" + acao
  * "Relatório"), mantem so o mais descritivo em vez de repetir.
@@ -156,8 +197,10 @@ function composeTicketTitle(modulo, tentouFazer) {
 }
 
 module.exports = {
+  TICKET_LABELS,
   isNewTicketForm,
-  parseTicketMetaLine,
+  parseTicketForm,
+  flattenBlockText,
   parseWorkflowMessage,
   pickField,
   composeTicketTitle,
