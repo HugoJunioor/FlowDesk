@@ -1,11 +1,13 @@
 /**
  * Cobre o parse das mensagens de abertura de demanda vindas do Slack.
  *
- * Os textos abaixo sao copias do `msg.text` REAL da API (com dados de cliente
- * trocados) — nao da renderizacao de nenhum leitor de Slack. A diferenca
- * importa: a API entrega tudo numa linha so, sem negrito e sem quebra, e uma
- * primeira versao deste parser foi escrita contra a versao renderizada e nao
- * casou com nada em producao.
+ * Os textos abaixo reproduzem a ESTRUTURA do `msg.text` real da API — nao a
+ * renderizacao de nenhum leitor de Slack. Todo identificador (nome, CNPJ, ID
+ * de usuario, ID de organizacao, protocolo) e sintetico.
+ *
+ * A diferenca entre payload cru e renderizacao importa: a API entrega tudo
+ * numa linha so, sem negrito e sem quebra, e uma primeira versao deste parser
+ * foi escrita contra a versao renderizada e nao casou com nada em producao.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -31,9 +33,9 @@ const CHAMADO =
 
 // Variante com os campos extras que so aparecem em alguns chamados.
 const CHAMADO_CAMPOS_EXTRA =
-  "ABERTURA — APP  Cliente/Organização: OUTRA ORG ID do usuário: 93823 CNPJ: 35710362000150 " +
-  "Produto/Módulo: Despesa Corporativo Tipo de operação: OUTROS ID da organização: 2400 " +
-  "Navegador/versão: BKO Usuário/perfil afetado: 93823-FULANO / 0 / 000 Natureza: Problema " +
+  "ABERTURA — APP  Cliente/Organização: OUTRA ORG ID do usuário: 10101 CNPJ: 00000000000000 " +
+  "Produto/Módulo: Despesa Corporativo Tipo de operação: OUTROS ID da organização: 1010 " +
+  "Navegador/versão: BKO Usuário/perfil afetado: 10101-FULANO / 0 / 000 Natureza: Problema " +
   "Impacto: Sem bloqueio Ambiente: Produção O que tentou fazer: Estorno não comunicado. " +
   "Resultado esperado: Precisamos realizar um estorno parcial. " +
   "Resultado obtido: A transação ocorreu em 06/07.  " +
@@ -102,9 +104,9 @@ describe("parseTicketForm", () => {
 
   it("le os campos extras quando presentes", () => {
     const p = parseTicketForm(CHAMADO_CAMPOS_EXTRA);
-    expect(p.fields["ID da organização"]).toBe("2400");
+    expect(p.fields["ID da organização"]).toBe("1010");
     expect(p.fields["Navegador/versão"]).toBe("BKO");
-    expect(p.fields["Usuário/perfil afetado"]).toBe("93823-FULANO / 0 / 000");
+    expect(p.fields["Usuário/perfil afetado"]).toBe("10101-FULANO / 0 / 000");
     expect(p.fields["Produto/Módulo"]).toBe("Despesa Corporativo");
   });
 
