@@ -83,6 +83,22 @@ export const authRepository = {
     return res.rows;
   },
 
+  /**
+   * Troca SOMENTE o hash. Usado na migração transparente de PBKDF2 para bcrypt
+   * no login — diferente de updatePassword(), que também zera primeiro_acesso e
+   * reset_senha_solicitado. Aqui a senha não mudou, então essas flags têm que
+   * ficar como estão: quem tinha troca pendente continua tendo.
+   */
+  async updatePasswordHash(usuarioId: string, novaHash: string): Promise<void> {
+    await pool.query(
+      `UPDATE tb_usuario
+       SET senha_hash = $1,
+           atualizado_em = NOW()
+       WHERE id = $2`,
+      [novaHash, usuarioId],
+    );
+  },
+
   async updatePassword(usuarioId: string, novaHash: string): Promise<void> {
     await pool.query(
       `UPDATE tb_usuario
