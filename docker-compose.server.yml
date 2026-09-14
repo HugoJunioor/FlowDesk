@@ -147,6 +147,11 @@ services:
       - traefik.http.routers.fdlegacy.entrypoints=websecure
       - traefik.http.routers.fdlegacy.tls.certresolver=letsencrypt
       - traefik.http.routers.fdlegacy.priority=300
+      # Mesma whitelist de IP que protege web e api. Sem este label o router
+      # fdlegacy servia /__state, /notes, /infra e /notifications abertos pra
+      # internet — o unico dos tres routers sem o middleware.
+      - "traefik.http.middlewares.flowdesk-vpn.ipallowlist.sourcerange=${VPN_IPS}"
+      - traefik.http.routers.fdlegacy.middlewares=flowdesk-vpn@docker
       # Router separado pro webhook do Telegram — sem o middleware VPN
       # porque os servers do Telegram nao estao na nossa whitelist.
       - traefik.http.routers.fdtgevents.rule=Host(`${DOMAIN}`) && PathPrefix(`/telegram-events/`)
