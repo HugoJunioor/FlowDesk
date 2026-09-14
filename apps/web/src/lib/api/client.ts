@@ -107,15 +107,32 @@ apiClient.interceptors.response.use(
  * Erro estruturado equivalente ao envelope da API. Use em catches que
  * precisam reagir por codigo (ex: RATE_LIMIT, VALIDACAO_FALHOU).
  */
+/**
+ * Como a requisicao falhou. `status` sozinho nao distingue: quando nao ha
+ * resposta HTTP ele vale 0 tanto pra timeout quanto pra rede fora do ar, e
+ * quem trata o erro acabava mostrando "credencial invalida" pros dois.
+ */
+export type ApiFailureKind =
+  | 'http'      // o servidor respondeu (use `status`)
+  | 'timeout'   // estourou o timeout do client, sem resposta
+  | 'network'   // DNS/conexao/CORS — nao chegou no servidor
+  | 'unknown';
+
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
     public codigo?: string,
     public detalhes?: unknown,
+    public kind: ApiFailureKind = 'http',
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+
+  /** true quando nao houve resposta do servidor — nada a ver com credencial. */
+  get isInfraFailure(): boolean {
+    return this.kind === 'timeout' || this.kind === 'network' || this.status >= 500;
   }
 }
 
@@ -124,12 +141,19 @@ export function toApiError(err: unknown): ApiError {
     const data = err.response?.data as
       | { erro?: boolean; mensagem?: string; codigo?: string; detalhes?: unknown }
       | undefined;
+    // Sem `response` o servidor nao respondeu. ECONNABORTED/ETIMEDOUT é o
+    // timeout do proprio axios (30s, ver apiClient acima); o resto e rede.
+    let kind: ApiFailureKind = 'http';
+    if (!err.response) {
+      kind = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' ? 'timeout' : 'network';
+    }
     return new ApiError(
       data?.mensagem || err.message,
       err.response?.status ?? 0,
       data?.codigo,
       data?.detalhes,
+      kind,
     );
   }
-  return new ApiError(err instanceof Error ? err.message : String(err), 0);
+  return new ApiError(err instanceof Error ? err.message : String(err), 0, undefined, undefined, 'unknown');
 }
