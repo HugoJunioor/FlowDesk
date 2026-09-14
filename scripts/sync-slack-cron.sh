@@ -20,37 +20,31 @@ if [ -f "$ENV_FILE" ]; then
   done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE")
 fi
 
-# Sincroniza demandas do Slack a cada N min e atualiza /opt/flowdesk/app/web-dist.
+# Sincroniza demandas do Slack a cada N min, escrevendo apps/web/src/data/realDemands.ts.
 #
-# Diferenca pro fluxo antigo: NAO rebuilda o container Docker. Em vez disso,
-# faz rsync sem --delete pra preservar chunks antigos (URLs com hash) e
-# manter abas abertas funcionando ate que reloadem naturalmente.
+# Escrever o arquivo E a propagacao: o legacy-state monta esse diretorio como
+# /web-data e serve o conteudo em /demands-snapshot; o frontend consulta
+# /sync-status a cada 30s e troca os dados em memoria quando o mtime muda.
+# Nenhum build, nenhum rsync, nenhum container reiniciado.
 #
-# - md5(realDemands.ts) muda => roda build do frontend e rsync
-# - chunks antigos com mais de 2h em /opt/flowdesk/app/web-dist/assets/
-#   sao deletados (garbage collect)
+# O web-dist so muda em deploy (scripts/deploy.sh), que e onde mudanca de
+# codigo deve entrar.
 set -e
 cd /opt/flowdesk/app
 
 LOG=/var/log/flowdesk-sync.log
 DATA_FILE=apps/web/src/data/realDemands.ts
-DIST_DIR=/opt/flowdesk/app/web-dist
-TMP_BUILD=/opt/flowdesk/app/tmp-build
 
-# Tetos de recurso dos containers efemeros. Sem isso o build competia de igual
+# Teto de recurso do container efemero do sync. Sem isso ele competia de igual
 # pra igual com api e legacy_state pela memoria do host, e o kernel matava os
 # dois (exit 137) — o Traefik entao removia os routers e tudo caia no nginx.
-#
-# Se o build estourar o teto ele falha sozinho, o que e seguro: a verificacao
-# de index.html logo abaixo mantem o dist atual intacto.
 SYNC_MEM=${SYNC_MEM:-512m}
 SYNC_CPUS=${SYNC_CPUS:-1}
-BUILD_MEM=${BUILD_MEM:-1536m}
-BUILD_CPUS=${BUILD_CPUS:-1.5}
 
-# Execucoes nao podem se sobrepor. O build leva varios minutos; se o cron
-# dispara antes do anterior terminar, os builds empilham e cada um traz outro
-# npm ci junto. Bastam duas ou tres sobreposicoes pra derrubar o servidor.
+# Execucoes nao podem se sobrepor. Sem o build o sync ficou rapido, mas a
+# chamada a API do Slack ainda pode se arrastar sob rate limit ou rede ruim — e
+# duas execucoes concorrentes escreveriam realDemands.ts ao mesmo tempo, que e
+# o arquivo que o legacy-state le pra servir /demands-snapshot.
 #
 # O teste de disponibilidade do flock nao e zelo excessivo: sem ele, um host
 # sem util-linux faria `flock` retornar "command not found" (status != 0), o
@@ -86,47 +80,30 @@ docker run --rm \
 HASH_AFTER=$(md5sum $DATA_FILE | awk '{print $1}')
 
 if [ "$HASH_BEFORE" != "$HASH_AFTER" ]; then
-  echo "Dados mudaram — buildando frontend e fazendo rsync..." >> $LOG
-
-  # Build do frontend num container temp (sem rebuildar a imagem nginx).
-  # Output vai pra /opt/flowdesk/app/tmp-build/dist
-  rm -rf "$TMP_BUILD"
-  mkdir -p "$TMP_BUILD"
-
-  docker run --rm \
-    --memory="$BUILD_MEM" --cpus="$BUILD_CPUS" \
-    -v /opt/flowdesk/app:/src:ro \
-    -v "$TMP_BUILD":/out \
-    -w /work \
-    node:20-alpine sh -c '
-      cp -r /src/package.json /src/package-lock.json /work/ && \
-      mkdir -p /work/apps/web && cp -r /src/apps/web/* /work/apps/web/ && \
-      cd /work && npm ci --legacy-peer-deps --workspace=@flowdesk/web --include-workspace-root --no-audit --no-fund >/dev/null 2>&1 && \
-      cd /work/apps/web && npm run build >/dev/null 2>&1 && \
-      cp -r /work/apps/web/dist/* /out/
-    ' >> $LOG 2>&1 || echo "  [aviso] container de build saiu com erro (codigo $?)" >> $LOG
-  # `|| echo` acima e proposital: com `set -e`, um docker run que falha abortava
-  # o script AQUI, e a verificacao de index.html logo abaixo — que existe
-  # exatamente pra tratar build falho — nunca rodava. Estourar o teto de memoria
-  # e uma falha esperada agora, entao ela precisa chegar no tratamento certo.
-
-  if [ ! -f "$TMP_BUILD/index.html" ]; then
-    echo "  [ERRO] build falhou — index.html nao gerado, mantendo dist atual" >> $LOG
-    rm -rf "$TMP_BUILD"
-    exit 1
-  fi
-
-  # rsync SEM --delete: chunks antigos sobrevivem pra abas abertas
-  rsync -a "$TMP_BUILD"/ "$DIST_DIR"/ >> $LOG 2>&1
-  echo "  [ok] rsync concluido" >> $LOG
-
-  # Garbage collect: assets com mtime > 2h sao apagados
-  # (chunks novos acabaram de ser criados, tem mtime atual)
-  find "$DIST_DIR/assets" -type f -mmin +120 -delete 2>/dev/null || true
-  REMAINING=$(ls "$DIST_DIR/assets" 2>/dev/null | wc -l)
-  echo "  [ok] gc: $REMAINING assets ativos" >> $LOG
-
-  rm -rf "$TMP_BUILD"
+  # Nao ha build aqui, e isso e proposital.
+  #
+  # O legacy-state le realDemands.ts direto do disco (bind mount
+  # apps/web/src/data -> /web-data) e serve o conteudo em /demands-snapshot.
+  # O frontend ja roda useSyncPolling: a cada 30s consulta /sync-status e, se o
+  # mtime mudou, busca o snapshot e troca os dados em memoria via
+  # updateRuntimeDemands(). O bundle compilado e so o valor inicial — ele e
+  # substituido pelo fetch poucos segundos depois do mount.
+  #
+  # Ou seja: escrever o arquivo acima JA propaga o dado. O `npm ci` + build do
+  # Vite que existia aqui regenerava um valor que era descartado em seguida, ao
+  # custo de recompilar a aplicacao inteira a cada 5 minutos. Numa VM de 2
+  # vCPUs isso empilhou 23 execucoes simultaneas em 2026-09-14 e derrubou o
+  # servidor.
+  #
+  # O garbage collect de assets saiu junto, e precisava sair: ele apagava
+  # arquivos de web-dist/assets com mtime acima de 2h, contando com o build pra
+  # recria-los. Sem build, ele apagaria os assets em producao.
+  #
+  # web-dist agora so muda em deploy (scripts/deploy.sh), que e onde mudanca de
+  # codigo deve entrar de qualquer forma.
+  echo "  [ok] dados atualizados — frontend recebe via /demands-snapshot (sem build)" >> $LOG
 else
-  echo "Sem mudancas — sem build" >> $LOG
+  echo "  [ok] sem mudancas" >> $LOG
 fi
+
+echo "===== $(date -Iseconds) sync concluido =====" >> $LOG
