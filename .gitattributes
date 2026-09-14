@@ -1,0 +1,4 @@
+# Hooks do husky precisam de LF: com CRLF o exec falha com "Exec format error"
+# em Windows, e o commit passa a exigir --no-verify.
+.husky/* text eol=lf
+*.sh text eol=lf
