@@ -37,12 +37,43 @@ DATA_FILE=apps/web/src/data/realDemands.ts
 DIST_DIR=/opt/flowdesk/app/web-dist
 TMP_BUILD=/opt/flowdesk/app/tmp-build
 
+# Tetos de recurso dos containers efemeros. Sem isso o build competia de igual
+# pra igual com api e legacy_state pela memoria do host, e o kernel matava os
+# dois (exit 137) — o Traefik entao removia os routers e tudo caia no nginx.
+#
+# Se o build estourar o teto ele falha sozinho, o que e seguro: a verificacao
+# de index.html logo abaixo mantem o dist atual intacto.
+SYNC_MEM=${SYNC_MEM:-512m}
+SYNC_CPUS=${SYNC_CPUS:-1}
+BUILD_MEM=${BUILD_MEM:-1536m}
+BUILD_CPUS=${BUILD_CPUS:-1.5}
+
+# Execucoes nao podem se sobrepor. O build leva varios minutos; se o cron
+# dispara antes do anterior terminar, os builds empilham e cada um traz outro
+# npm ci junto. Bastam duas ou tres sobreposicoes pra derrubar o servidor.
+#
+# O teste de disponibilidade do flock nao e zelo excessivo: sem ele, um host
+# sem util-linux faria `flock` retornar "command not found" (status != 0), o
+# `!` inverteria pra verdadeiro e o script sairia achando que ha outra execucao
+# — TODA vez. O sync morreria em silencio, com log dizendo que estava tudo bem.
+LOCK=/var/lock/flowdesk-sync.lock
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK"
+  if ! flock -n 9; then
+    echo "===== $(date -Iseconds) sync anterior ainda rodando, pulando =====" >> $LOG
+    exit 0
+  fi
+else
+  echo "  [aviso] flock indisponivel — seguindo sem protecao contra sobreposicao" >> $LOG
+fi
+
 HASH_BEFORE=$(md5sum $DATA_FILE 2>/dev/null | awk '{print $1}' || echo "none")
 
 echo "===== $(date -Iseconds) sync iniciado =====" >> $LOG
 
 # Sync Slack -> realDemands.ts
 docker run --rm \
+  --memory="$SYNC_MEM" --cpus="$SYNC_CPUS" \
   -v /opt/flowdesk/app:/app \
   -w /app \
   --env-file /opt/flowdesk/app/.env \
@@ -63,6 +94,7 @@ if [ "$HASH_BEFORE" != "$HASH_AFTER" ]; then
   mkdir -p "$TMP_BUILD"
 
   docker run --rm \
+    --memory="$BUILD_MEM" --cpus="$BUILD_CPUS" \
     -v /opt/flowdesk/app:/src:ro \
     -v "$TMP_BUILD":/out \
     -w /work \
@@ -72,7 +104,11 @@ if [ "$HASH_BEFORE" != "$HASH_AFTER" ]; then
       cd /work && npm ci --legacy-peer-deps --workspace=@flowdesk/web --include-workspace-root --no-audit --no-fund >/dev/null 2>&1 && \
       cd /work/apps/web && npm run build >/dev/null 2>&1 && \
       cp -r /work/apps/web/dist/* /out/
-    ' >> $LOG 2>&1
+    ' >> $LOG 2>&1 || echo "  [aviso] container de build saiu com erro (codigo $?)" >> $LOG
+  # `|| echo` acima e proposital: com `set -e`, um docker run que falha abortava
+  # o script AQUI, e a verificacao de index.html logo abaixo — que existe
+  # exatamente pra tratar build falho — nunca rodava. Estourar o teto de memoria
+  # e uma falha esperada agora, entao ela precisa chegar no tratamento certo.
 
   if [ ! -f "$TMP_BUILD/index.html" ]; then
     echo "  [ERRO] build falhou — index.html nao gerado, mantendo dist atual" >> $LOG
