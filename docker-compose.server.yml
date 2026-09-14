@@ -18,6 +18,12 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: flowdesk-api
     restart: unless-stopped
+    # Teto de memoria: sem ele, um pico em qualquer container do host (o build
+    # do cron de sync, por exemplo) fazia o kernel escolher a vitima do OOM — e
+    # a api caia junto. Com teto, cada servico morre por conta propria e o
+    # restart o traz de volta, em vez de derrubar o vizinho.
+    mem_limit: 512m
+    cpus: 1.0
     env_file:
       - ./apps/api/.env
     environment:
@@ -70,6 +76,9 @@ services:
         VITE_BUILD_DATE: "${BUILD_DATE:-}"
     container_name: flowdesk-web
     restart: unless-stopped
+    # nginx servindo estatico — folgado de proposito, mas com teto.
+    mem_limit: 128m
+    cpus: 0.5
     # Disable image HEALTHCHECK — nginx listens on IPv6/bridge but `localhost`
     # in the image's `wget http://localhost/` resolves to IPv4 127.0.0.1 and
     # fails. Traefik Docker provider drops unhealthy containers, so a bogus
@@ -105,6 +114,10 @@ services:
       context: ./legacy-state
     container_name: flowdesk-legacy-state
     restart: unless-stopped
+    # Le e escreve o snapshot inteiro em memoria a cada request, e aceita corpo
+    # de ate 20mb (express.json limit) — por isso a folga sobre o uso normal.
+    mem_limit: 512m
+    cpus: 1.0
     environment:
       DATA_DIR: /data
       PORT: '8090'
