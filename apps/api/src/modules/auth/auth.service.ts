@@ -11,14 +11,16 @@
  * Convenções:
  *   - Access token JWT HS256, ttl curto (15min default)
  *   - Refresh token: opaco aleatório 32 bytes hex, persistido SHA-256 no banco
- *   - Senha hash: bcrypt (cost 12)
+ *   - Senha hash: bcrypt (cost 12) na escrita; a leitura aceita tambem o
+ *     PBKDF2 do store legado e migra pra bcrypt no primeiro login (ver
+ *     ./password.ts)
  */
-import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '@config/env';
 import { UnauthorizedError, ForbiddenError, ValidationError } from '@shared/domain/errors';
 import { authRepository, type UsuarioRow } from './auth.repository';
+import { hashPassword, verifyPassword } from './password';
 import type { AuthResponse, AuthenticatedUser, ChangePasswordInput, LoginInput } from './auth.dto';
 import type { JwtAccessPayload } from './auth.types';
 
@@ -166,10 +168,21 @@ export const authService = {
       throw new ForbiddenError('Conta bloqueada. Contate o administrador.');
     }
 
-    const ok = await bcrypt.compare(input.senha, user.senha_hash);
-    if (!ok) {
+    const { valid, needsRehash } = await verifyPassword(input.senha, user.senha_hash);
+    if (!valid) {
       recordFailedLogin(lockoutKey);
       throw new UnauthorizedError('Usuário ou senha inválidos');
+    }
+
+    // Hash no formato legado (PBKDF2, vindo do fd_users_v2): regrava em bcrypt
+    // agora que sabemos a senha em claro. Best-effort — se falhar, o login
+    // segue valido e a proxima tentativa tenta de novo.
+    if (needsRehash) {
+      try {
+        await authRepository.updatePasswordHash(user.id, await hashPassword(input.senha));
+      } catch {
+        /* migracao de hash nao pode derrubar um login valido */
+      }
     }
 
     clearLockout(lockoutKey);
@@ -244,14 +257,16 @@ export const authService = {
     const user = await authRepository.findUserById(userId);
     if (!user) throw new UnauthorizedError('Sessão inválida');
 
-    const ok = await bcrypt.compare(input.senhaAtual, user.senha_hash);
-    if (!ok) throw new UnauthorizedError('Senha atual incorreta');
+    // Aceita hash legado aqui tambem: se o re-hash do login falhou, o usuario
+    // ainda consegue trocar a senha em vez de ficar preso.
+    const { valid } = await verifyPassword(input.senhaAtual, user.senha_hash);
+    if (!valid) throw new UnauthorizedError('Senha atual incorreta');
 
     if (input.senhaAtual === input.novaSenha) {
       throw new ValidationError('Nova senha deve ser diferente da atual');
     }
 
-    const novaHash = await bcrypt.hash(input.novaSenha, 12);
+    const novaHash = await hashPassword(input.novaSenha);
     await authRepository.updatePassword(userId, novaHash);
     // Revoga todas as sessões — força re-login nos outros devices
     await authRepository.revokeAllUserRefreshTokens(userId, 'mudanca_senha');

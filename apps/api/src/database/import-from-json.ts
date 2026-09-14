@@ -13,9 +13,14 @@
  *   npm run import:json
  *
  *   # Importa só uma fonte:
+ *   npm run import:json -- --only=usuarios
  *   npm run import:json -- --only=notas
  *   npm run import:json -- --only=notificacoes
  *   npm run import:json -- --only=infra
+ *
+ * `--only=usuarios` lê fd_users_v2 de shared-state.json e cria em tb_usuario
+ * as contas que só existiam no store legado. Sem isso elas não conseguem
+ * logar, porque o login é resolvido só contra tb_usuario.
  *
  * Variáveis:
  *   DATABASE_URL              (obrigatório)
@@ -37,7 +42,7 @@ const SOURCE_DIR = process.env.IMPORT_SOURCE_DIR ||
 
 interface CliFlags {
   dryRun: boolean;
-  only: 'notas' | 'notificacoes' | 'preferencias' | 'infra' | 'tudo';
+  only: 'notas' | 'notificacoes' | 'preferencias' | 'infra' | 'usuarios' | 'tudo';
 }
 
 function parseFlags(argv: string[]): CliFlags {
@@ -63,6 +68,105 @@ function readJsonSafe<T>(filePath: string, fallback: T): T {
     logger.error({ filePath, err }, 'falha ao parsear JSON');
     return fallback;
   }
+}
+
+// ============= Usuários =============
+//
+// As contas nasceram no store legado (fd_users_v2, dentro de
+// shared-state.json) e o login passou a ser resolvido pela API, que consulta
+// só tb_usuario. Como nunca existiu rotina ligando os dois, quem só existia no
+// legado passou a receber 401 — que o frontend mostra como
+// "Usuário ou senha inválidos".
+//
+// O hash vai como está, em PBKDF2. auth/password.ts sabe validar esse formato
+// e o login regrava em bcrypt na primeira entrada bem-sucedida, então ninguém
+// precisa trocar de senha por causa da migração.
+
+interface LegacyUser {
+  id?: string;
+  login: string;
+  email?: string | null;
+  name?: string | null;
+  role?: string | null;
+  status?: string | null;
+  passwordHash?: string | null;
+  isFirstAccess?: boolean;
+  passwordResetRequested?: boolean;
+}
+
+/** Aceita o snapshot inteiro ou já o array de fd_users_v2. */
+function extractLegacyUsers(raw: unknown): LegacyUser[] {
+  let node: unknown = raw;
+  if (node && typeof node === 'object' && !Array.isArray(node)) {
+    const obj = node as Record<string, unknown>;
+    node = obj.fd_users_v2 ?? obj.value ?? node;
+  }
+  if (typeof node === 'string') {
+    try { node = JSON.parse(node); } catch { return []; }
+  }
+  if (!Array.isArray(node)) return [];
+  return node.filter(
+    (u): u is LegacyUser =>
+      !!u && typeof u === 'object' && typeof (u as LegacyUser).login === 'string',
+  );
+}
+
+/** 'master' no legado é o perfil de administrador; o resto vira 'user'. */
+function mapPerfil(role: string | null | undefined): string {
+  return role === 'master' ? 'master' : 'user';
+}
+
+async function importUsuarios(dryRun: boolean): Promise<{ inserted: number; skipped: number }> {
+  const file = path.join(SOURCE_DIR, 'shared-state.json');
+  const users = extractLegacyUsers(readJsonSafe<unknown>(file, {}));
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const u of users) {
+    // Sem hash não dá pra autenticar; criar a linha só esconderia o problema.
+    if (!u.passwordHash) {
+      logger.warn({ login: u.login }, 'usuario legado sem passwordHash, pulando');
+      skipped++;
+      continue;
+    }
+    if (dryRun) { inserted++; continue; }
+
+    // ON CONFLICT DO NOTHING: nunca sobrescreve uma conta que já existe na
+    // API — se alguém já trocou a senha por lá, ela vale mais que o legado.
+    //
+    // email também é UNIQUE, e ON CONFLICT (login) não cobre colisão nele.
+    // Sem o try/catch, um e-mail repetido no legado abortaria o import inteiro
+    // e deixaria metade das contas de fora.
+    try {
+      const res = await pool.query(
+        `INSERT INTO tb_usuario
+           (login, email, nome, perfil, senha_hash, status, primeiro_acesso, reset_senha_solicitado, criado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'import:legacy')
+         ON CONFLICT (login) DO NOTHING`,
+        [
+          u.login,
+          u.email ?? `${u.login}@invalido.local`,
+          u.name ?? u.login,
+          mapPerfil(u.role),
+          u.passwordHash,
+          u.status === 'blocked' ? 'blocked' : 'active',
+          u.isFirstAccess ?? false,
+          u.passwordResetRequested ?? false,
+        ],
+      );
+      if ((res.rowCount ?? 0) > 0) inserted++;
+      else skipped++;
+    } catch (err) {
+      // 23505 = unique_violation (aqui, quase sempre e-mail duplicado).
+      if ((err as { code?: string }).code === '23505') {
+        logger.warn({ login: u.login, email: u.email }, 'conflito de email, pulando usuario');
+        skipped++;
+      } else {
+        throw err;
+      }
+    }
+  }
+  return { inserted, skipped };
 }
 
 // ============= Notas =============
@@ -307,6 +411,12 @@ async function main(): Promise<void> {
 
   const ran: Record<string, { inserted: number; skipped: number }> = {};
 
+  // Usuários primeiro: sem conta na API ninguém entra, e as outras tabelas
+  // referenciam pessoas por e-mail.
+  if (flags.only === 'tudo' || flags.only === 'usuarios') {
+    ran.usuarios = await importUsuarios(flags.dryRun);
+    logger.info(ran.usuarios, 'usuarios importados');
+  }
   if (flags.only === 'tudo' || flags.only === 'notas') {
     ran.notas = await importNotas(flags.dryRun);
     logger.info(ran.notas, 'notas importadas');
