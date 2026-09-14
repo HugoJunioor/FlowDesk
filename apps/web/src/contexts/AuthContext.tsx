@@ -17,6 +17,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { authApi } from "@/modules/auth/api";
 import { setAccessToken } from "@/lib/api/client";
 import { toApiError } from "@/lib/api/client";
+import { describeLoginFailure } from "@/lib/api/loginError";
 import type { AuthenticatedUser } from "@/modules/auth/types";
 
 interface AuthContextType {
@@ -152,14 +153,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: true };
     } catch (err) {
       const apiErr = toApiError(err);
-      if (apiErr.status === 429) {
-        return { success: false, error: "Muitas tentativas. Aguarde e tente novamente." };
+      // Timeout, rede e 5xx NAO sao credencial invalida — ver describeLoginFailure.
+      if (apiErr.isInfraFailure) {
+        console.error("[auth] login falhou por infraestrutura:", apiErr.kind, apiErr.status, apiErr.message);
       }
-      if (apiErr.status === 403) {
-        return { success: false, error: apiErr.message || "Conta bloqueada. Contate o administrador." };
-      }
-      // 401 or network error
-      return { success: false, error: "Usuário ou senha inválidos" };
+      return { success: false, error: describeLoginFailure(apiErr) };
     }
   }, [loadForUser, loadLangForUser]);
 
