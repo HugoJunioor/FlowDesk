@@ -2,7 +2,7 @@
 // antes de migrar pra API nova. Persiste em JSON em /data.
 //
 // Endpoints:
-//   GET/PUT  /__state            (snapshot inteiro)
+//   GET      /__state            (snapshot inteiro, somente leitura)
 //   GET/PUT  /__state/:key
 //   GET/POST/PUT/DELETE /notes
 //   GET/POST/PUT/DELETE /infra-demands
@@ -292,13 +292,35 @@ async function sendEmailFor(notification, prefs) {
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ============ __state ============
-app.get('/__state', (_req, res) => res.json(readJson('shared-state.json', {})));
-app.put('/__state', (req, res) => { writeJson('shared-state.json', req.body || {}); res.json({ ok: true }); });
-app.get('/__state/:key', (req, res) => {
+//
+// Estas rotas carregam o estado compartilhado inteiro — inclusive fd_users_v2,
+// que traz login, e-mail e hash de senha de todo mundo. A protecao primaria e
+// a whitelist de IP do Traefik (middleware flowdesk-vpn, ver
+// docker-compose.server.yml). STATE_TOKEN e defesa em profundidade: quando
+// definido, exige o header X-FlowDesk-Token que o frontend ja envia.
+//
+// Fica desligado por padrao de proposito — ligar sem distribuir o token
+// derrubaria os clientes que hoje nao tem nenhum.
+const STATE_TOKEN = process.env.STATE_TOKEN || '';
+
+function requireStateToken(req, res, next) {
+  if (!STATE_TOKEN) return next();
+  if (req.get('X-FlowDesk-Token') === STATE_TOKEN) return next();
+  return res.status(401).json({ error: 'unauthorized' });
+}
+
+app.get('/__state', requireStateToken, (_req, res) =>
+  res.json(readJson('shared-state.json', {})),
+);
+// PUT /__state (snapshot inteiro) foi removido: substituia o arquivo todo pelo
+// corpo da requisicao, entao um corpo vazio zerava usuarios, grupos e overrides
+// de uma vez. Nenhum cliente usava — o frontend so escreve por chave, via
+// pushToServer() em apps/web/src/lib/stateSync.ts.
+app.get('/__state/:key', requireStateToken, (req, res) => {
   const s = readJson('shared-state.json', {});
   res.json({ key: req.params.key, value: s[req.params.key] ?? null });
 });
-app.put('/__state/:key', (req, res) => {
+app.put('/__state/:key', requireStateToken, (req, res) => {
   const s = readJson('shared-state.json', {});
   s[req.params.key] = req.body?.value ?? req.body;
   writeJson('shared-state.json', s);
