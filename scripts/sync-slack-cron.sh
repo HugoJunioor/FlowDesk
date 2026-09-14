@@ -66,6 +66,17 @@ HASH_BEFORE=$(md5sum $DATA_FILE 2>/dev/null | awk '{print $1}' || echo "none")
 echo "===== $(date -Iseconds) sync iniciado =====" >> $LOG
 
 # Sync Slack -> realDemands.ts
+#
+# O npm install so roda se as deps faltarem, e na pratica elas nunca faltam:
+# @slack/web-api e dotenv estao declarados em apps/web/package.json e o npm
+# workspaces os iça pra /opt/flowdesk/app/node_modules, que entra aqui pelo
+# bind mount. Rodar o install assim mesmo custava ~6 dos ~10 minutos de cada
+# execucao — ele refaz a resolucao da arvore inteira do monorepo pra concluir
+# que nao ha nada a fazer.
+#
+# O fallback fica porque o node_modules e do host, nao da imagem: se alguem
+# limpar o diretorio ou clonar o repo do zero, o sync precisa se virar sozinho
+# em vez de falhar no require.
 docker run --rm \
   --memory="$SYNC_MEM" --cpus="$SYNC_CPUS" \
   -v /opt/flowdesk/app:/app \
@@ -73,7 +84,13 @@ docker run --rm \
   --env-file /opt/flowdesk/app/.env \
   --network "${DOCKER_NETWORK:-cfo_default}" \
   node:20-alpine sh -c '
-    cd /app && npm install --no-save --legacy-peer-deps @slack/web-api dotenv >/dev/null 2>&1 && \
+    cd /app && \
+    if [ -d node_modules/@slack/web-api ] && [ -d node_modules/dotenv ]; then \
+      echo "  [ok] deps do sync ja presentes — sem npm install"; \
+    else \
+      echo "  [info] deps do sync ausentes — instalando"; \
+      npm install --no-save --legacy-peer-deps @slack/web-api dotenv >/dev/null 2>&1; \
+    fi && \
     cd apps/web && node scripts/syncSlack.cjs
   ' >> $LOG 2>&1
 
