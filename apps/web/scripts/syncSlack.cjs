@@ -165,6 +165,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   let cursor;
   let cacheHits = 0;
   let cacheMisses = 0;
+  // Acumuladores de tempo: historico (paginacao de conversations.history) vs
+  // replies (conversations.replies + o throttle de 250ms entre elas). Sao os
+  // dois candidatos a gargalo e otimiza-los exige mudancas bem diferentes.
+  let msHistory = 0;
+  let msReplies = 0;
+  let pages = 0;
   // Contadores auxiliares — usados pra esclarecer no log quando um canal
   // termina com 0 demandas. Sem isso, "0 demandas encontradas" parece bug;
   // com isso fica claro que o canal so tem bate-papo humano (ex: bcgestao).
@@ -172,6 +178,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   let humanMessages = 0;
 
   do {
+    const tPage = Date.now();
     const result = await client.conversations.history({
       channel: channelId,
       oldest: String(OLDEST),
@@ -179,6 +186,8 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       limit: 100,
       cursor,
     });
+    msHistory += Date.now() - tPage;
+    pages++;
 
     for (const msg of result.messages) {
       totalRead++;
@@ -232,6 +241,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
           cacheHits++;
         } else {
           cacheMisses++;
+          const tReply = Date.now();
           try {
             await sleep(250); // throttle vs rate limit
             const replies = await fetchAllReplies(channelId, msg.ts);
@@ -256,6 +266,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
           } catch (e) {
             console.error(`  Erro ao buscar replies de ${msg.ts}:`, e.message);
           }
+          msReplies += Date.now() - tReply;
         }
       }
 
@@ -520,7 +531,8 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   if (cacheHits + cacheMisses > 0) {
     console.log(`  cache replies: ${cacheHits} hits, ${cacheMisses} misses`);
   }
-  return { demands, totalRead, humanMessages };
+  console.log(`  [tempo] historico: ${(msHistory / 1000).toFixed(1)}s em ${pages} pagina(s) | replies: ${(msReplies / 1000).toFixed(1)}s em ${cacheMisses} chamada(s)`);
+  return { demands, totalRead, humanMessages, msHistory, msReplies, pages };
 }
 
 // === PRESERVAR ESTADO CONCLUIDA DO SYNC ANTERIOR ===
@@ -571,6 +583,15 @@ function loadPreviousState() {
 // Slack tier-3 = 50 req/min/method. 250ms = 4/s = 240/min → ainda confortável.
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+// === INSTRUMENTACAO DE TEMPO ===
+// Serve pra decidir ONDE otimizar em vez de adivinhar. O sync leva minutos e
+// ate agora nao havia como saber quanto e users.list, quanto e a varredura de
+// historico e quanto e conversations.replies — sem isso, qualquer refactor de
+// performance e chute.
+const T_START = Date.now();
+function elapsed(since) { return ((Date.now() - since) / 1000).toFixed(1); }
+function fase(label, since) { console.log(`  [tempo] ${label}: ${elapsed(since)}s`); }
+
 async function main() {
   console.log('Conectando ao Slack...');
   const auth = await client.auth.test();
@@ -578,7 +599,9 @@ async function main() {
   console.log(`Periodo: 01/04/2026 ate hoje\n`);
 
   // PRE-FETCH todos os usuarios (elimina rate limiting)
+  const tUsers = Date.now();
   await prefetchUsers();
+  fase('users.list (prefetch)', tUsers);
 
   // Carregar estado anterior para preservar concluidas + prioridades
   const previousState = loadPreviousState();
@@ -590,12 +613,18 @@ async function main() {
   console.log(`${previousConcluded.size} demandas com status concluida no sync anterior (serao preservadas)`);
   console.log(`${existingIds.size} demandas no arquivo anterior — novas demandas sem prioridade serao classificadas como P3.\n`);
 
+  const tList = Date.now();
   const channelsResult = await client.conversations.list({ types: 'public_channel', limit: 200 });
   const clientChannels = channelsResult.channels.filter(c => c.name.startsWith('cliente-'));
+  fase('conversations.list', tList);
 
   console.log(`${clientChannels.length} canais de clientes encontrados\n`);
 
   let allDemands = [];
+  let totalHistory = 0;
+  let totalReplies = 0;
+  let totalPages = 0;
+  const tCanais = Date.now();
 
   // Tracks channels that already fired a not_in_channel alert this run.
   // Prevents duplicate emails if the same error repeats across retries.
@@ -610,7 +639,10 @@ async function main() {
 
     console.log(`Buscando #${channel.name}...`);
     try {
-      const { demands, totalRead, humanMessages } = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
+      const { demands, totalRead, humanMessages, msHistory, msReplies, pages } = await fetchChannelMessages(channel.id, channel.name, previousPriorities, existingIds, previousThreadReplies, previousLatestReplyTs, previousConcluded);
+      totalHistory += msHistory || 0;
+      totalReplies += msReplies || 0;
+      totalPages += pages || 0;
       if (demands.length === 0 && totalRead > 0) {
         // Explica que canal tem mensagens mas nenhuma com formato de workflow —
         // ex: cliente usa o canal so pra bate-papo, sem abrir demanda via bot.
@@ -648,6 +680,11 @@ async function main() {
     }
     await new Promise(r => setTimeout(r, 500));
   }
+
+  fase('varredura de canais (total)', tCanais);
+  console.log(`  [tempo] ├─ conversations.history: ${(totalHistory / 1000).toFixed(1)}s em ${totalPages} pagina(s)`);
+  console.log(`  [tempo] ├─ conversations.replies: ${(totalReplies / 1000).toFixed(1)}s`);
+  console.log(`  [tempo] └─ resto (parsing, throttle entre canais, etc): ${((Date.now() - tCanais - totalHistory - totalReplies) / 1000).toFixed(1)}s`);
 
   // === FILTRO POR ROTEAMENTO DE CANAIS ===
   // Le fd_channel_routing do shared-state.json (configurado via UI).
@@ -755,6 +792,7 @@ export function extractClientName(channel: string): string {
 
   fs.writeFileSync(path.join(__dirname, '..', 'src', 'data', 'realDemands.ts'), output);
   console.log('\nArquivo src/data/realDemands.ts atualizado com dados reais (gitignored)!');
+  fase('TOTAL do sync', T_START);
 }
 
 // Executa so quando chamado direto (`node scripts/syncSlack.cjs`), pra que os
