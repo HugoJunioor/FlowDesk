@@ -27,8 +27,10 @@ fi
 # /sync-status a cada 30s e troca os dados em memoria quando o mtime muda.
 # Nenhum build, nenhum rsync, nenhum container reiniciado.
 #
-# O web-dist so muda em deploy (scripts/deploy.sh), que e onde mudanca de
-# codigo deve entrar.
+# Mudanca de CODIGO do frontend nao passa por aqui: ela entra por deploy
+# (scripts/deploy.sh), que rebuilda a imagem do web. O diretorio web-dist/ e
+# residuo de um mecanismo antigo e nao e servido por ninguem — ver o comentario
+# do bloco `web` no deploy.sh.
 set -e
 cd /opt/flowdesk/app
 
@@ -114,10 +116,13 @@ if [ "$HASH_BEFORE" != "$HASH_AFTER" ]; then
   #
   # O garbage collect de assets saiu junto, e precisava sair: ele apagava
   # arquivos de web-dist/assets com mtime acima de 2h, contando com o build pra
-  # recria-los. Sem build, ele apagaria os assets em producao.
+  # recria-los.
   #
-  # web-dist agora so muda em deploy (scripts/deploy.sh), que e onde mudanca de
-  # codigo deve entrar de qualquer forma.
+  # Nota de 2026-09-18: descobrimos depois que web-dist/ nao e servido por
+  # ninguem — o compose nao monta esse diretorio no container web, que serve o
+  # dist assado na propria imagem. Ou seja, nem o build nem o GC daqui jamais
+  # afetaram o que o usuario recebe. Mudanca de codigo do frontend so chega por
+  # deploy (rebuild da imagem); ver o bloco `web` em scripts/deploy.sh.
   echo "  [ok] dados atualizados — frontend recebe via /demands-snapshot (sem build)" >> $LOG
 else
   echo "  [ok] sem mudancas" >> $LOG

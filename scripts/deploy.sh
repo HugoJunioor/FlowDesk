@@ -6,8 +6,9 @@
 #   --no-cache  Force rebuild sem cache Docker
 #
 # Detecta automaticamente quais services mudaram (api/web/legacy_state) e
-# rebuilda só os necessários. Web continua usando bind mount de /web-dist
-# (não rebuilda container, só faz rsync do novo dist).
+# rebuilda só os necessários. Os três (api, web, legacy_state) seguem o mesmo
+# caminho: build da imagem + recreate. O web NÃO usa bind mount — o dist é
+# copiado pra dentro da imagem pelo apps/web/Dockerfile.
 set -euo pipefail
 
 APP_DIR="/opt/flowdesk/app"
@@ -71,30 +72,33 @@ if [ "$NEED_LEGACY" = "1" ]; then
 fi
 
 if [ "$NEED_WEB" = "1" ]; then
-  echo "  -> web (rebuild do dist via bind mount, sem rebuildar container)"
-  TMP_BUILD=/opt/flowdesk/app/tmp-build-deploy
-  rm -rf "$TMP_BUILD" && mkdir -p "$TMP_BUILD"
-  docker run --rm \
-    -v "$APP_DIR":/src:ro \
-    -v "$TMP_BUILD":/out \
-    -w /work \
-    node:20-alpine sh -c '
-      cp -r /src/package.json /src/package-lock.json /work/ && \
-      mkdir -p /work/apps/web && cp -r /src/apps/web/* /work/apps/web/ && \
-      cd /work && npm ci --legacy-peer-deps --workspace=@flowdesk/web --include-workspace-root --no-audit --no-fund >/dev/null 2>&1 && \
-      cd /work/apps/web && npm run build >/dev/null 2>&1 && \
-      cp -r /work/apps/web/dist/* /out/
-    '
-  if [ -f "$TMP_BUILD/index.html" ]; then
-    rsync -a "$TMP_BUILD"/ /opt/flowdesk/app/web-dist/
-    find /opt/flowdesk/app/web-dist/assets -type f -mmin +120 -delete 2>/dev/null || true
-    echo "    rsync OK"
+  # O web se deploya como api e legacy_state: rebuild da imagem + recreate.
+  #
+  # Antes este bloco buildava o dist num container temporario e fazia rsync pra
+  # /opt/flowdesk/app/web-dist/. Esse caminho nunca chegou ao usuario: o
+  # servico `web` do docker-compose.server.yml NAO declara volumes, e o
+  # apps/web/Dockerfile copia o dist pra dentro da imagem
+  # (COPY --from=build /app/apps/web/dist /usr/share/nginx/html). O rsync
+  # atualizava um diretorio que ninguem le.
+  #
+  # A falha era silenciosa — sem erro, sem log, sem 404. O index.html no disco
+  # apontava pro bundle novo, o nginx seguia servindo o antigo de dentro da
+  # imagem, e os DADOS continuavam frescos porque vem do /demands-snapshot em
+  # runtime, nao do bundle. Em 2026-09-18 descobrimos que producao rodava
+  # frontend de 10/09: quatro PRs de web tinham "deployado" sem efeito.
+  echo "  -> web (build $NO_CACHE + recreate)"
+  docker compose -f "$COMPOSE_FILE" build $NO_CACHE web
+  docker compose -f "$COMPOSE_FILE" up -d --no-build --force-recreate web
+
+  # Verifica o que o nginx PASSOU A SERVIR, nao o que esta no disco. Foi a
+  # ausencia exatamente desta checagem que deixou o problema acima passar.
+  SERVED=$(docker exec flowdesk-web \
+    grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' /usr/share/nginx/html/index.html 2>/dev/null | head -1)
+  if [ -n "$SERVED" ]; then
+    echo "    servindo: $SERVED"
   else
-    echo "    [ERRO] build do web falhou — dist nao gerado"
-    rm -rf "$TMP_BUILD"
-    exit 1
+    echo "    [AVISO] nao foi possivel ler o bundle servido — confira o container web"
   fi
-  rm -rf "$TMP_BUILD"
 fi
 
 # 4. Migrations
