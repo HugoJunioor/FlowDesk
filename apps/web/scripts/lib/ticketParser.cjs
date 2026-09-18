@@ -148,6 +148,29 @@ function parseWorkflowMessage(text) {
       if (value) fields[currentKey] = value;
       continue;
     }
+
+    // Segundo formato de bot, em italico com dois-pontos DENTRO do par:
+    //
+    //   _Titulo da demanda:_
+    //   Supermercado Tal
+    //   _Data limite:_
+    //   2026-09-22
+    //
+    // Sao dois apps diferentes postando nos mesmos canais. Sem este ramo o
+    // parse devolvia {} pra esse formato e tudo caia em fallback: o titulo
+    // virava a mencao da primeira linha (@Fulano) e a data limite sumia. Na
+    // base de producao eram 120 titulos perdidos e 133 prazos — o dueDate
+    // estava 100% vazio nas 985 demandas por causa disso.
+    //
+    // O dois-pontos e obrigatorio de proposito. Sem ele, qualquer trecho em
+    // italico no meio de uma descricao viraria um campo fantasma.
+    const italicMatch = line.match(/^_(.+?):_\s*(.*)/);
+    if (italicMatch) {
+      currentKey = italicMatch[1].replace(/[*_]/g, '').trim();
+      const value = italicMatch[2].trim();
+      if (value) fields[currentKey] = value;
+      continue;
+    }
     if (currentKey && !fields[currentKey]) {
       fields[currentKey] = line;
       currentKey = null;
