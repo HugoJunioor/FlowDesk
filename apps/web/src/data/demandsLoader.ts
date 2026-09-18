@@ -68,9 +68,18 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
     const titleLower = d.title.toLowerCase();
     const workflowLower = d.workflow.toLowerCase();
 
-    // Workflow forcado P3 (conciliacao etc) — sobrepoe regras manuais e classificador.
+    // Workflow forcado P3 (conciliacao etc) — sobrepoe a PRIORIDADE, nao a
+    // atribuicao de responsavel. Sao duas decisoes diferentes, e antes este
+    // bloco saia com `return` antes das etapas 1 e 2: demanda de "Nova
+    // conciliacao" nunca recebia responsavel, nem por regra de texto nem pelo
+    // fallback. Em producao isso deixou 58 demandas permanentemente sem dono,
+    // e o time atribuia na mao sem saber por que a regra nao pegava.
+    //
+    // Aqui aplicamos so o fallback, nao as regras por texto: o pedido e
+    // "se vier sem responsavel, atribui a quem esta configurado". Quem ja tem
+    // dono continua intocado.
     if (FORCED_P3_WORKFLOWS.includes(workflowLower)) {
-      return {
+      const forced: SlackDemand = {
         ...d,
         priority: "p3",
         autoClassification: {
@@ -80,6 +89,11 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
           matchedKeywords: [d.workflow],
         },
       };
+      if (fallbackRule && !forced.assignee?.name) {
+        forced.assignee = { name: fallbackRule.assignee, avatar: "" };
+        // A prioridade da regra NAO se aplica aqui: o P3 do workflow vence.
+      }
+      return forced;
     }
 
     // 1) Regras dinâmicas por texto (título/workflow)
