@@ -55,10 +55,10 @@ function makeDemand(over: Partial<SlackDemand> = {}): SlackDemand {
   } as SlackDemand;
 }
 
-function setFallback(assignee: string) {
+function setFallback(assignee: string, appliesFrom?: string) {
   localStorage.setItem(
     RULES_KEY,
-    JSON.stringify([{ id: "r1", condition: "no_assignee", assignee }]),
+    JSON.stringify([{ id: "r1", condition: "no_assignee", assignee, appliesFrom }]),
   );
 }
 
@@ -124,6 +124,72 @@ describe("fallback no_assignee em workflow forcado P3 (conciliacao)", () => {
     );
 
     expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+  });
+});
+
+describe("recorte por data do fallback (appliesFrom)", () => {
+  // O fallback e aplicado na carga sobre a base inteira. Sem recorte, ligar a
+  // regra transfere de uma vez todo o historico sem dono — em producao eram 133
+  // demandas desde abril, 126 ja concluidas. Estes testes fixam o contrato de
+  // "so daqui pra frente".
+
+  it("ignora demanda criada ANTES da data de corte", () => {
+    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+
+    const out = processOne(
+      makeDemand({ createdAt: "2026-08-20T10:00:00.000Z", assignee: null }),
+    );
+
+    expect(out.assignee?.name ?? null).toBeNull();
+  });
+
+  it("atribui demanda criada DEPOIS da data de corte", () => {
+    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+
+    const out = processOne(
+      makeDemand({ createdAt: "2026-09-19T10:00:00.000Z", assignee: null }),
+    );
+
+    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+  });
+
+  it("inclui o proprio dia do corte", () => {
+    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+
+    const out = processOne(
+      makeDemand({ createdAt: "2026-09-18T14:00:00.000Z", assignee: null }),
+    );
+
+    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+  });
+
+  it("vale para todo o historico quando appliesFrom esta ausente", () => {
+    // Retrocompatibilidade: regra salva antes do campo existir nao muda de
+    // alcance so porque o codigo passou a suportar recorte.
+    setFallback("Hugo Cordeiro Junior");
+
+    const out = processOne(
+      makeDemand({ createdAt: "2026-04-01T10:00:00.000Z", assignee: null }),
+    );
+
+    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+  });
+
+  it("aplica o recorte tambem no caminho de workflow forcado P3", () => {
+    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+
+    const out = processOne(
+      makeDemand({
+        workflow: "Nova conciliação",
+        createdAt: "2026-05-10T10:00:00.000Z",
+        assignee: null,
+      }),
+    );
+
+    // Conciliacao antiga nao pode escapar do recorte por causa do caminho
+    // separado — foi exatamente esse desvio que causou o bug anterior.
+    expect(out.assignee?.name ?? null).toBeNull();
+    expect(out.priority).toBe("p3");
   });
 });
 

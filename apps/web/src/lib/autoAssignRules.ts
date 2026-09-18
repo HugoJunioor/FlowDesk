@@ -21,10 +21,45 @@ export interface AutoAssignRule {
   condition: AutoAssignCondition;
   assignee: string;
   priority?: string;
+  /**
+   * no_assignee-only: data (YYYY-MM-DD) a partir da qual o fallback vale,
+   * comparada contra `createdAt` da demanda.
+   *
+   * Existe porque o fallback e aplicado na carga, sobre a base inteira — sem
+   * recorte, criar a regra transfere de uma vez todo o historico sem dono (em
+   * producao, 133 demandas desde abril, 126 delas ja concluidas) e distorce as
+   * metricas por responsavel. Ausente = vale pra tudo, que era o comportamento
+   * antes deste campo existir.
+   */
+  appliesFrom?: string;
   // text_match-only fields:
   pattern?: string;
   field?: "title" | "workflow";
   match?: "includes" | "equals";
+}
+
+/** Hoje em YYYY-MM-DD, hora local — o padrao de "daqui pra frente". */
+export function todayIso(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * A regra de fallback alcanca esta demanda?
+ *
+ * `appliesFrom` e interpretado como meia-noite LOCAL, nao UTC: o usuario
+ * escolhe "a partir de hoje" pensando no fuso dele, e uma demanda criada as
+ * 22h de ontem (01h UTC de hoje) nao deve ser capturada por engano.
+ */
+export function fallbackReaches(rule: AutoAssignRule, demandCreatedAt: string): boolean {
+  if (!rule.appliesFrom) return true;
+  const from = new Date(`${rule.appliesFrom}T00:00:00`).getTime();
+  if (Number.isNaN(from)) return true; // data corrompida nao deve desligar a regra
+  const created = new Date(demandCreatedAt).getTime();
+  if (Number.isNaN(created)) return false;
+  return created >= from;
 }
 
 type StoredRule = Partial<AutoAssignRule> & { assignee: string };
@@ -40,6 +75,9 @@ function normalize(raw: StoredRule): AutoAssignRule {
     condition,
     assignee: raw.assignee,
     priority: raw.priority,
+    // Regras salvas antes deste campo existir ficam sem appliesFrom e seguem
+    // valendo pra base inteira — nao mudamos o alcance de nada ja configurado.
+    appliesFrom: condition === "no_assignee" ? raw.appliesFrom : undefined,
     pattern: condition === "text_match" ? (raw.pattern ?? "") : undefined,
     field: condition === "text_match" ? (raw.field ?? "title") : undefined,
     match: condition === "text_match" ? (raw.match ?? "includes") : undefined,
@@ -78,5 +116,13 @@ export function deleteAutoAssignRule(id: string): AutoAssignRule[] {
 }
 
 export function newRule(condition: AutoAssignCondition): AutoAssignRule {
-  return normalize({ id: genId(), condition, assignee: "" });
+  return normalize({
+    id: genId(),
+    condition,
+    assignee: "",
+    // Fallback novo nasce valendo so de hoje em diante: e o que se espera ao
+    // ligar a regra, e evita a surpresa de herdar meses de historico sem dono.
+    // O campo fica editavel na UI pra quem quiser alcance maior.
+    ...(condition === "no_assignee" ? { appliesFrom: todayIso() } : {}),
+  });
 }
