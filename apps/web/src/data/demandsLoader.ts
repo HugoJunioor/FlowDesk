@@ -3,7 +3,7 @@ import { mockDemands as demoData, extractClientName } from "./mockDemands";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import { classifyClosureFields } from "@/lib/closureClassifier";
-import { loadAutoAssignRules } from "@/lib/autoAssignRules";
+import { loadAutoAssignRules, fallbackReaches } from "@/lib/autoAssignRules";
 
 /**
  * Carrega demandas: tenta realDemands (dados reais, gitignored),
@@ -89,7 +89,7 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
           matchedKeywords: [d.workflow],
         },
       };
-      if (fallbackRule && !forced.assignee?.name) {
+      if (fallbackRule && !forced.assignee?.name && fallbackReaches(fallbackRule, d.createdAt)) {
         forced.assignee = { name: fallbackRule.assignee, avatar: "" };
         // A prioridade da regra NAO se aplica aqui: o P3 do workflow vence.
       }
@@ -117,7 +117,8 @@ function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
     const result: SlackDemand = { ...d, autoClassification: classification };
 
     // 2) Fallback: demanda sem responsável → aplica regra "no_assignee" se houver
-    if (fallbackRule && (!result.assignee || !result.assignee.name)) {
+    //    e se ela alcançar a data de criação da demanda (ver appliesFrom).
+    if (fallbackRule && (!result.assignee || !result.assignee.name) && fallbackReaches(fallbackRule, d.createdAt)) {
       result.assignee = { name: fallbackRule.assignee, avatar: "" };
       if (fallbackRule.priority) {
         result.priority = fallbackRule.priority as SlackDemand["priority"];

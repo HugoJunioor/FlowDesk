@@ -108,6 +108,15 @@ export default function AutoAssignRulesCard() {
               <p className="text-[11px] text-muted-foreground">
                 Aplica este responsável a qualquer demanda que ainda esteja sem assignee.
               </p>
+              {/* O alcance precisa ficar visível: sem isso, "todo o histórico" e
+                  "só daqui pra frente" parecem a mesma regra na tela. */}
+              {fallback && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {fallback.appliesFrom
+                    ? `Vale para demandas criadas a partir de ${fallback.appliesFrom.split("-").reverse().join("/")}.`
+                    : "Vale para todo o histórico, inclusive demandas antigas já concluídas."}
+                </p>
+              )}
             </div>
             {fallback ? (
               <div className="flex items-center gap-1.5">
@@ -217,6 +226,22 @@ export default function AutoAssignRulesCard() {
                     className="h-9"
                   />
                 </div>
+              </div>
+            )}
+
+            {editing.condition === "no_assignee" && (
+              <div>
+                <label className="text-[11px] text-muted-foreground">Vale a partir de</label>
+                <Input
+                  type="date"
+                  value={editing.appliesFrom ?? ""}
+                  onChange={(e) => setEditing({ ...editing, appliesFrom: e.target.value || undefined })}
+                  className="h-9"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Só demandas criadas nesta data ou depois. Em branco, a regra alcança
+                  todo o histórico — inclusive demandas antigas já concluídas.
+                </p>
               </div>
             )}
 
