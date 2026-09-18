@@ -35,12 +35,20 @@ describe("fallbackReaches", () => {
     expect(fallbackReaches(fallback(), "2026-04-01T10:00:00.000Z")).toBe(true);
   });
 
+  // Os horarios sao construidos a partir da meia-noite LOCAL do corte, nunca
+  // com offset fixo no literal. Um "2026-09-17T23:00:00-03:00" cravado aqui
+  // mede o fuso de quem roda o teste, nao o comportamento: da false em -03 e
+  // true em UTC, e o CI roda em UTC.
+  const meiaNoiteDoCorte = () => new Date("2026-09-18T00:00:00").getTime();
+
   it("nao alcanca o que foi criado antes do corte", () => {
-    expect(fallbackReaches(fallback("2026-09-18"), "2026-09-17T23:00:00-03:00")).toBe(false);
+    const umaHoraAntes = new Date(meiaNoiteDoCorte() - 60 * 60 * 1000);
+    expect(fallbackReaches(fallback("2026-09-18"), umaHoraAntes.toISOString())).toBe(false);
   });
 
   it("alcanca o que foi criado a partir do corte", () => {
-    expect(fallbackReaches(fallback("2026-09-18"), "2026-09-18T00:05:00-03:00")).toBe(true);
+    const cincoMinDepois = new Date(meiaNoiteDoCorte() + 5 * 60 * 1000);
+    expect(fallbackReaches(fallback("2026-09-18"), cincoMinDepois.toISOString())).toBe(true);
   });
 
   it("corta exatamente na meia-noite LOCAL, nao na UTC", () => {
