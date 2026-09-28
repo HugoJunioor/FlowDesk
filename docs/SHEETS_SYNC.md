@@ -5,8 +5,10 @@ A cada execução do sync do Slack (cron de 5 min), o FlowDesk envia para a aba
 **transferidas para a Engenharia**. A transferência é o botão **Transferir para
 Engenharia** no detalhe da demanda, e vale para qualquer formulário.
 
-- Na tela de Demandas, o seletor **Suporte / Engenharia / Todas** mostra o que
-  está com cada área. A transferência fica no override da demanda
+- Na tela de Demandas, cada área tem seu painel: **Operações** (azul) e
+  **Engenharia** (amarelo). O aberto ocupa a tela e o outro fica recolhido no
+  canto, com contagem e as últimas demandas; clicar nele inverte. A
+  transferência fica no override da demanda
   (`fd_demand_overrides`: `area`, `areaChangedAt`, `areaChangedBy`) e pode ser
   desfeita pelo toast ou revertida com **Devolver ao Suporte**.
 - O FlowDesk **cria** a linha na transferência e **mantém atualizadas** as

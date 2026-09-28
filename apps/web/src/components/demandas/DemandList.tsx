@@ -6,7 +6,6 @@ import { Building2, ExternalLink } from "lucide-react";
 import ExpirationCountdown from "@/components/demandas/ExpirationCountdown";
 import CopyLinkButton from "@/components/demandas/CopyLinkButton";
 import StaleBadge from "./StaleBadge";
-import AreaBadge from "./AreaBadge";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DemandListProps {
@@ -80,7 +79,6 @@ const DemandList = ({ demands, onSelect }: DemandListProps) => {
                   <span className="truncate text-sm font-medium min-w-0" title={d.title}>
                     {d.title}
                   </span>
-                  <AreaBadge demand={d} />
 
                   {d.slackPermalink && (
                     <>
