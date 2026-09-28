@@ -185,6 +185,14 @@ export interface InfraChatMessage {
   files?: ClosureAttachment[];
 }
 
+/** Area responsavel pela demanda no momento. */
+export type DemandArea = "suporte" | "engenharia";
+
+/** Area atual; demanda nunca transferida esta com o Suporte. */
+export function areaOf(d: Pick<SlackDemand, "area">): DemandArea {
+  return d.area === "engenharia" ? "engenharia" : "suporte";
+}
+
 export interface SlackDemand {
   id: string;
   title: string;
@@ -279,6 +287,17 @@ export interface SlackDemand {
    * chave-valor no detalhe da demanda.
    */
   formFields?: Record<string, string>;
+  /**
+   * Area que esta com a demanda. Ausente = nunca foi transferida (fica com o
+   * Suporte). Vem so de override manual (fd_demand_overrides) — o sync nao
+   * define. Toda demanda com area definida vai pra planilha da Engenharia,
+   * inclusive as devolvidas, pra la refletir o "Time atual".
+   */
+  area?: DemandArea;
+  /** Quando a area mudou pela ultima vez (ISO). */
+  areaChangedAt?: string | null;
+  /** Quem mudou a area pela ultima vez (nome do usuario). */
+  areaChangedBy?: string | null;
   manualStatusOverride?: boolean;
   slaFirstResponse?: number | null;
   slaStatus?: string | null;

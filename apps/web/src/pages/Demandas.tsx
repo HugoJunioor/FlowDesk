@@ -5,11 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Calendar, Signal, Users, List, Database, Bookmark, BookmarkX } from "lucide-react";
+import { LayoutGrid, Calendar, Signal, Users, List, Database, Bookmark, BookmarkX, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
-import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS } from "@/types/demand";
+import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, DemandArea, areaOf } from "@/types/demand";
+import type { DemandOverride } from "@/data/demandsPipeline";
 import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { setSyncedItem } from "@/lib/stateSync";
 
@@ -34,17 +35,6 @@ import ReportButton from "@/components/reports/ReportButton";
 import { notifyStarted, notifyCompleted, notifyReopened, notifyAssigned } from "@/lib/notificationEvents";
 
 // === LOCAL PERSISTENCE ===
-type DemandOverride = {
-  status?: string;
-  priority?: string;
-  assignee?: string | null;
-  completedAt?: string | null;
-  manualStatusOverride?: boolean;
-  closure?: Partial<ClosureFields>;
-  taskLink?: string;
-  hasTask?: boolean;
-};
-
 function loadOverrides(): Record<string, DemandOverride> {
   try {
     const stored = localStorage.getItem("fd_demand_overrides");
@@ -78,6 +68,18 @@ function loadScope(): DemandScope {
     return v === "all" ? "all" : "mine";
   } catch { return "mine"; }
 }
+
+type AreaFilter = DemandArea | "all";
+const AREA_FILTER_KEY = "flowdesk:demandas:area";
+
+function loadAreaFilter(): AreaFilter {
+  try {
+    const v = localStorage.getItem(AREA_FILTER_KEY);
+    return v === "suporte" || v === "engenharia" ? v : "all";
+  } catch { return "all"; }
+}
+
+type AreaFields = Pick<DemandOverride, "area" | "areaChangedAt" | "areaChangedBy">;
 
 // === Saved view (filter preferences per user) ===
 // Permite o user salvar o conjunto atual de visualizacao (filtros, modo
@@ -135,6 +137,7 @@ const Demandas = () => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
   const [scope, setScope] = useState<DemandScope>(loadScope);
+  const [areaFilter, setAreaFilter] = useState<AreaFilter>(loadAreaFilter);
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
 
   // Revalida em 3 gatilhos:
@@ -373,6 +376,49 @@ const Demandas = () => {
     saveOverrides(overrides);
   }, []);
 
+  /**
+   * Grava (ou limpa, com null) os campos de area no override e na tela. O
+   * override e o que leva a demanda pra planilha da Engenharia: o export roda
+   * no cron e le fd_demand_overrides do estado compartilhado.
+   */
+  const writeAreaFields = useCallback((demandId: string, fields: AreaFields | null) => {
+    const patch = (d: SlackDemand): SlackDemand => ({
+      ...d,
+      area: fields?.area,
+      areaChangedAt: fields?.areaChangedAt ?? null,
+      areaChangedBy: fields?.areaChangedBy ?? null,
+    });
+    setDemands((prev) => prev.map((d) => (d.id === demandId ? patch(d) : d)));
+    setSelected((prev) => (prev && prev.id === demandId ? patch(prev) : prev));
+
+    const overrides = loadOverrides();
+    const { area: _area, areaChangedAt: _at, areaChangedBy: _by, ...rest } = overrides[demandId] || {};
+    overrides[demandId] = fields?.area ? { ...rest, ...fields } : rest;
+    saveOverrides(overrides);
+  }, []);
+
+  const handleAreaChange = useCallback((demandId: string, area: DemandArea) => {
+    const current = loadOverrides()[demandId] || {};
+    const previous: AreaFields | null = current.area
+      ? { area: current.area, areaChangedAt: current.areaChangedAt, areaChangedBy: current.areaChangedBy }
+      : null;
+
+    writeAreaFields(demandId, {
+      area,
+      areaChangedAt: new Date().toISOString(),
+      areaChangedBy: currentUser?.name || currentUser?.login || undefined,
+    });
+
+    // Desfazer restaura exatamente o estado anterior — inclusive "nunca
+    // transferida", que tira a demanda do export se o cron ainda nao rodou.
+    const undo = { label: t("demand.area.undo"), onClick: () => writeAreaFields(demandId, previous) };
+    if (area === "engenharia") {
+      toast.success(t("demand.area.transferred"), { description: t("demand.area.transferred_desc"), action: undo });
+    } else {
+      toast.success(t("demand.area.returned"), { action: undo });
+    }
+  }, [writeAreaFields, currentUser, t]);
+
   const handleStatClick = useCallback((statKey: string) => {
     setFilters((prev) => ({
       ...prev,
@@ -384,10 +430,22 @@ const Demandas = () => {
   // CC nao conta — quem ja foi assignee no passado fica em cc pra sempre
   // (a partir do header do Slack), entao incluir cc faria a demanda nunca
   // sair da lista de quem ja a passou pra outro.
-  const scopedDemands = useMemo(() => {
+  const ownerScopedDemands = useMemo(() => {
     if (scope === "all" || !currentUser) return demands;
     return demands.filter((d) => d.assignee?.name === currentUser.name);
   }, [demands, scope, currentUser]);
+
+  // Contagem por area sobre o recorte de responsavel, pra os botoes mostrarem
+  // quanto tem em cada lado antes de filtrar.
+  const areaCounts = useMemo(() => {
+    const engenharia = ownerScopedDemands.filter((d) => areaOf(d) === "engenharia").length;
+    return { all: ownerScopedDemands.length, engenharia, suporte: ownerScopedDemands.length - engenharia };
+  }, [ownerScopedDemands]);
+
+  const scopedDemands = useMemo(() => {
+    if (areaFilter === "all") return ownerScopedDemands;
+    return ownerScopedDemands.filter((d) => areaOf(d) === areaFilter);
+  }, [ownerScopedDemands, areaFilter]);
 
   // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
   const statsFiltered = useMemo(() => {
@@ -565,7 +623,7 @@ const Demandas = () => {
           <div>
             <p className="text-muted-foreground text-sm text-center sm:text-left">Acompanhe as demandas recebidas via Slack</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
             {/* Scope toggle */}
             <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
               <button
@@ -580,6 +638,27 @@ const Demandas = () => {
               >
                 Todas
               </button>
+            </div>
+            {/* Area: com o Suporte x com a Engenharia */}
+            <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+              {([
+                ["suporte", t("demand.area.support")],
+                ["engenharia", t("demand.area.engineering")],
+                ["all", t("demand.area.all")],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => {
+                    setAreaFilter(value);
+                    try { localStorage.setItem(AREA_FILTER_KEY, value); } catch { /* ignore */ }
+                  }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${areaFilter === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {value === "engenharia" && <Wrench size={11} />}
+                  {label}
+                  <span className="opacity-70 tabular-nums">{areaCounts[value]}</span>
+                </button>
+              ))}
             </div>
             <AdvancedFilters
               filters={filters}
@@ -724,6 +803,7 @@ const Demandas = () => {
           expirationReasons={allExpirationReasons}
           onAddExpirationReason={handleAddExpirationReason}
           onTaskLinkChange={handleTaskLinkChange}
+          onAreaChange={handleAreaChange}
         />
       </div>
     </AppLayout>

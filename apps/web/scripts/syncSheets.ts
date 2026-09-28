@@ -1,6 +1,7 @@
 /**
- * Exporta os chamados do formulario "Novo chamado" pra planilha Suporte →
- * Engenharia (Google Sheets), via o Apps Script publicado nela
+ * Exporta as demandas transferidas pra Engenharia (botao no detalhe da
+ * demanda) pra planilha Suporte → Engenharia (Google Sheets), via o Apps
+ * Script publicado nela
  * (scripts/sheets/flowdeskSheetSync.cjs). Setup completo em docs/SHEETS_SYNC.md.
  *
  * Roda no cron do sync, logo depois do syncSlack, dentro do mesmo container:
@@ -92,7 +93,12 @@ function loadSharedState(): { overrides: DemandOverrides; rules: ReturnType<type
   };
 }
 
-interface ExportState { hash: string; lastSuccessAt: string }
+interface ExportState {
+  hash: string;
+  lastSuccessAt: string;
+  /** "Time atual" enviado por ID no ultimo envio — detecta transferencia/devolucao. */
+  areas?: Record<string, string>;
+}
 
 function readExportState(): ExportState | null {
   try { return JSON.parse(fs.readFileSync(EXPORT_STATE_FILE, "utf8")) as ExportState; } catch { return null; }
@@ -125,10 +131,18 @@ async function main(): Promise<void> {
 
   const { overrides, rules } = loadSharedState();
   const processed = processCurrentDemands(demands, { rules, overrides });
-  const { rows, duplicates } = buildSheetRows(processed);
+  const built = buildSheetRows(processed);
+  const { duplicates } = built;
 
-  log(`${rows.length} chamado(s) "Novo chamado" de ${demands.length} demanda(s) do Slack`);
-  if (duplicates.length) log(`aviso: protocolo repetido, mantido o mais antigo: ${duplicates.join(", ")}`);
+  // "Time atual" so vai pra planilha quando a area mudou desde o ultimo envio
+  // bem-sucedido. Sem estado anterior (primeiro envio, arquivo apagado), todas
+  // as linhas contam como mudanca — K e reescrito uma vez e segue a vida.
+  const previous = readExportState();
+  const rows = built.rows.map((r) => ({ ...r, timeAtualMudou: previous?.areas?.[r.id] !== r.timeAtual }));
+
+  const comEngenharia = rows.filter((r) => r.timeAtual === "Engenharia").length;
+  log(`${rows.length} demanda(s) passaram pela Engenharia (${comEngenharia} com ela agora) de ${demands.length} do Slack`);
+  if (duplicates.length) log(`aviso: ID repetido, mantida a mais antiga: ${duplicates.join(", ")}`);
 
   if (DRY_RUN) {
     console.log(JSON.stringify(rows.slice(-3), null, 2));
@@ -139,7 +153,6 @@ async function main(): Promise<void> {
   // Destino entra no hash: trocar URL ou token (novo deploy do Apps Script)
   // precisa reenviar na hora, nao so depois do FORCE_RESEND_MS.
   const hash = crypto.createHash("sha256").update(`${url}\n${token}\n${JSON.stringify(rows)}`).digest("hex");
-  const previous = readExportState();
   if (previous?.hash === hash && Date.now() - Date.parse(previous.lastSuccessAt) < FORCE_RESEND_MS) {
     log("sem mudancas desde o ultimo envio");
     return;
@@ -165,7 +178,13 @@ async function main(): Promise<void> {
     throw new Error(`Apps Script recusou (HTTP ${res.status}): ${body.error ?? "sem detalhe"}`);
   }
 
-  writeExportState({ hash, lastSuccessAt: new Date().toISOString(), rows: rows.length, result: body });
+  writeExportState({
+    hash,
+    lastSuccessAt: new Date().toISOString(),
+    areas: Object.fromEntries(rows.map((r) => [r.id, r.timeAtual])),
+    rows: rows.length,
+    result: body,
+  });
   log(`enviado: ${body.criadas ?? 0} nova(s), ${body.atualizadas ?? 0} atualizada(s), ${body.inalteradas ?? 0} sem mudanca`);
 }
 

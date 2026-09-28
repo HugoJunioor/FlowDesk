@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ExpirationCountdown from "./ExpirationCountdown";
 import StaleBadge from "./StaleBadge";
+import AreaBadge from "./AreaBadge";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface DemandCardProps {
@@ -146,6 +147,7 @@ const DemandCard = ({ demand, onClick }: DemandCardProps) => {
             <Badge variant="secondary" className="text-[10px]">
               {demand.demandType}
             </Badge>
+            <AreaBadge demand={demand} />
           </div>
 
           {/* Countdown / SLA status (inclui concluidas fora do prazo com motivo) */}

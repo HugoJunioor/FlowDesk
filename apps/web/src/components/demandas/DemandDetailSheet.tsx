@@ -5,17 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, Circle, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2 } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, Circle, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2, Wrench, Undo2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   SlackDemand, PRIORITY_CONFIG, STATUS_CONFIG, DemandStatus, DemandPriority,
   ClosureFields, ClosureAttachment, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, SUPPORT_LEVEL_OPTIONS,
-  DemandCategory, ExpirationReason, SupportLevel,
+  DemandCategory, ExpirationReason, SupportLevel, DemandArea, areaOf,
 } from "@/types/demand";
 import { extractClientName } from "@/data/demandsLoader";
 import { addBusinessHours, getFirstResponseMinutes, getResolutionMinutes, formatBusinessTime, getBusinessMinutesBetween } from "@/lib/businessHours";
 import ExpirationCountdown from "./ExpirationCountdown";
+import AreaBadge from "./AreaBadge";
 import CopyLinkButton from "./CopyLinkButton";
 import DemandReplyComposer from "./DemandReplyComposer";
 import SlackFilesList from "./SlackFilesList";
@@ -63,6 +64,8 @@ interface DemandDetailSheetProps {
   onAddExpirationReason?: (name: string) => void;
   /** Callback para salvar o link da task */
   onTaskLinkChange?: (demandId: string, taskLink: string) => void;
+  /** Transfere entre Suporte e Engenharia. Sem ele, o botao nao aparece. */
+  onAreaChange?: (demandId: string, area: DemandArea) => void;
 }
 
 const DemandDetailSheet = ({
@@ -80,6 +83,7 @@ const DemandDetailSheet = ({
   expirationReasons,
   onAddExpirationReason,
   onTaskLinkChange,
+  onAreaChange,
 }: DemandDetailSheetProps) => {
   const { currentUser } = useAuth();
   const { t } = useLanguage();
@@ -357,6 +361,43 @@ const DemandDetailSheet = ({
               <Layers size={12} /> {demand.workflow}
             </span>
           </div>
+          {onAreaChange && (
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              {areaOf(demand) === "engenharia" ? (
+                <>
+                  <AreaBadge demand={demand} />
+                  {demand.areaChangedAt && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {demand.areaChangedBy
+                        ? t("demand.area.since_by", {
+                            date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
+                            by: demand.areaChangedBy,
+                          })
+                        : t("demand.area.since", {
+                            date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
+                          })}
+                    </span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1.5 ml-auto"
+                    onClick={() => onAreaChange(demand.id, "suporte")}
+                  >
+                    <Undo2 size={12} /> {t("demand.area.return")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={() => onAreaChange(demand.id, "engenharia")}
+                >
+                  <Wrench size={12} /> {t("demand.area.transfer")}
+                </Button>
+              )}
+            </div>
+          )}
         </DialogHeader>
         {/* Conteudo scrollavel — limitado a ~720px centralizado pra harmonia
             (campos curtos como prioridade, status, badges nao precisam de

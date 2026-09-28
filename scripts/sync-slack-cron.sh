@@ -80,7 +80,7 @@ echo "===== $(date -Iseconds) sync iniciado =====" >> $LOG
 # limpar o diretorio ou clonar o repo do zero, o sync precisa se virar sozinho
 # em vez de falhar no require.
 #
-# Depois do sync, o mesmo container exporta os chamados "Novo chamado" pra
+# Depois do sync, o mesmo container exporta as demandas transferidas pra
 # planilha Suporte → Engenharia (docs/SHEETS_SYNC.md). O export e best-effort:
 # sem SHEETS_WEBHOOK_URL/TOKEN no .env ele so avisa que esta desligado, e uma
 # falha dele nunca invalida o sync — realDemands.ts ja foi escrito a essa altura.

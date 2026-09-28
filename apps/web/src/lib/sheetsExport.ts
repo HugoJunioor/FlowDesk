@@ -5,20 +5,21 @@
  * entra no bundle da UI. Fica em src/lib pra reaproveitar tipos, regras de SLA
  * e a suite de testes do app.
  *
- * Escopo: so os chamados do formulario "Novo chamado", reconhecidos pelos
- * `formFields` que o sync grava apenas pra esse formulario.
+ * Escopo: as demandas que passaram pela Engenharia — transferidas no FlowDesk
+ * (area definida no override), de qualquer formulario. As devolvidas ao
+ * Suporte continuam indo, pra planilha refletir o "Time atual".
  *
  * Cada campo daqui corresponde a uma coluna que o FlowDesk e dono. As colunas
- * da Engenharia (Time atual, Responsavel, Retorno, Proxima acao, Observacoes)
- * nao aparecem: o Apps Script da planilha nunca as sobrescreve.
+ * da Engenharia (Responsavel, Retorno, Proxima acao, Observacoes) nao
+ * aparecem; "Time atual" so e escrito na transferencia/devolucao (timeAtualMudou).
  */
-import { PRIORITY_CONFIG, type DemandPriority, type SlackDemand } from "@/types/demand";
+import { PRIORITY_CONFIG, areaOf, type DemandPriority, type SlackDemand } from "@/types/demand";
 import { addBusinessHours } from "@/lib/businessHours";
 import { extractClientName } from "@/data/mockDemands";
 import { splitTicketDescription } from "../../scripts/lib/ticketParser.cjs";
 
 export interface SheetRow {
-  /** Coluna A — protocolo do formulario; id do FlowDesk quando o protocolo falta. */
+  /** Coluna A — protocolo do "Novo chamado"; senao FD-<timestamp do Slack>. */
   id: string;
   /** Id interno da demanda, so pra diagnostico no log. */
   flowdeskId: string;
@@ -40,8 +41,16 @@ export interface SheetRow {
   concluida: boolean;
   /** T — ISO, so quando concluida. */
   conclusao: string | null;
-  /** W — ultima atividade conhecida (abertura, respostas da thread, conclusao). */
+  /** W — ultima atividade conhecida (abertura, respostas, conclusao, transferencia). */
   ultimaAtualizacao: string;
+  /** K — quem esta com a demanda no FlowDesk. */
+  timeAtual: "Engenharia" | "Suporte";
+  /**
+   * Se a area mudou desde o ultimo envio. So entao o Apps Script escreve K —
+   * entre uma transferencia e outra, a Engenharia pode mudar K a vontade.
+   * toSheetRow devolve true; quem compara com o envio anterior e o exportador.
+   */
+  timeAtualMudou: boolean;
 }
 
 /** Valores aceitos pela validacao da coluna Tipo (aba Listas). */
@@ -75,6 +84,23 @@ export function isNovoChamado(d: SlackDemand): boolean {
   return !!d.formFields && Object.keys(d.formFields).length > 0;
 }
 
+/** Ja foi transferida pra Engenharia (inclusive se depois voltou pro Suporte). */
+export function wentToEngineering(d: SlackDemand): boolean {
+  return d.area === "engenharia" || d.area === "suporte";
+}
+
+/**
+ * ID da linha: o protocolo do "Novo chamado" ou, nos outros formularios,
+ * FD- + timestamp da mensagem no Slack (unico no canal e estavel entre syncs;
+ * da pra achar a mensagem por ele).
+ */
+function sheetId(d: SlackDemand): string {
+  const protocolo = d.formFields?.["Protocolo"]?.trim();
+  if (protocolo) return protocolo;
+  const ts = d.id.match(/_(\d+)\.(\d+)$/);
+  return ts ? `FD-${ts[1]}${ts[2]}` : d.id;
+}
+
 function clip(s: string): string {
   return s.length > MAX_CELL ? `${s.slice(0, MAX_CELL - 1)}…` : s;
 }
@@ -87,7 +113,7 @@ function joinFields(fields: Record<string, string>, labels: string[]): string {
 }
 
 function lastActivity(d: SlackDemand): string {
-  const stamps = [d.createdAt, d.completedAt, ...(d.threadReplies || []).map((r) => r.timestamp)]
+  const stamps = [d.createdAt, d.completedAt, d.areaChangedAt, ...(d.threadReplies || []).map((r) => r.timestamp)]
     .map((s) => (s ? Date.parse(s) : NaN))
     .filter((ms) => !Number.isNaN(ms));
   return new Date(Math.max(...stamps)).toISOString();
@@ -95,16 +121,20 @@ function lastActivity(d: SlackDemand): string {
 
 export function toSheetRow(d: SlackDemand): SheetRow {
   const fields = d.formFields || {};
-  const narrative = splitTicketDescription(d.description);
+  const ticket = isNovoChamado(d);
+  const narrative = splitTicketDescription(ticket ? d.description : "");
 
-  const problema = [
-    d.title,
-    [
-      narrative.resultadoObtido && `Resultado obtido: ${narrative.resultadoObtido}`,
-      narrative.resultadoEsperado && `Resultado esperado: ${narrative.resultadoEsperado}`,
-    ].filter(Boolean).join("\n"),
-    [joinFields(fields, CONTEXT_FIELDS), joinFields(fields, TECH_FIELDS)].filter(Boolean).join("\n"),
-  ].filter(Boolean).join("\n\n");
+  // "Novo chamado" tem campos estruturados; os outros formularios so titulo e corpo.
+  const problema = ticket
+    ? [
+        d.title,
+        [
+          narrative.resultadoObtido && `Resultado obtido: ${narrative.resultadoObtido}`,
+          narrative.resultadoEsperado && `Resultado esperado: ${narrative.resultadoEsperado}`,
+        ].filter(Boolean).join("\n"),
+        [joinFields(fields, CONTEXT_FIELDS), joinFields(fields, TECH_FIELDS)].filter(Boolean).join("\n"),
+      ].filter(Boolean).join("\n\n")
+    : [d.title, d.description !== d.title ? d.description : ""].filter(Boolean).join("\n\n");
 
   const evidencias = [
     d.slackPermalink && `Slack: ${d.slackPermalink}`,
@@ -116,7 +146,7 @@ export function toSheetRow(d: SlackDemand): SheetRow {
   const concluida = d.status === "concluida";
 
   return {
-    id: fields["Protocolo"]?.trim() || d.id,
+    id: sheetId(d),
     flowdeskId: d.id,
     abertura: new Date(d.createdAt).toISOString(),
     cliente: fields["Cliente/Organização"]?.trim() || narrative.cliente || extractClientName(d.slackChannel),
@@ -132,18 +162,20 @@ export function toSheetRow(d: SlackDemand): SheetRow {
     concluida,
     conclusao: concluida && d.completedAt ? new Date(d.completedAt).toISOString() : null,
     ultimaAtualizacao: lastActivity(d),
+    timeAtual: areaOf(d) === "engenharia" ? "Engenharia" : "Suporte",
+    timeAtualMudou: true,
   };
 }
 
 /**
- * Filtra os chamados, converte e ordena por abertura (linhas novas entram na
- * planilha em ordem cronologica). Se dois chamados trouxerem o mesmo
- * protocolo, fica o mais antigo — a coluna A e a chave da planilha e uma
- * duplicata faria as duas demandas brigarem pela mesma linha.
+ * Filtra as demandas que passaram pela Engenharia, converte e ordena por
+ * abertura (linhas novas entram na planilha em ordem cronologica). Se duas
+ * trouxerem o mesmo ID, fica a mais antiga — a coluna A e a chave da planilha
+ * e uma duplicata faria as duas brigarem pela mesma linha.
  */
 export function buildSheetRows(demands: SlackDemand[]): { rows: SheetRow[]; duplicates: string[] } {
   const rows = demands
-    .filter(isNovoChamado)
+    .filter(wentToEngineering)
     .map(toSheetRow)
     .sort((a, b) => a.abertura.localeCompare(b.abertura));
 

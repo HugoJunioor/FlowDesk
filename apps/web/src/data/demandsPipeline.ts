@@ -1,4 +1,4 @@
-import { SlackDemand, PRIORITY_CONFIG, ClosureFields } from "@/types/demand";
+import { SlackDemand, PRIORITY_CONFIG, ClosureFields, type DemandArea } from "@/types/demand";
 import { classifyDemand } from "@/lib/priorityClassifier";
 import { processDemandsStatus } from "@/lib/statusAnalyzer";
 import { classifyClosureFields } from "@/lib/closureClassifier";
@@ -25,6 +25,10 @@ export interface DemandOverride {
   closure?: Partial<ClosureFields>;
   taskLink?: string;
   hasTask?: boolean;
+  /** Transferencia entre Suporte e Engenharia (ausente = nunca transferida). */
+  area?: DemandArea;
+  areaChangedAt?: string;
+  areaChangedBy?: string;
 }
 
 /** Conteudo de `fd_demand_overrides`: override manual indexado pelo id da demanda. */
@@ -165,6 +169,9 @@ export function applyOverrides(demands: SlackDemand[], overrides: DemandOverride
       closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
       taskLink: ov.taskLink !== undefined ? ov.taskLink : d.taskLink,
       hasTask: ov.hasTask !== undefined ? ov.hasTask : d.hasTask,
+      area: ov.area ?? d.area,
+      areaChangedAt: ov.areaChangedAt ?? d.areaChangedAt,
+      areaChangedBy: ov.areaChangedBy ?? d.areaChangedBy,
     };
   });
 }

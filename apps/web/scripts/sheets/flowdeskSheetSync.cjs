@@ -9,9 +9,9 @@
  * O servidor (apps/web/scripts/syncSheets.ts) faz POST com {token, rows}. Aqui:
  *   - a coluna A (ID) identifica a linha;
  *   - so as colunas do FlowDesk sao escritas: B–J e N–O sempre que mudam;
- *     M (Status), T (Data conclusao) e W (Ultima atualizacao) pelas regras de
- *     fdPlanSync;
- *   - K, L, P, U, V, X (Engenharia) e as formulas de Q, R, S nunca sao tocadas;
+ *     K (Time atual) so na transferencia/devolucao; M (Status), T (Data
+ *     conclusao) e W (Ultima atualizacao) pelas regras de fdPlanSync;
+ *   - L, P, U, V, X (Engenharia) e as formulas de Q, R, S nunca sao tocadas;
  *   - nenhuma linha e apagada.
  *
  * Nomes com prefixo FD_/fd pra nao colidir com outros arquivos do mesmo
@@ -41,7 +41,7 @@ const FD_HEADERS = [
 
 // Indices 0-based das colunas que o sync le ou escreve.
 const FD_COL = {
-  ID: 0, ABERTURA: 1, CLIENTE: 2, PROBLEMA: 7, EVIDENCIAS: 9,
+  ID: 0, ABERTURA: 1, CLIENTE: 2, PROBLEMA: 7, EVIDENCIAS: 9, TIME: 10,
   STATUS: 12, SLA_H: 13, PRAZO: 14, TEMPO_ABERTO: 16, CONCLUSAO: 19, ULTIMA: 22,
 };
 
@@ -164,6 +164,12 @@ function fdPlanSync(existing, incoming) {
       if (sla && !fdSameList(cur.slice(FD_COL.SLA_H, FD_COL.PRAZO + 1), sla)) {
         writes.push({ row: i, col: FD_COL.SLA_H, values: [sla] });
       }
+      // Time atual acompanha a transferencia/devolucao feita no FlowDesk. Fora
+      // desses momentos a Engenharia pode trocar (Cliente, Terceiro) sem o sync
+      // desfazer.
+      if (r.timeAtualMudou && r.timeAtual && fdText(cur[FD_COL.TIME]) !== r.timeAtual) {
+        writes.push({ row: i, col: FD_COL.TIME, values: [[r.timeAtual]] });
+      }
       // Status e da Engenharia; o FlowDesk so avisa que fechou. Nunca rebaixa
       // um status final nem reabre o que a Engenharia ja concluiu.
       if (r.concluida && FD_STATUS_FINAIS.indexOf(fdText(cur[FD_COL.STATUS])) === -1) {
@@ -189,6 +195,7 @@ function fdPlanSync(existing, incoming) {
     stats.criadas++;
     writes.push({ row: row, col: FD_COL.ID, values: [[r.id].concat(main)] });
     writes.push({ row: row, col: FD_COL.STATUS, values: [[r.concluida ? FD_STATUS_CONCLUIDA : FD_STATUS_NOVA]] });
+    if (r.timeAtual) writes.push({ row: row, col: FD_COL.TIME, values: [[r.timeAtual]] });
     if (sla) writes.push({ row: row, col: FD_COL.SLA_H, values: [sla] });
     if (r.conclusao) writes.push({ row: row, col: FD_COL.CONCLUSAO, values: [[r.conclusao]] });
     writes.push({ row: row, col: FD_COL.ULTIMA, values: [[r.ultimaAtualizacao]] });
@@ -247,6 +254,8 @@ function fdReviveRow(raw) {
     concluida: raw.concluida === true,
     conclusao: fdDate(raw.conclusao),
     ultimaAtualizacao: fdDate(raw.ultimaAtualizacao) || abertura,
+    timeAtual: fdText(raw.timeAtual),
+    timeAtualMudou: raw.timeAtualMudou === true,
   };
 }
 

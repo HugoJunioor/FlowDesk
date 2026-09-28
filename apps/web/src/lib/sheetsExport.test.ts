@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import type { SlackDemand } from "@/types/demand";
 import { addBusinessHours } from "@/lib/businessHours";
-import { buildSheetRows, isNovoChamado, toSheetRow } from "./sheetsExport";
+import { buildSheetRows, isNovoChamado, toSheetRow, wentToEngineering } from "./sheetsExport";
 import { composeTicketDescription } from "../../scripts/lib/ticketParser.cjs";
 
 /** Sexta-feira, 25/09/2026, 17:00 no fuso local. */
@@ -67,10 +67,32 @@ describe("isNovoChamado", () => {
 });
 
 describe("toSheetRow", () => {
-  it("usa o protocolo como ID e cai no id do FlowDesk sem ele", () => {
+  it("usa o protocolo como ID e, sem ele, o timestamp da mensagem no Slack", () => {
     expect(toSheetRow(chamado()).id).toBe("ABCDE-12345");
     const semProtocolo = chamado({ formFields: { "Cliente/Organização": "X" } });
-    expect(toSheetRow(semProtocolo).id).toBe("slack_C1_1790000000.000100");
+    expect(toSheetRow(semProtocolo).id).toBe("FD-1790000000000100");
+    expect(toSheetRow(chamado({ formFields: undefined })).id).toBe("FD-1790000000000100");
+  });
+
+  it("formulario antigo: problema e titulo + corpo, sem testes do suporte", () => {
+    const row = toSheetRow(chamado({
+      formFields: undefined,
+      title: "Ajuste no relatório de fechamento",
+      description: "O relatório está trazendo valores duplicados.",
+    }));
+    expect(row.problema).toBe("Ajuste no relatório de fechamento\n\nO relatório está trazendo valores duplicados.");
+    expect(row.testes).toBe("");
+    expect(row.cliente).toBe("Exemplo");
+  });
+
+  it("Time atual acompanha a area da demanda", () => {
+    expect(toSheetRow(chamado({ area: "engenharia" })).timeAtual).toBe("Engenharia");
+    expect(toSheetRow(chamado({ area: "suporte" })).timeAtual).toBe("Suporte");
+  });
+
+  it("a transferencia conta como atualizacao", () => {
+    const transferencia = new Date(2026, 8, 28, 16, 0).toISOString();
+    expect(toSheetRow(chamado({ area: "engenharia", areaChangedAt: transferencia })).ultimaAtualizacao).toBe(transferencia);
   });
 
   it("mapeia criticidade e horas de SLA pela prioridade", () => {
@@ -146,19 +168,28 @@ describe("toSheetRow", () => {
   });
 });
 
-describe("buildSheetRows", () => {
-  it("filtra os chamados e ordena por abertura", () => {
-    const antigo = chamado({ id: "a", createdAt: new Date(2026, 8, 1, 9).toISOString(), formFields: { Protocolo: "P-0001" } });
-    const novo = chamado({ id: "b", createdAt: new Date(2026, 8, 20, 9).toISOString(), formFields: { Protocolo: "P-0002" } });
-    const legado = chamado({ id: "c", formFields: undefined });
+describe("wentToEngineering", () => {
+  it("vale pra transferida e pra devolvida, nao pra quem nunca foi", () => {
+    expect(wentToEngineering(chamado({ area: "engenharia" }))).toBe(true);
+    expect(wentToEngineering(chamado({ area: "suporte" }))).toBe(true);
+    expect(wentToEngineering(chamado())).toBe(false);
+  });
+});
 
-    const { rows } = buildSheetRows([novo, legado, antigo]);
-    expect(rows.map((r) => r.id)).toEqual(["P-0001", "P-0002"]);
+describe("buildSheetRows", () => {
+  it("leva so o que passou pela Engenharia, de qualquer formulario, por abertura", () => {
+    const antigo = chamado({ id: "a", area: "engenharia", createdAt: new Date(2026, 8, 1, 9).toISOString(), formFields: { Protocolo: "P-0001" } });
+    const legado = chamado({ id: "slack_C2_1790500000.000300", area: "suporte", createdAt: new Date(2026, 8, 10, 9).toISOString(), formFields: undefined });
+    const novo = chamado({ id: "b", area: "engenharia", createdAt: new Date(2026, 8, 20, 9).toISOString(), formFields: { Protocolo: "P-0002" } });
+    const naoTransferido = chamado({ id: "c", formFields: { Protocolo: "P-0003" } });
+
+    const { rows } = buildSheetRows([novo, naoTransferido, legado, antigo]);
+    expect(rows.map((r) => r.id)).toEqual(["P-0001", "FD-1790500000000300", "P-0002"]);
   });
 
-  it("descarta protocolo repetido, mantendo o chamado mais antigo", () => {
-    const primeiro = chamado({ id: "a", createdAt: new Date(2026, 8, 1, 9).toISOString() });
-    const repetido = chamado({ id: "b", createdAt: new Date(2026, 8, 2, 9).toISOString() });
+  it("descarta ID repetido, mantendo a demanda mais antiga", () => {
+    const primeiro = chamado({ id: "a", area: "engenharia", createdAt: new Date(2026, 8, 1, 9).toISOString() });
+    const repetido = chamado({ id: "b", area: "engenharia", createdAt: new Date(2026, 8, 2, 9).toISOString() });
 
     const { rows, duplicates } = buildSheetRows([repetido, primeiro]);
     expect(rows).toHaveLength(1);
