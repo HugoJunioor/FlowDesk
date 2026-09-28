@@ -8,12 +8,21 @@ const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 // Channels where the bot is intentionally not invited.
 // Errors from these are silently skipped — no alert is fired.
-const IGNORED_CHANNELS = new Set([
-  'cliente-convenios',
-  'cliente-cashtime',
-  'cliente-keshbank',
-  'cliente-bc-teste',
-]);
+//
+// Lista vem do ambiente (SLACK_IGNORED_CHANNELS, separada por virgula), nao do
+// codigo: sao canais reais de clientes e este repositorio e publico. Em
+// producao o valor fica no .env do servidor.
+//
+// Cuidado ao mexer no deploy: se a variavel faltar, a lista fica vazia e o sync
+// tenta ler canais onde o bot nao tem acesso — cada um dispara um e-mail de
+// alerta (not_in_channel), a cada execucao do cron. A variavel tem que estar no
+// .env ANTES deste codigo chegar ao servidor.
+const IGNORED_CHANNELS = new Set(
+  (process.env.SLACK_IGNORED_CHANNELS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
 
 // April 1st 2026 00:00 UTC-3
 const OLDEST = new Date('2026-04-01T00:00:00-03:00').getTime() / 1000;
@@ -174,7 +183,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
   let pages = 0;
   // Contadores auxiliares — usados pra esclarecer no log quando um canal
   // termina com 0 demandas. Sem isso, "0 demandas encontradas" parece bug;
-  // com isso fica claro que o canal so tem bate-papo humano (ex: bcgestao).
+  // com isso fica claro que o canal so tem bate-papo humano (ex: um canal usado só pra conversa).
   let totalRead = 0;
   let humanMessages = 0;
 

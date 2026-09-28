@@ -2,7 +2,7 @@
  * Reseta a senha de um usuario, gerando nova temporaria.
  *
  * Uso: node scripts/resetUserPassword.cjs <login>
- * Exemplo: node scripts/resetUserPassword.cjs brunaqueiroz
+ * Exemplo: node scripts/resetUserPassword.cjs usuario.exemplo
  */
 const fs = require('fs');
 const path = require('path');

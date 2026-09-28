@@ -72,7 +72,7 @@ const USER_B = { id: 'u2', email: 'pedro@just.com', nome: 'Pedro Costa' };
 
 const DEMANDA_ABERTA = {
   id: 'd1',
-  titulo: 'Erro pagamento BC Gestão',
+  titulo: 'Erro pagamento Cliente Exemplo',
   prioridade: 'p1',
   due_date: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2h no futuro
 };
