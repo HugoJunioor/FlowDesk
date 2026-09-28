@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, Calendar, Signal, Users, List, Database, Bookmark, BookmarkX, Wrench } from "lucide-react";
+import { LayoutGrid, Calendar, Signal, Users, List, Database, Bookmark, BookmarkX } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
@@ -31,6 +31,7 @@ import DemandByAssignee from "@/components/demandas/DemandByAssignee";
 import DemandDetailSheet from "@/components/demandas/DemandDetailSheet";
 import SyncStatusIndicator from "@/components/demandas/SyncStatusIndicator";
 import AdvancedFilters from "@/components/demandas/AdvancedFilters";
+import AreaPanels from "@/components/demandas/AreaPanels";
 import ReportButton from "@/components/reports/ReportButton";
 import { notifyStarted, notifyCompleted, notifyReopened, notifyAssigned } from "@/lib/notificationEvents";
 
@@ -69,14 +70,14 @@ function loadScope(): DemandScope {
   } catch { return "mine"; }
 }
 
-type AreaFilter = DemandArea | "all";
-const AREA_FILTER_KEY = "flowdesk:demandas:area";
+const ACTIVE_AREA_KEY = "flowdesk:demandas:area";
+const AREA_PREVIEW_SIZE = 5;
 
-function loadAreaFilter(): AreaFilter {
+/** Area aberta na tela (a outra fica recolhida no canto). Padrao: Operacoes. */
+function loadActiveArea(): DemandArea {
   try {
-    const v = localStorage.getItem(AREA_FILTER_KEY);
-    return v === "suporte" || v === "engenharia" ? v : "all";
-  } catch { return "all"; }
+    return localStorage.getItem(ACTIVE_AREA_KEY) === "engenharia" ? "engenharia" : "suporte";
+  } catch { return "suporte"; }
 }
 
 type AreaFields = Pick<DemandOverride, "area" | "areaChangedAt" | "areaChangedBy">;
@@ -137,7 +138,11 @@ const Demandas = () => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
   const [scope, setScope] = useState<DemandScope>(loadScope);
-  const [areaFilter, setAreaFilter] = useState<AreaFilter>(loadAreaFilter);
+  const [activeArea, setActiveArea] = useState<DemandArea>(loadActiveArea);
+  const handleActivateArea = useCallback((area: DemandArea) => {
+    setActiveArea(area);
+    try { localStorage.setItem(ACTIVE_AREA_KEY, area); } catch { /* ignore */ }
+  }, []);
   const [demands, setDemands] = useState<SlackDemand[]>(() => getProcessedDemands());
 
   // Revalida em 3 gatilhos:
@@ -435,17 +440,23 @@ const Demandas = () => {
     return demands.filter((d) => d.assignee?.name === currentUser.name);
   }, [demands, scope, currentUser]);
 
-  // Contagem por area sobre o recorte de responsavel, pra os botoes mostrarem
-  // quanto tem em cada lado antes de filtrar.
-  const areaCounts = useMemo(() => {
-    const engenharia = ownerScopedDemands.filter((d) => areaOf(d) === "engenharia").length;
-    return { all: ownerScopedDemands.length, engenharia, suporte: ownerScopedDemands.length - engenharia };
+  // Contagem e amostra por area sobre o recorte de responsavel: a faixa
+  // recolhida mostra quanto tem do outro lado e as mais recentes.
+  const { areaCounts, areaPreviews } = useMemo(() => {
+    const byArea: Record<DemandArea, SlackDemand[]> = { suporte: [], engenharia: [] };
+    ownerScopedDemands.forEach((d) => byArea[areaOf(d)].push(d));
+    const recent = (list: SlackDemand[]) =>
+      [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, AREA_PREVIEW_SIZE);
+    return {
+      areaCounts: { suporte: byArea.suporte.length, engenharia: byArea.engenharia.length },
+      areaPreviews: { suporte: recent(byArea.suporte), engenharia: recent(byArea.engenharia) },
+    };
   }, [ownerScopedDemands]);
 
-  const scopedDemands = useMemo(() => {
-    if (areaFilter === "all") return ownerScopedDemands;
-    return ownerScopedDemands.filter((d) => areaOf(d) === areaFilter);
-  }, [ownerScopedDemands, areaFilter]);
+  const scopedDemands = useMemo(
+    () => ownerScopedDemands.filter((d) => areaOf(d) === activeArea),
+    [ownerScopedDemands, activeArea],
+  );
 
   // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
   const statsFiltered = useMemo(() => {
@@ -639,27 +650,6 @@ const Demandas = () => {
                 Todas
               </button>
             </div>
-            {/* Area: com o Suporte x com a Engenharia */}
-            <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
-              {([
-                ["suporte", t("demand.area.support")],
-                ["engenharia", t("demand.area.engineering")],
-                ["all", t("demand.area.all")],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setAreaFilter(value);
-                    try { localStorage.setItem(AREA_FILTER_KEY, value); } catch { /* ignore */ }
-                  }}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${areaFilter === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {value === "engenharia" && <Wrench size={11} />}
-                  {label}
-                  <span className="opacity-70 tabular-nums">{areaCounts[value]}</span>
-                </button>
-              ))}
-            </div>
             <AdvancedFilters
               filters={filters}
               onChange={setFilters}
@@ -697,6 +687,10 @@ const Demandas = () => {
           </div>
         </div>
 
+        {/* Operacoes x Engenharia: a area aberta ocupa o espaco, a outra fica
+            recolhida no canto. Os blocos ficam em superficie propria pra ler
+            bem em cima da cor da area. */}
+        <AreaPanels active={activeArea} onActivate={handleActivateArea} counts={areaCounts} previews={areaPreviews}>
         {/* Stats - clicaveis */}
         <DemandStats
           demands={statsFiltered}
@@ -705,7 +699,7 @@ const Demandas = () => {
         />
 
         {/* Filters + SQL button */}
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 rounded-xl bg-background p-3">
           <div className="flex-1 min-w-0">
             <DemandFilters
               filters={filters}
@@ -727,7 +721,7 @@ const Demandas = () => {
         </div>
 
         {/* View mode + Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GroupingTab)}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GroupingTab)} className="rounded-xl bg-background p-3">
           {/* Row 1: Cards / Lista toggle */}
           <div className="flex items-center gap-2 mb-2">
             <Button
@@ -786,6 +780,7 @@ const Demandas = () => {
               : <DemandByAssignee demands={sorted} onSelect={setSelected} />}
           </TabsContent>
         </Tabs>
+        </AreaPanels>
 
         {/* Detail sheet */}
         <DemandDetailSheet
