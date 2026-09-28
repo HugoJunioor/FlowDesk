@@ -84,13 +84,21 @@ function normalize(raw: StoredRule): AutoAssignRule {
   };
 }
 
+/**
+ * Normaliza a lista crua de regras (como fica gravada em `fd_auto_assign_rules`).
+ * Separado do loader pra servir tambem quem le a chave fora do navegador — os
+ * scripts do servidor leem o mesmo valor do shared-state.json.
+ */
+export function normalizeAutoAssignRules(parsed: unknown): AutoAssignRule[] {
+  if (!Array.isArray(parsed)) return [];
+  return (parsed as StoredRule[]).map(normalize);
+}
+
 export function loadAutoAssignRules(): AutoAssignRule[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed: StoredRule[] = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalize);
+    return normalizeAutoAssignRules(JSON.parse(raw));
   } catch {
     return [];
   }

@@ -1,9 +1,7 @@
-import { SlackDemand, PRIORITY_CONFIG, ClosureFields } from "@/types/demand";
+import { SlackDemand } from "@/types/demand";
 import { mockDemands as demoData, extractClientName } from "./mockDemands";
-import { classifyDemand } from "@/lib/priorityClassifier";
-import { processDemandsStatus } from "@/lib/statusAnalyzer";
-import { classifyClosureFields } from "@/lib/closureClassifier";
-import { loadAutoAssignRules, fallbackReaches } from "@/lib/autoAssignRules";
+import { loadAutoAssignRules } from "@/lib/autoAssignRules";
+import { applyOverrides, processCurrentDemands, type DemandOverrides } from "./demandsPipeline";
 
 /**
  * Carrega demandas: tenta realDemands (dados reais, gitignored),
@@ -52,153 +50,15 @@ export const baseDemands: SlackDemand[] = [...initialDemands]; // backward compa
 export const isRealData = !!realModule;
 
 // === PROCESSAMENTO COMPARTILHADO ===
+// A logica em si vive em demandsPipeline.ts (sem dependencia de browser, pra
+// rodar igual nos scripts do servidor). Aqui so entram as fontes do navegador:
+// regras e overrides lidos do localStorage.
 
-// Workflows que sao sempre P3 por definicao operacional (independente do texto).
-// Mantemos em lower-case pra comparar sem se preocupar com acento/caixa.
-const FORCED_P3_WORKFLOWS = [
-  "nova conciliacao", "nova conciliação",
-];
-
-function autoClassifyDemands(demands: SlackDemand[]): SlackDemand[] {
-  const rules = loadAutoAssignRules();
-  const textRules = rules.filter((r) => r.condition === "text_match");
-  const fallbackRule = rules.find((r) => r.condition === "no_assignee");
-
-  return demands.map((d) => {
-    const titleLower = d.title.toLowerCase();
-    const workflowLower = d.workflow.toLowerCase();
-
-    // Workflow forcado P3 (conciliacao etc) — sobrepoe a PRIORIDADE, nao a
-    // atribuicao de responsavel. Sao duas decisoes diferentes, e antes este
-    // bloco saia com `return` antes das etapas 1 e 2: demanda de "Nova
-    // conciliacao" nunca recebia responsavel, nem por regra de texto nem pelo
-    // fallback. Em producao isso deixou 58 demandas permanentemente sem dono,
-    // e o time atribuia na mao sem saber por que a regra nao pegava.
-    //
-    // Aqui aplicamos so o fallback, nao as regras por texto: o pedido e
-    // "se vier sem responsavel, atribui a quem esta configurado". Quem ja tem
-    // dono continua intocado.
-    if (FORCED_P3_WORKFLOWS.includes(workflowLower)) {
-      const forced: SlackDemand = {
-        ...d,
-        priority: "p3",
-        autoClassification: {
-          priority: "p3" as const,
-          confidence: "alta" as const,
-          reason: `Workflow "${d.workflow}" classificado como P3 por definicao operacional.`,
-          matchedKeywords: [d.workflow],
-        },
-      };
-      if (fallbackRule && !forced.assignee?.name && fallbackReaches(fallbackRule, d.createdAt)) {
-        forced.assignee = { name: fallbackRule.assignee, avatar: "" };
-        // A prioridade da regra NAO se aplica aqui: o P3 do workflow vence.
-      }
-      return forced;
-    }
-
-    // 1) Regras dinâmicas por texto (título/workflow)
-    for (const rule of textRules) {
-      const pattern = rule.pattern ?? "";
-      if (!pattern) continue;
-      const value = rule.field === "workflow" ? workflowLower : titleLower;
-      const matched = rule.match === "equals"
-        ? value === pattern.toLowerCase()
-        : value.includes(pattern.toLowerCase());
-      if (matched) {
-        return {
-          ...d,
-          assignee: { name: rule.assignee, avatar: "" },
-          priority: (rule.priority as SlackDemand["priority"]) || d.priority,
-        };
-      }
-    }
-
-    const classification = classifyDemand(d.title, d.description);
-    const result: SlackDemand = { ...d, autoClassification: classification };
-
-    // 2) Fallback: demanda sem responsável → aplica regra "no_assignee" se houver
-    //    e se ela alcançar a data de criação da demanda (ver appliesFrom).
-    if (fallbackRule && (!result.assignee || !result.assignee.name) && fallbackReaches(fallbackRule, d.createdAt)) {
-      result.assignee = { name: fallbackRule.assignee, avatar: "" };
-      if (fallbackRule.priority) {
-        result.priority = fallbackRule.priority as SlackDemand["priority"];
-      }
-    }
-
-    // Sem_classificacao: se o classificador encontrou um p1/p2/p3, adota.
-    // Senao, mantem sem_classificacao mesmo.
-    if (d.priority === "sem_classificacao") {
-      if (classification.priority !== "sem_classificacao") {
-        result.priority = classification.priority;
-        result.autoClassification = {
-          ...classification,
-          reason: `Classificada automaticamente como ${PRIORITY_CONFIG[classification.priority].label}. ${classification.reason}`,
-        };
-      }
-      return result;
-    }
-
-    if (classification.priority !== "sem_classificacao" && classification.priority !== d.priority) {
-      result.autoClassification = {
-        ...classification,
-        reason: `Reclassificado de ${PRIORITY_CONFIG[d.priority].label} para ${PRIORITY_CONFIG[classification.priority].label}. ${classification.reason}`,
-      };
-      result.priority = classification.priority;
-    } else {
-      result.autoClassification = {
-        ...classification,
-        priority: d.priority,
-        reason: `Classificacao original confirmada como ${PRIORITY_CONFIG[d.priority].label}. ${classification.reason}`,
-      };
-    }
-
-    return result;
-  });
-}
-
-function loadOverrides(): Record<string, { status?: string; priority?: string; assignee?: string | null; completedAt?: string | null; manualStatusOverride?: boolean; closure?: Partial<ClosureFields>; taskLink?: string; hasTask?: boolean }> {
+function loadOverrides(): DemandOverrides {
   try {
     const stored = localStorage.getItem("fd_demand_overrides");
     return stored ? JSON.parse(stored) : {};
   } catch { return {}; }
-}
-
-function applyOverrides(demands: SlackDemand[]): SlackDemand[] {
-  const overrides = loadOverrides();
-  return demands.map((d) => {
-    const ov = overrides[d.id];
-    if (!ov) return d;
-
-    // REGRA: so sobrepor override manual se a conclusao foi detectada AGORA
-    // via circulo verde na thread (closureSource === 'green_circle').
-    // Se a demanda esta como concluida apenas por preservacao do sync
-    // anterior, o override do usuario prevalece (ele deve ter reaberto
-    // conscientemente).
-    const closureSource = (d as SlackDemand & { closureSource?: string }).closureSource;
-    const syncConcludedViaReaction =
-      d.status === "concluida" && d.completedAt && closureSource === "green_circle";
-    const hasManualStatus = ov.manualStatusOverride && ov.status && !syncConcludedViaReaction;
-
-    return {
-      ...d,
-      status: syncConcludedViaReaction
-        ? d.status
-        : hasManualStatus
-        ? (ov.status as any)
-        : ((ov.status as any) || d.status),
-      priority: (ov.priority as any) || d.priority,
-      assignee: ov.assignee !== undefined ? (ov.assignee ? { name: ov.assignee, avatar: "" } : null) : d.assignee,
-      completedAt: syncConcludedViaReaction
-        ? d.completedAt
-        : ov.completedAt !== undefined
-        ? ov.completedAt
-        : d.completedAt,
-      manualStatusOverride: syncConcludedViaReaction ? false : ov.manualStatusOverride || false,
-      closure: ov.closure ? { ...(d.closure || { category: "", expirationReason: "", supportLevel: "", internalComment: "", autoFilled: { category: false, expirationReason: false, supportLevel: false } }), ...ov.closure } as ClosureFields : d.closure,
-      taskLink: ov.taskLink !== undefined ? ov.taskLink : d.taskLink,
-      hasTask: ov.hasTask !== undefined ? ov.hasTask : d.hasTask,
-    };
-  });
 }
 
 /** Demandas completamente processadas: classificadas, com status analisado, closure e overrides */
@@ -206,16 +66,14 @@ export function getProcessedDemands(): SlackDemand[] {
   // Processar demandas atuais (abril+): classificar, analisar status, closure.
   // Le do runtime cache se polling ja trouxe dados frescos; senao usa o
   // bundle estatico carregado no momento do build.
-  const classified = autoClassifyDemands(getCurrentDemands());
-  const analyzed = processDemandsStatus(classified);
-  const withClosure = analyzed.map((d) => ({
-    ...d,
-    closure: d.closure || classifyClosureFields(d),
-  }));
-  const currentProcessed = applyOverrides(withClosure);
+  const overrides = loadOverrides();
+  const currentProcessed = processCurrentDemands(getCurrentDemands(), {
+    rules: loadAutoAssignRules(),
+    overrides,
+  });
 
   // Historicos (Jan-Mar): ja vem prontos da planilha+Slack, apenas aplicar overrides locais
-  const historicalProcessed = applyOverrides(historicalDemands);
+  const historicalProcessed = applyOverrides(historicalDemands, overrides);
 
   return [...currentProcessed, ...historicalProcessed];
 }
