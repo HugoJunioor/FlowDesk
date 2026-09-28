@@ -21,7 +21,9 @@ type Cell = string | number | Date;
 type Write = { row: number; col: number; values: Cell[][] };
 
 // Colunas (0-based) que so a Engenharia preenche, mais as formulas Q/R/S.
-const ENGENHARIA = [10, 11, 15, 20, 21, 23];
+// K (10, Time atual) tem regra propria: so muda na transferencia/devolucao.
+const ENGENHARIA = [11, 15, 20, 21, 23];
+const TIME_ATUAL = 10;
 const FORMULAS = [16, 17, 18];
 
 function emptyRow(): Cell[] {
@@ -177,6 +179,37 @@ describe("fdPlanSync — linha existente", () => {
     const plan = fdPlanSync([syncedRow({ 0: 12345 })], [incoming({ id: "12345" })]);
 
     expect(plan.stats.criadas).toBe(0);
+  });
+});
+
+describe("fdPlanSync — Time atual (coluna K)", () => {
+  it("linha nova nasce com o time que esta com a demanda", () => {
+    const plan = fdPlanSync([emptyRow()], [incoming({ timeAtual: "Engenharia", timeAtualMudou: true })]);
+
+    expect(plan.writes.find((w: Write) => w.col === TIME_ATUAL).values).toEqual([["Engenharia"]]);
+  });
+
+  it("devolucao ao Suporte atualiza o Time atual", () => {
+    const row = syncedRow({ [TIME_ATUAL]: "Engenharia" });
+    const plan = fdPlanSync([row], [incoming({ timeAtual: "Suporte", timeAtualMudou: true })]);
+
+    expect(plan.writes.find((w: Write) => w.col === TIME_ATUAL).values).toEqual([["Suporte"]]);
+  });
+
+  it("fora da transferencia, respeita o que a Engenharia pos", () => {
+    // Engenharia marcou "Cliente" (aguardando retorno); o FlowDesk continua
+    // dizendo Engenharia, mas a area nao mudou desde o ultimo envio.
+    const row = syncedRow({ [TIME_ATUAL]: "Cliente" });
+    const plan = fdPlanSync([row], [incoming({ timeAtual: "Engenharia", timeAtualMudou: false })]);
+
+    expect(colsWritten(plan.writes)).not.toContain(TIME_ATUAL);
+  });
+
+  it("nao reescreve quando ja esta igual", () => {
+    const row = syncedRow({ [TIME_ATUAL]: "Engenharia" });
+    const plan = fdPlanSync([row], [incoming({ timeAtual: "Engenharia", timeAtualMudou: true })]);
+
+    expect(plan.writes).toEqual([]);
   });
 });
 

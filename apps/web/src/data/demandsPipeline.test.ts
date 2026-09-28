@@ -69,6 +69,29 @@ describe("processCurrentDemands", () => {
     expect(out.assignee?.name).toBe("Membro do time");
   });
 
+  it("leva a area da transferencia do override pra demanda", () => {
+    const [out] = processCurrentDemands([makeDemand()], {
+      rules: [],
+      overrides: {
+        "slack_C1_1700000000.000100": {
+          area: "engenharia",
+          areaChangedAt: "2026-09-28T19:00:00.000Z",
+          areaChangedBy: "Membro do time",
+        },
+      },
+    });
+
+    expect(out.area).toBe("engenharia");
+    expect(out.areaChangedAt).toBe("2026-09-28T19:00:00.000Z");
+    expect(out.areaChangedBy).toBe("Membro do time");
+  });
+
+  it("demanda nunca transferida fica sem area", () => {
+    const [out] = processCurrentDemands([makeDemand()], { rules: [], overrides: {} });
+
+    expect(out.area).toBeUndefined();
+  });
+
   it("mantem a conclusao por circulo verde acima de uma reabertura manual", () => {
     const concluida = makeDemand({
       status: "concluida",

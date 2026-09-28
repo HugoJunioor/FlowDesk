@@ -1,11 +1,16 @@
 # Export pra planilha Suporte → Engenharia
 
-A cada execução do sync do Slack (cron de 5 min), o FlowDesk envia os chamados
-do formulário **"Novo chamado"** para a aba `Demandas` da planilha de gestão
-Suporte → Engenharia no Google Sheets.
+A cada execução do sync do Slack (cron de 5 min), o FlowDesk envia para a aba
+`Demandas` da planilha de gestão Suporte → Engenharia as demandas
+**transferidas para a Engenharia**. A transferência é o botão **Transferir para
+Engenharia** no detalhe da demanda, e vale para qualquer formulário.
 
-- O FlowDesk **cria** a linha quando o chamado aparece e **mantém atualizadas**
-  as colunas que vêm dele.
+- Na tela de Demandas, o seletor **Suporte / Engenharia / Todas** mostra o que
+  está com cada área. A transferência fica no override da demanda
+  (`fd_demand_overrides`: `area`, `areaChangedAt`, `areaChangedBy`) e pode ser
+  desfeita pelo toast ou revertida com **Devolver ao Suporte**.
+- O FlowDesk **cria** a linha na transferência e **mantém atualizadas** as
+  colunas que vêm dele, inclusive depois de uma devolução ao Suporte.
 - A Engenharia **completa** as colunas dela. O sync nunca as sobrescreve.
 - Nenhuma linha é apagada. Linhas criadas à mão (WhatsApp, ClickUp, etc.)
   nunca são tocadas.
@@ -32,7 +37,7 @@ FlowDesk mostra.
 
 | Coluna | Dono | Regra |
 |--------|------|-------|
-| A ID | FlowDesk | Protocolo do formulário (id do FlowDesk se faltar). É a chave da linha. |
+| A ID | FlowDesk | Protocolo do "Novo chamado"; nos outros formulários, `FD-` + timestamp da mensagem no Slack. É a chave da linha. |
 | B Abertura/data | FlowDesk | Data de abertura no Slack. |
 | C Cliente | FlowDesk | `Cliente/Organização` do formulário. |
 | D Solicitante Suporte | FlowDesk | "Aberto via formulário por …" |
@@ -42,7 +47,7 @@ FlowDesk mostra.
 | H Problema / Demanda | FlowDesk | Título, resultado obtido/esperado, impacto, ambiente e IDs técnicos. |
 | I Testes realizados pelo Suporte | FlowDesk | "O que tentou fazer". |
 | J Evidências / Links | FlowDesk | Link da thread, link do ClickUp, quantidade de anexos. |
-| K Time atual | Engenharia | — |
+| K Time atual | Compartilhado | O FlowDesk grava `Engenharia` na transferência e `Suporte` na devolução. Entre um e outro, a Engenharia pode trocar (Cliente, Terceiro) sem o sync desfazer. |
 | L Responsável Engenharia | Engenharia | — |
 | M Status | Compartilhado | O FlowDesk grava `Nova` ao criar e `Concluída` quando a demanda fecha. No meio, vale o que a Engenharia puser. `Concluída` e `Cancelada` definidas pela Engenharia nunca são sobrescritas. |
 | N SLA (h) | FlowDesk | 4 / 8 / 24, conforme a criticidade. |
@@ -154,5 +159,9 @@ grep '\[planilha\]' /var/log/flowdesk-sync.log | tail -5
   as fórmulas dele precisam ser estendidas.
 - Texto enviado é gravado como texto literal (prefixo `'`): nada vindo do
   formulário vira fórmula ou é convertido em data.
-- Só entram chamados do formulário "Novo chamado". Formulários antigos,
-  Sitef/Conciliação e Demandas Internas ficam de fora.
+- Só entram demandas do Slack transferidas para a Engenharia. Demandas
+  Internas e o módulo SQL ficam de fora.
+- A transferência chega à planilha no próximo ciclo do cron (até 5 min).
+  Linhas já exportadas não somem se a transferência for desfeita depois.
+- Nos formulários antigos, "Testes realizados pelo Suporte" fica vazio: só o
+  "Novo chamado" tem o campo "O que tentou fazer".
