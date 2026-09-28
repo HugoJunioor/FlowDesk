@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, Circle, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2, Wrench, Undo2 } from "lucide-react";
+import { ExternalLink, Hash, User, Calendar, Clock, MessageSquare, UserCog, Building2, Layers, Package, MessageCircle, Link2, AlertTriangle, Circle, Signal, Info, Sparkles, X, Plus, Paperclip, FileText, Image, Download, Trash2, Wrench, ArrowRight, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -333,6 +333,8 @@ const DemandDetailSheet = ({
       >
         {/* Header fixo (alinhado com a coluna de conteudo, nao stretches edge-to-edge) */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0 max-w-4xl w-full mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
+          <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className={`text-[10px] ${priority.bg} ${priority.color}`}>
               {priority.label}
@@ -361,43 +363,45 @@ const DemandDetailSheet = ({
               <Layers size={12} /> {demand.workflow}
             </span>
           </div>
-          {onAreaChange && (
-            <div className="flex items-center gap-2 flex-wrap mt-2">
-              {areaOf(demand) === "engenharia" ? (
-                <>
-                  <AreaBadge demand={demand} />
-                  {demand.areaChangedAt && (
-                    <span className="text-[11px] text-muted-foreground">
-                      {demand.areaChangedBy
-                        ? t("demand.area.since_by", {
-                            date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
-                            by: demand.areaChangedBy,
-                          })
-                        : t("demand.area.since", {
-                            date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
-                          })}
-                    </span>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs gap-1.5 ml-auto"
-                    onClick={() => onAreaChange(demand.id, "suporte")}
-                  >
-                    <Undo2 size={12} /> {t("demand.area.return")}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  className="h-7 text-xs gap-1.5"
-                  onClick={() => onAreaChange(demand.id, "engenharia")}
-                >
-                  <Wrench size={12} /> {t("demand.area.transfer")}
-                </Button>
+          {onAreaChange && areaOf(demand) === "engenharia" && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <AreaBadge demand={demand} />
+              {demand.areaChangedAt && (
+                <span className="text-[11px] text-muted-foreground">
+                  {demand.areaChangedBy
+                    ? t("demand.area.since_by", {
+                        date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
+                        by: demand.areaChangedBy,
+                      })
+                    : t("demand.area.since", {
+                        date: format(new Date(demand.areaChangedAt), "dd/MM HH:mm", { locale: ptBR }),
+                      })}
+                </span>
               )}
             </div>
           )}
+          </div>
+
+          {/* Acao principal da area, destacada no canto: mesma cor do painel
+              pra onde a demanda vai (amarelo Engenharia / azul Operacoes). */}
+          {onAreaChange && (
+            areaOf(demand) === "engenharia" ? (
+              <Button
+                onClick={() => onAreaChange(demand.id, "suporte")}
+                className="h-11 px-5 gap-2 text-sm font-semibold shrink-0 sm:mr-6 shadow-md bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
+              >
+                <ArrowLeft size={18} /> {t("demand.area.return")}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => onAreaChange(demand.id, "engenharia")}
+                className="h-11 px-5 gap-2 text-sm font-semibold shrink-0 sm:mr-6 shadow-md bg-yellow-300 text-yellow-950 hover:bg-yellow-400 dark:bg-yellow-400 dark:hover:bg-yellow-300"
+              >
+                <Wrench size={16} /> {t("demand.area.transfer")} <ArrowRight size={18} />
+              </Button>
+            )
+          )}
+          </div>
         </DialogHeader>
         {/* Conteudo scrollavel — limitado a ~720px centralizado pra harmonia
             (campos curtos como prioridade, status, badges nao precisam de
