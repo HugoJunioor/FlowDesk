@@ -136,6 +136,16 @@ openssl rand -base64 24 | tr -d '/+=' | head -c 32
 | `SMTP_PASS` | Sim (se `EMAIL_ENABLED`) | — | Senha ou **App Password** (Gmail/Workspace exige). | https://myaccount.google.com/apppasswords |
 | `SMTP_FROM` | Sim (se `EMAIL_ENABLED`) | — | Remetente. Ex: `FlowDesk <suporte@empresa.com>`. | — |
 
+### Planilha Suporte → Engenharia
+
+> Integracao opcional, no `.env` da raiz (o cron do sync repassa ao container). Sem as duas variaveis o export fica desligado. Setup em [SHEETS_SYNC.md](./SHEETS_SYNC.md).
+
+| Var | Obrigatoria | Default | Descricao | Como obter |
+|-----|-------------|---------|-----------|------------|
+| `SHEETS_WEBHOOK_URL` | Sim (se usar) | — | URL `/exec` do App da Web do Apps Script da planilha. | Apps Script > Implantar > App da Web |
+| `SHEETS_WEBHOOK_TOKEN` | Sim (se usar) | — | Segredo compartilhado; igual a propriedade `FLOWDESK_TOKEN` do script. | `openssl rand -hex 32` |
+| `FLOWDESK_STATE_FILE` | Nao | `<raiz>/data/shared-state.json` | Caminho do estado compartilhado (overrides e regras) lido pelo export. | — |
+
 ### Observability / Sentry
 
 > Sem `SENTRY_DSN`, o Sentry fica desligado (zero overhead). Opcional mas recomendado em prod.

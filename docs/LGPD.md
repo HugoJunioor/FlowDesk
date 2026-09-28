@@ -81,6 +81,12 @@ Os dados **não são compartilhados** com terceiros, exceto:
 - **Slack** (origem dos dados; já é parte da operação)
 - **Resend** (caso `RESEND_API_KEY` esteja configurado, e somente o
   conteúdo da notificação por e-mail para o destinatário interno)
+- **Google Sheets** (caso `SHEETS_WEBHOOK_URL` esteja configurado): os
+  chamados do formulário "Novo chamado" vão para a planilha interna
+  Suporte → Engenharia, no Google Workspace da empresa. Vão cliente,
+  solicitante, descrição do problema e IDs técnicos; o CNPJ não é enviado.
+  A planilha precisa ter compartilhamento restrito à empresa. Ver
+  [SHEETS_SYNC.md](./SHEETS_SYNC.md)
 
 Sem analytics de terceiros, sem rastreadores, sem ads.
 

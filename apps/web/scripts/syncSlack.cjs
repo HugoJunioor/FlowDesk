@@ -131,6 +131,7 @@ const {
   parseWorkflowMessage,
   pickField,
   composeTicketTitle,
+  composeTicketDescription,
 } = require('./lib/ticketParser.cjs');
 
 // === BUSCA TODAS AS REPLIES (com paginacao) ===
@@ -311,18 +312,15 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       };
       // No formulario novo o corpo esta repartido em 3 blocos narrativos.
       // Junta os que vierem preenchidos, mantendo os rotulos como contexto.
-      const newFormDescription = (() => {
-        if (!isNewForm) return null;
-        const blocks = [
-          ['O que tentou fazer', formTentou],
-          ['Resultado esperado', formEsperado],
-          ['Resultado obtido', formObtido],
-        ].filter(([, v]) => v);
-        if (!blocks.length) return null;
-        const out = blocks.map(([label, v]) => `${label}:\n${v}`);
-        if (formCliente) out.push(`Cliente/Organização: ${formCliente}`);
-        return out.join('\n\n');
-      })();
+      // O formato e lido de volta por splitTicketDescription (export da planilha).
+      const newFormDescription = isNewForm
+        ? composeTicketDescription({
+            tentouFazer: formTentou,
+            resultadoEsperado: formEsperado,
+            resultadoObtido: formObtido,
+            cliente: formCliente,
+          })
+        : null;
 
       const description = newFormDescription ||
                           extractDescriptionBody(resolvedText) ||
