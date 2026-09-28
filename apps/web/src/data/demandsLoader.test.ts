@@ -11,6 +11,11 @@
  * O contrato que estes testes fixam: forcar P3 decide PRIORIDADE, nao decide
  * responsavel. Quem chega sem dono cai no fallback; quem ja tem dono fica como
  * esta.
+ *
+ * Todo nome de pessoa e de cliente aqui e sintetico. Este repositorio e
+ * publico: nao usar nome de colega, de solicitante nem de canal de cliente
+ * real, mesmo como valor de teste. Uma versao anterior deste arquivo usou nomes
+ * reais da equipe e um canal de cliente como fixture.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SlackDemand } from "@/types/demand";
@@ -47,7 +52,7 @@ function makeDemand(over: Partial<SlackDemand> = {}): SlackDemand {
     hasTask: false,
     taskLink: "",
     tags: [],
-    slackChannel: "#cliente-kpi",
+    slackChannel: "#cliente-exemplo",
     // statusAnalyzer percorre threadReplies sem guarda — omitir quebra o
     // pipeline antes de chegar na atribuicao.
     threadReplies: [],
@@ -72,17 +77,17 @@ function processOne(demand: SlackDemand): SlackDemand {
 
 describe("fallback no_assignee em workflow forcado P3 (conciliacao)", () => {
   it("atribui o responsavel padrao quando a demanda chega sem dono", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({ workflow: "Nova conciliação", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("mantem a prioridade P3 do workflow ao aplicar o fallback", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({ workflow: "Nova conciliação", priority: "p1", assignee: null }),
@@ -91,20 +96,20 @@ describe("fallback no_assignee em workflow forcado P3 (conciliacao)", () => {
     // O P3 do workflow vence a prioridade original — esse comportamento ja
     // existia e nao pode regredir por causa da correcao de atribuicao.
     expect(out.priority).toBe("p3");
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("nao rouba demanda que ja tem responsavel", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({
         workflow: "Nova conciliação",
-        assignee: { name: "Bruna Queiroz", avatar: "" },
+        assignee: { name: "Outra Responsavel", avatar: "" },
       }),
     );
 
-    expect(out.assignee?.name).toBe("Bruna Queiroz");
+    expect(out.assignee?.name).toBe("Outra Responsavel");
   });
 
   it("deixa sem dono quando nao ha regra de fallback configurada", () => {
@@ -117,13 +122,13 @@ describe("fallback no_assignee em workflow forcado P3 (conciliacao)", () => {
   });
 
   it("aceita a forma sem acento do workflow", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({ workflow: "Nova conciliacao", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 });
 
@@ -134,7 +139,7 @@ describe("recorte por data do fallback (appliesFrom)", () => {
   // "so daqui pra frente".
 
   it("ignora demanda criada ANTES da data de corte", () => {
-    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+    setFallback("Responsavel Padrao", "2026-09-18");
 
     const out = processOne(
       makeDemand({ createdAt: "2026-08-20T10:00:00.000Z", assignee: null }),
@@ -144,39 +149,39 @@ describe("recorte por data do fallback (appliesFrom)", () => {
   });
 
   it("atribui demanda criada DEPOIS da data de corte", () => {
-    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+    setFallback("Responsavel Padrao", "2026-09-18");
 
     const out = processOne(
       makeDemand({ createdAt: "2026-09-19T10:00:00.000Z", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("inclui o proprio dia do corte", () => {
-    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+    setFallback("Responsavel Padrao", "2026-09-18");
 
     const out = processOne(
       makeDemand({ createdAt: "2026-09-18T14:00:00.000Z", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("vale para todo o historico quando appliesFrom esta ausente", () => {
     // Retrocompatibilidade: regra salva antes do campo existir nao muda de
     // alcance so porque o codigo passou a suportar recorte.
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({ createdAt: "2026-04-01T10:00:00.000Z", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("aplica o recorte tambem no caminho de workflow forcado P3", () => {
-    setFallback("Hugo Cordeiro Junior", "2026-09-18");
+    setFallback("Responsavel Padrao", "2026-09-18");
 
     const out = processOne(
       makeDemand({
@@ -195,25 +200,25 @@ describe("recorte por data do fallback (appliesFrom)", () => {
 
 describe("fallback no_assignee nos demais workflows (guarda de regressao)", () => {
   it("continua atribuindo o responsavel padrao em workflow comum", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({ workflow: "Fluxo de Trabalho", assignee: null }),
     );
 
-    expect(out.assignee?.name).toBe("Hugo Cordeiro Junior");
+    expect(out.assignee?.name).toBe("Responsavel Padrao");
   });
 
   it("nao sobrepoe responsavel existente em workflow comum", () => {
-    setFallback("Hugo Cordeiro Junior");
+    setFallback("Responsavel Padrao");
 
     const out = processOne(
       makeDemand({
         workflow: "Fluxo de Trabalho",
-        assignee: { name: "Bruna Queiroz", avatar: "" },
+        assignee: { name: "Outra Responsavel", avatar: "" },
       }),
     );
 
-    expect(out.assignee?.name).toBe("Bruna Queiroz");
+    expect(out.assignee?.name).toBe("Outra Responsavel");
   });
 });
