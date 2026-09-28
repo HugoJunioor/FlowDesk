@@ -11,12 +11,14 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  composeTicketDescription,
   composeTicketTitle,
   flattenBlockText,
   isNewTicketForm,
   parseTicketForm,
   parseWorkflowMessage,
   pickField,
+  splitTicketDescription,
   // eslint-disable-next-line @typescript-eslint/no-require-imports
 } from "../../scripts/lib/ticketParser.cjs";
 
@@ -213,5 +215,55 @@ describe("composeTicketTitle", () => {
 
   it("devolve null quando nao ha nada pra compor", () => {
     expect(composeTicketTitle("", "")).toBeNull();
+  });
+});
+
+describe("composeTicketDescription / splitTicketDescription", () => {
+  it("monta os blocos narrativos no formato que o detalhe da demanda exibe", () => {
+    const p = parseTicketForm(CHAMADO);
+    const description = composeTicketDescription({
+      tentouFazer: p.fields["O que tentou fazer"],
+      resultadoEsperado: p.fields["Resultado esperado"],
+      resultadoObtido: p.fields["Resultado obtido"],
+      cliente: p.fields["Cliente/Organização"],
+    });
+
+    expect(description).toBe(
+      "O que tentou fazer:\nTentativa de mudar a situação de um crédito de ativo para bloqueado.\n\n" +
+        "Resultado esperado:\nGostaria de solicitar que a opção volte a ficar disponível. " +
+        "Atualmente precisamos cancelar a nota fiscal, o que torna o processo trabalhoso.\n\n" +
+        "Resultado obtido:\nSituação disponível para alteração sem cancelar a NF.\n\n" +
+        "Cliente/Organização: ORGANIZACAO EXEMPLO",
+    );
+  });
+
+  it("le de volta exatamente o que foi montado", () => {
+    const parts = {
+      tentouFazer: "Estorno não comunicado.",
+      resultadoEsperado: "Estorno parcial.",
+      resultadoObtido: "A transação ocorreu em 06/07.",
+      cliente: "OUTRA ORG",
+    };
+    expect(splitTicketDescription(composeTicketDescription(parts))).toEqual(parts);
+  });
+
+  it("devolve vazio pros blocos que o chamado nao trouxe", () => {
+    const description = composeTicketDescription({ resultadoObtido: "Erro 500" });
+    expect(splitTicketDescription(description)).toEqual({
+      tentouFazer: "",
+      resultadoEsperado: "",
+      resultadoObtido: "Erro 500",
+      cliente: "",
+    });
+  });
+
+  it("nao inventa campos em descricao de formulario antigo", () => {
+    expect(splitTicketDescription("O relatório está trazendo valores duplicados.")).toEqual({
+      tentouFazer: "",
+      resultadoEsperado: "",
+      resultadoObtido: "",
+      cliente: "",
+    });
+    expect(composeTicketDescription({})).toBeNull();
   });
 });

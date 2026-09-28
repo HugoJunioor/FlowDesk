@@ -79,6 +79,14 @@ echo "===== $(date -Iseconds) sync iniciado =====" >> $LOG
 # O fallback fica porque o node_modules e do host, nao da imagem: se alguem
 # limpar o diretorio ou clonar o repo do zero, o sync precisa se virar sozinho
 # em vez de falhar no require.
+#
+# Depois do sync, o mesmo container exporta os chamados "Novo chamado" pra
+# planilha Suporte → Engenharia (docs/SHEETS_SYNC.md). O export e best-effort:
+# sem SHEETS_WEBHOOK_URL/TOKEN no .env ele so avisa que esta desligado, e uma
+# falha dele nunca invalida o sync — realDemands.ts ja foi escrito a essa altura.
+# Ele roda TypeScript (reusa o pipeline do navegador) e por isso depende do tsx,
+# que vem no node_modules do monorepo; nao instalamos aqui pra nao repetir o
+# `npm install` lento que o comentario acima descreve.
 docker run --rm \
   --memory="$SYNC_MEM" --cpus="$SYNC_CPUS" \
   -v /opt/flowdesk/app:/app \
@@ -93,7 +101,12 @@ docker run --rm \
       echo "  [info] deps do sync ausentes — instalando"; \
       npm install --no-save --legacy-peer-deps @slack/web-api dotenv >/dev/null 2>&1; \
     fi && \
-    cd apps/web && node scripts/syncSlack.cjs
+    cd apps/web && node scripts/syncSlack.cjs && \
+    if [ -d /app/node_modules/tsx ]; then \
+      node --import tsx scripts/syncSheets.ts || echo "  [aviso] export da planilha falhou — o sync do Slack segue valido"; \
+    else \
+      echo "  [aviso] tsx ausente em node_modules — export da planilha pulado (rode npm ci no servidor)"; \
+    fi
   ' >> $LOG 2>&1
 
 HASH_AFTER=$(md5sum $DATA_FILE | awk '{print $1}')

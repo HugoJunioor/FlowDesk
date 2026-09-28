@@ -219,6 +219,47 @@ function composeTicketTitle(modulo, tentouFazer) {
   return truncateTitle(parts.join(' — '));
 }
 
+// Blocos narrativos do formulario de chamado, na ordem em que entram na descricao.
+const NARRATIVE_BLOCKS = [
+  ['tentouFazer', 'O que tentou fazer'],
+  ['resultadoEsperado', 'Resultado esperado'],
+  ['resultadoObtido', 'Resultado obtido'],
+];
+const CLIENT_LINE = 'Cliente/Organização';
+
+/**
+ * Descricao de um chamado: os 3 blocos narrativos preenchidos, cada um como
+ * "Rotulo:\nvalor", mais a linha do cliente, separados por linha em branco.
+ * Retorna null quando nenhum bloco veio preenchido.
+ *
+ * O formato e contrato: splitTicketDescription le exatamente isto de volta
+ * (ex: o export pra planilha separa "O que tentou fazer" do resto). Os valores
+ * saem do parseTicketForm com espacos colapsados, entao nunca carregam "\n\n".
+ */
+function composeTicketDescription({ tentouFazer, resultadoEsperado, resultadoObtido, cliente } = {}) {
+  const values = { tentouFazer, resultadoEsperado, resultadoObtido };
+  const out = NARRATIVE_BLOCKS
+    .filter(([key]) => values[key])
+    .map(([key, label]) => `${label}:\n${values[key]}`);
+  if (!out.length) return null;
+  if (cliente) out.push(`${CLIENT_LINE}: ${cliente}`);
+  return out.join('\n\n');
+}
+
+/** Inverso de composeTicketDescription. Campos ausentes voltam como string vazia. */
+function splitTicketDescription(text) {
+  const result = { tentouFazer: '', resultadoEsperado: '', resultadoObtido: '', cliente: '' };
+  for (const chunk of (text || '').split('\n\n')) {
+    const block = NARRATIVE_BLOCKS.find(([, label]) => chunk.startsWith(`${label}:\n`));
+    if (block) {
+      result[block[0]] = chunk.slice(block[1].length + 2).trim();
+    } else if (chunk.startsWith(`${CLIENT_LINE}: `)) {
+      result.cliente = chunk.slice(CLIENT_LINE.length + 2).trim();
+    }
+  }
+  return result;
+}
+
 module.exports = {
   TICKET_LABELS,
   isNewTicketForm,
@@ -227,4 +268,6 @@ module.exports = {
   parseWorkflowMessage,
   pickField,
   composeTicketTitle,
+  composeTicketDescription,
+  splitTicketDescription,
 };
