@@ -144,6 +144,54 @@ describe("parseWorkflowMessage — formularios antigos", () => {
   });
 });
 
+describe("parseWorkflowMessage — formulario em italico (segundo bot)", () => {
+  // Estrutura do msg.text real do outro app que posta nos mesmos canais.
+  // Rotulos em italico com dois-pontos DENTRO do par, valor na linha seguinte.
+  // Todos os identificadores sao sinteticos.
+  const FORMATO_ITALICO = [
+    "<@U000SINTETICO>",
+    "Mercado Exemplo e Atacarejo Modelo: Solicitação enviada com sucesso!",
+    "Link da solicitação: <https://exemplo.slack.com/archives/C000000/p1700000000000000>",
+    "",
+    "Solicitação:",
+    "_Título da demanda:_",
+    "Mercado Exemplo e Atacarejo Modelo",
+    "_Empresa solicitante:_",
+    "Cliente Exemplo",
+    "_Solicitante:_",
+    "<@U000SINTETICO>",
+    "_Data limite:_",
+    "2026-09-22",
+  ].join("\n");
+
+  it("extrai titulo e data limite, que antes eram descartados", () => {
+    const fields = parseWorkflowMessage(FORMATO_ITALICO);
+    expect(fields["Título da demanda"]).toBe("Mercado Exemplo e Atacarejo Modelo");
+    expect(fields["Data limite"]).toBe("2026-09-22");
+    expect(fields["Empresa solicitante"]).toBe("Cliente Exemplo");
+  });
+
+  it("nao cria campo fantasma a partir de italico solto na descricao", () => {
+    // O dois-pontos e o que separa rotulo de enfase. Sem essa exigencia,
+    // qualquer trecho enfatizado no corpo viraria chave.
+    const comEnfase = [
+      "*Título da demanda*",
+      "Erro no fechamento",
+      "*Descrição da demanda*",
+      "O cliente disse que o valor está _muito_ diferente do esperado.",
+    ].join("\n");
+
+    const fields = parseWorkflowMessage(comEnfase);
+    expect(fields["Título da demanda"]).toBe("Erro no fechamento");
+    expect(Object.keys(fields)).not.toContain("muito");
+  });
+
+  it("segue funcionando com o formato em negrito", () => {
+    const fields = parseWorkflowMessage(FORMATO_ANTIGO);
+    expect(fields["Título da demanda"]).toBe("Ajuste no relatório de fechamento");
+  });
+});
+
 describe("composeTicketTitle", () => {
   it("junta modulo e acao", () => {
     const p = parseTicketForm(CHAMADO);
