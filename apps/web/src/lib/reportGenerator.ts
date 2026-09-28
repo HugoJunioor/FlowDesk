@@ -96,7 +96,7 @@ export function generateInteractiveReport(options: ReportOptions): string {
   }
   const clientEntries = Object.entries(clientMap).sort((a, b) => b[1].total - a[1].total);
 
-  // Product breakdown (KPI: Telemedicina/Beneficios/Frotas, Smartvale: X/Y...)
+  // Product breakdown (ex: Cliente A: Telemedicina/Beneficios/Frotas, Cliente B: X/Y...)
   // Ignora demandas sem produto definido. Agrupa por cliente + produto pra
   // mostrar contexto (qual produto de qual cliente).
   const productMap: Record<string, { total: number; p1: number; p2: number; p3: number; concluida: number; expirada: number }> = {};

@@ -13,7 +13,7 @@ import { setSyncedItem } from "./stateSync";
 export type ChannelRoute = "demandas" | "sql" | "ignore";
 
 export interface ChannelRule {
-  /** Nome do canal Slack sem # (ex: 'cliente-vspay') */
+  /** Nome do canal Slack sem # (ex: 'cliente-exemplo') */
   name: string;
   routeTo: ChannelRoute;
   /** Notas internas (opcional) */

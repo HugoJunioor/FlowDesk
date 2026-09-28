@@ -49,7 +49,7 @@ describe("routeFor", () => {
 
   it("aplica padrao legacy: cliente-* vai pra demandas", () => {
     const cfg = makeConfig({ defaultRoute: "ignore" }); // mesmo com default ignore
-    expect(routeFor("cliente-vspay", cfg)).toBe("demandas");
+    expect(routeFor("cliente-exemplo", cfg)).toBe("demandas");
     expect(routeFor("cliente-acme", cfg)).toBe("demandas");
   });
 
@@ -62,10 +62,10 @@ describe("routeFor", () => {
   it("regra explicita sobrescreve legacy", () => {
     const cfg = makeConfig({
       channels: [
-        { name: "cliente-vspay", routeTo: "ignore", addedAt: "2026-01-01" },
+        { name: "cliente-exemplo", routeTo: "ignore", addedAt: "2026-01-01" },
       ],
     });
-    expect(routeFor("cliente-vspay", cfg)).toBe("ignore");
+    expect(routeFor("cliente-exemplo", cfg)).toBe("ignore");
   });
 
   it("ignora prefixo # no nome do canal", () => {

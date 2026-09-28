@@ -402,7 +402,7 @@ const NewInfraDemandModal = ({ open, defaultKind, onClose, onCreated }: NewInfra
               <Input
                 value={client}
                 onChange={(e) => setClient(e.target.value)}
-                placeholder="Ex: VSPay, eFleet, SmartVale"
+                placeholder="Ex: Cliente A, Cliente B"
                 maxLength={80}
               />
             </div>

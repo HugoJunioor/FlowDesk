@@ -5,20 +5,23 @@
  * Persistencia: localStorage key "fd_infra_databases" — sincronizada com
  * outros dispositivos via stateSync plugin (lista em SYNCED_KEYS).
  *
- * Formato: array de strings (nome do banco). Ex: ["vspay", "efleet"].
+ * Formato: array de strings (nome do banco). Ex: ["banco_a", "banco_b"].
  */
 import { setSyncedItem } from "./stateSync";
 
 const KEY = "fd_infra_databases";
 
-/** Bancos sugeridos por padrao quando a lista esta vazia */
-const DEFAULTS: string[] = [
-  "vspay",
-  "efleet",
-  "smartvale",
-  "dxtech",
-  "kpi",
-];
+/**
+ * Vazio de proposito. Os bancos reais sao dado de producao e moram no estado
+ * compartilhado (fd_infra_databases), nao no codigo — este repositorio e
+ * publico. Numa instalacao nova a lista comeca vazia e o master adiciona pelo
+ * proprio formulario, que tem input pra isso; o campo e opcional.
+ *
+ * Ate 2026-09-28 havia aqui cinco nomes reais de bancos, e como a chave nao
+ * estava na SYNCED_KEYS do cliente, era exatamente esta lista que toda a equipe
+ * via em producao.
+ */
+const DEFAULTS: string[] = [];
 
 export function loadInfraDatabases(): string[] {
   try {

@@ -389,7 +389,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         return null;
       })();
 
-      // "Aberto via formulário por *Amanda Ferreira* · <mailto:…> · protocolo `X`"
+      // "Aberto via formulário por *Fulana de Tal* · <mailto:…> · protocolo `X`"
       // Sem isto o solicitante virava o proprio bot que postou a mensagem.
       // No formulario de chamado o solicitante esta no rodape ("Aberto via
       // formulário por Fulana"); sem isso o solicitante virava o proprio bot.
@@ -430,8 +430,8 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
       const workflow = msg.username || (isWorkflow ? 'Fluxo de Trabalho' : 'Mensagem');
 
       // Produto: priorizar campo "Produto" do formulario. Se vazio, detectar
-      // pelo nome do workflow do bot (ex: "Nova solicitação KPI telemedicina"
-      // → "Telemedicina"). Cobre KPI/Smartvale que tem 1 workflow por produto.
+      // pelo nome do workflow do bot (ex: "Nova solicitação Cliente telemedicina"
+      // → "Telemedicina"). Cobre clientes que tem 1 workflow por produto.
       const product = (() => {
         const explicit = fields['Produto'] || formModulo;
         if (explicit) return explicit;

@@ -108,7 +108,7 @@ describe('runLembreteDiarioCycle', () => {
 
   it('envia e-mail com contagem correta quando há demandas', async () => {
     mockUsers([USER_A]);
-    mockDemandas([DEMANDA_ABERTA, { ...DEMANDA_ABERTA, id: 'd2', titulo: 'Deploy SmartVale' }]);
+    mockDemandas([DEMANDA_ABERTA, { ...DEMANDA_ABERTA, id: 'd2', titulo: 'Deploy Cliente Exemplo' }]);
 
     const result = await runLembreteDiarioCycle();
 
@@ -134,7 +134,7 @@ describe('runLembreteDiarioCycle', () => {
 
     const demandaVencida = {
       id: 'd3',
-      titulo: 'Login VSPAY',
+      titulo: 'Login CLIENTE',
       prioridade: 'p2',
       due_date: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3h atrás
     };
