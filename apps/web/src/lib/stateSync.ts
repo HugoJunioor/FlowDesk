@@ -16,6 +16,11 @@ const SYNCED_KEYS = [
   "fd_auto_assign_rules",
   "fd_support_members",
   "fd_channel_routing",
+  // Estava so na lista do plugin do Vite (scripts/stateSync.mjs), nunca nesta.
+  // Resultado: a lista de bancos do modulo Infra ficava presa no navegador de
+  // quem a editava, e todos os outros viam o DEFAULTS hardcoded — com nomes
+  // reais de bancos, num repositorio publico. Ver infraDatabases.ts.
+  "fd_infra_databases",
 ] as const;
 
 type SyncedKey = typeof SYNCED_KEYS[number];
@@ -112,9 +117,33 @@ export async function initStateSync(): Promise<void> {
     // or before the PR that started pushing them (see PR #187).
     const MERGEABLE_DICT_KEYS: Set<string> = new Set(["fd_demand_overrides", "fd_sql_demand_overrides"]);
 
+    // Mesma protecao pra listas de strings. fd_infra_databases passou a ser
+    // sincronizada so agora; ate entao cada navegador guardava a sua. Com
+    // "servidor vence", o primeiro carregamento apos o deploy apagaria qualquer
+    // banco que alguem tivesse adicionado so localmente. A uniao preserva os
+    // dois lados e devolve ao servidor o que so existia no navegador.
+    const MERGEABLE_ARRAY_KEYS: Set<string> = new Set(["fd_infra_databases"]);
+
     for (const key of SYNCED_KEYS) {
       const serverValue = serverState[key];
       const localRaw = localStorage.getItem(key);
+
+      if (MERGEABLE_ARRAY_KEYS.has(key)) {
+        const serverArr = Array.isArray(serverValue) ? (serverValue as unknown[]) : [];
+        let localArr: unknown[] = [];
+        try {
+          const parsed = localRaw ? JSON.parse(localRaw) : [];
+          localArr = Array.isArray(parsed) ? parsed : [];
+        } catch { localArr = []; }
+        // Ordem do servidor primeiro, adicoes locais no fim — quem nao adicionou
+        // nada ve exatamente a mesma lista de antes.
+        const merged = Array.from(new Set([...serverArr, ...localArr]));
+        localStorage.setItem(key, JSON.stringify(merged));
+        if (merged.length > serverArr.length) {
+          try { await pushToServer(key, merged); } catch { /* ignore */ }
+        }
+        continue;
+      }
 
       if (MERGEABLE_DICT_KEYS.has(key)) {
         // Merge dictionaries. Local wins on conflict (the user's browser has

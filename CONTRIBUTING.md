@@ -44,11 +44,23 @@ Hook local recomendado (`.git/hooks/commit-msg`):
 
 ```bash
 #!/bin/bash
-if grep -qE "Hugo|Bichof|Tiago Silva|Bruna|Joyce|wearejust\\.it" "$1"; then
+# A lista de nomes e dominios reais fica em .git/hooks/denylist.txt — dentro de
+# .git/, portanto nunca versionada. Uma expressao regular por linha.
+# Nao escreva a lista neste arquivo: ele e publico, e uma lista de bloqueio
+# expoe exatamente os nomes que pretende proteger.
+DENY="$(git rev-parse --git-dir)/hooks/denylist.txt"
+if [ -f "$DENY" ] && grep -qEf "$DENY" "$1"; then
   echo "ERRO: commit message contem nome/email real. Generalize." >&2
   exit 1
 fi
 ```
+
+Peça a lista a quem mantém o projeto e salve em `.git/hooks/denylist.txt`.
+
+A busca é sensível a maiúsculas: para cobrir variações, escreva-as no próprio
+padrão (`[Ff]ulano`). **Não adicione `-i`**: no Git Bash do Windows,
+`grep -i` combinado com `-f` aborta (exit 134), e o `if` trata o aborto como
+"não encontrou" — o hook passaria a aceitar tudo em silêncio.
 - **Strings:** em português no código de UI, em inglês em comentários técnicos
 - **CI obrigatório:** build precisa passar, lint não bloqueia mas evite regredir
 

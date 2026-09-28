@@ -139,3 +139,72 @@ describe("initStateSync — não pode travar o boot", () => {
     expect(localStorage.getItem("fd_groups")).toContain("local");
   });
 });
+
+describe("initStateSync — fd_infra_databases mescla em vez de sobrescrever", () => {
+  // A chave so passou a ser sincronizada agora. Antes cada navegador guardava a
+  // sua lista, entao pode haver banco que so existe localmente. "Servidor vence"
+  // o apagaria no primeiro carregamento; estes testes fixam que nao apaga.
+  // Nomes de banco sinteticos — o repositorio e publico.
+  const KEY = "fd_infra_databases";
+
+  function serverWith(value: unknown) {
+    return vi.fn(async (url: string) => {
+      if (String(url) === "/__state") {
+        return new Response(JSON.stringify({ [KEY]: value }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    });
+  }
+
+  it("quem nao tem nada local recebe a lista do servidor, sem PUT", async () => {
+    const fetchMock = serverWith(["banco_a", "banco_b"]);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { initStateSync, installLocalStorageInterceptor } = await import("./stateSync");
+    installLocalStorageInterceptor();
+    await initStateSync();
+
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(["banco_a", "banco_b"]);
+    expect(writesFrom(fetchMock)).toEqual([]);
+  });
+
+  it("preserva banco que so existia no navegador e o devolve ao servidor", async () => {
+    localStorage.setItem(KEY, JSON.stringify(["banco_local"]));
+    const fetchMock = serverWith(["banco_a", "banco_b"]);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { initStateSync, installLocalStorageInterceptor } = await import("./stateSync");
+    installLocalStorageInterceptor();
+    await initStateSync();
+
+    // Servidor primeiro, adicao local no fim — ninguem perde nada.
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(["banco_a", "banco_b", "banco_local"]);
+    expect(writesFrom(fetchMock)).toEqual([`/__state/${KEY}`]);
+  });
+
+  it("nao duplica nem reenvia quando local e servidor ja coincidem", async () => {
+    localStorage.setItem(KEY, JSON.stringify(["banco_a", "banco_b"]));
+    const fetchMock = serverWith(["banco_a", "banco_b"]);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { initStateSync, installLocalStorageInterceptor } = await import("./stateSync");
+    installLocalStorageInterceptor();
+    await initStateSync();
+
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(["banco_a", "banco_b"]);
+    expect(writesFrom(fetchMock)).toEqual([]);
+  });
+
+  it("sobe a lista local quando o servidor ainda nao tem a chave", async () => {
+    localStorage.setItem(KEY, JSON.stringify(["banco_local"]));
+    const fetchMock = serverWith(undefined);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { initStateSync, installLocalStorageInterceptor } = await import("./stateSync");
+    installLocalStorageInterceptor();
+    await initStateSync();
+
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(["banco_local"]);
+    expect(writesFrom(fetchMock)).toEqual([`/__state/${KEY}`]);
+  });
+});

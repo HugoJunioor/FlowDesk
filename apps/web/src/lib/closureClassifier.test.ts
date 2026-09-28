@@ -186,7 +186,7 @@ describe("classifyContactReason", () => {
     const cases = [
       "Layout arquivos conciliações Boa Vista",
       "Erro de conciliação",
-      "Habilitação Arquivos de conciliação KPI Benefícios",
+      "Habilitação Arquivos de conciliação Cliente Exemplo",
     ];
     for (const title of cases) {
       const r = classifyContactReason(makeDemand({ title }));

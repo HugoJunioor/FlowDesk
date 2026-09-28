@@ -415,7 +415,7 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: [VSPAY] ERRO AO REALIZAR LOGIN NO APP"
+                placeholder="Ex: [CLIENTE] ERRO AO REALIZAR LOGIN NO APP"
                 maxLength={150}
                 autoFocus
               />
@@ -703,7 +703,7 @@ const NewDemandaInternaModal = ({ open, defaultKind, onClose, onCreated }: NewDe
           <Input
             value={client}
             onChange={(e) => setClient(e.target.value)}
-            placeholder="Ex: VSPay, eFleet, SmartVale"
+            placeholder="Ex: Cliente A, Cliente B"
             maxLength={80}
           />
         </div>
