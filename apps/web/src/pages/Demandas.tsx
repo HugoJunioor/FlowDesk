@@ -21,7 +21,7 @@ function parseResponseSla(sla: string): number {
   return match[2].startsWith("hora") ? val * 60 : val;
 }
 import DemandStats from "@/components/demandas/DemandStats";
-import DemandFilters, { DemandFilterState, EMPTY_FILTERS } from "@/components/demandas/DemandFilters";
+import DemandFilters, { DemandFilterState, EMPTY_FILTERS, withCurrentPeriod } from "@/components/demandas/DemandFilters";
 import DemandKanban from "@/components/demandas/DemandKanban";
 import DemandList from "@/components/demandas/DemandList";
 import DemandListGrouped from "@/components/demandas/DemandListGrouped";
@@ -458,6 +458,12 @@ const Demandas = () => {
     [ownerScopedDemands, activeArea],
   );
 
+  // Datas do periodo valendo para hoje — ver withCurrentPeriod. A chave do dia
+  // entra nas deps pra que uma aba aberta na virada do mes recalcule no proximo
+  // render (focus e o polling do sync ja provocam um).
+  const dayKey = new Date().toDateString();
+  const period = useMemo(() => withCurrentPeriod(filters, new Date(dayKey)), [filters, dayKey]);
+
   // Demandas filtradas por todos os critérios EXCETO statFilter (para os quadros de stats)
   const statsFiltered = useMemo(() => {
     return scopedDemands.filter((d) => {
@@ -477,19 +483,19 @@ const Demandas = () => {
       if (filters.category !== "all" && d.closure?.category !== filters.category) return false;
       if (filters.supportLevel !== "all" && d.closure?.supportLevel !== filters.supportLevel) return false;
       if (filters.client && extractClientName(d.slackChannel) !== filters.client) return false;
-      if (filters.dateFrom) {
-        const from = new Date(filters.dateFrom);
+      if (period.dateFrom) {
+        const from = new Date(period.dateFrom);
         from.setHours(0, 0, 0, 0);
         if (new Date(d.createdAt) < from) return false;
       }
-      if (filters.dateTo) {
-        const to = new Date(filters.dateTo);
+      if (period.dateTo) {
+        const to = new Date(period.dateTo);
         to.setHours(23, 59, 59, 999);
         if (new Date(d.createdAt) > to) return false;
       }
       return true;
     });
-  }, [filters, scopedDemands]);
+  }, [filters, period, scopedDemands]);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -589,20 +595,20 @@ const Demandas = () => {
       if (filters.client && extractClientName(d.slackChannel) !== filters.client) return false;
 
       // Date range (based on createdAt)
-      if (filters.dateFrom) {
-        const from = new Date(filters.dateFrom);
+      if (period.dateFrom) {
+        const from = new Date(period.dateFrom);
         from.setHours(0, 0, 0, 0);
         if (new Date(d.createdAt) < from) return false;
       }
-      if (filters.dateTo) {
-        const to = new Date(filters.dateTo);
+      if (period.dateTo) {
+        const to = new Date(period.dateTo);
         to.setHours(23, 59, 59, 999);
         if (new Date(d.createdAt) > to) return false;
       }
 
       return true;
     });
-  }, [filters, scopedDemands]);
+  }, [filters, period, scopedDemands]);
 
   // SLA sort: estourados primeiro, depois por menor tempo restante até estouro
   const sorted = useMemo(() => {
@@ -678,8 +684,8 @@ const Demandas = () => {
                 ...(filters.assignee ? { Responsável: filters.assignee } : {}),
                 ...(filters.client ? { Cliente: filters.client } : {}),
                 ...(filters.category !== "all" ? { Categoria: filters.category } : {}),
-                ...(filters.dateFrom ? { "De": new Date(filters.dateFrom).toLocaleDateString("pt-BR") } : {}),
-                ...(filters.dateTo ? { "Até": new Date(filters.dateTo).toLocaleDateString("pt-BR") } : {}),
+                ...(period.dateFrom ? { "De": new Date(period.dateFrom).toLocaleDateString("pt-BR") } : {}),
+                ...(period.dateTo ? { "Até": new Date(period.dateTo).toLocaleDateString("pt-BR") } : {}),
                 ...(filters.statFilter ? { Filtro: filters.statFilter } : {}),
               }}
             />

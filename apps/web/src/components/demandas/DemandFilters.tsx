@@ -59,8 +59,7 @@ interface DemandFiltersProps {
   clients: string[];
 }
 
-function getPeriodDates(preset: PeriodPreset): { from: string; to: string } {
-  const now = new Date();
+function getPeriodDates(preset: PeriodPreset, now: Date = new Date()): { from: string; to: string } {
   switch (preset) {
     case "hoje":
       return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
@@ -71,6 +70,28 @@ function getPeriodDates(preset: PeriodPreset): { from: string; to: string } {
     default:
       return { from: "", to: "" };
   }
+}
+
+const RELATIVE_PRESETS: ReadonlySet<PeriodPreset> = new Set<PeriodPreset>(["hoje", "semanal", "mensal"]);
+
+/**
+ * Filtro com as datas do periodo recalculadas para `now`.
+ *
+ * "Hoje", "semanal" e "mensal" sao relativos a quando se filtra, mas dateFrom/
+ * dateTo guardam as datas de quando o preset foi escolhido. Sem recalcular, uma
+ * visualizacao salva como "mensal" em setembro seguia filtrando 01/09–30/09 em
+ * outubro — e toda demanda nova sumia da tela, parecendo falha do sync. O mesmo
+ * valia para uma aba aberta de um dia pro outro, ja que o default do mes atual
+ * e calculado no carregamento da pagina.
+ *
+ * "Anual" e "personalizado" sao datas absolutas e passam intactos. Devolve o
+ * mesmo objeto quando nada muda, pra nao invalidar memos a toa.
+ */
+export function withCurrentPeriod(filters: DemandFilterState, now: Date = new Date()): DemandFilterState {
+  if (!RELATIVE_PRESETS.has(filters.periodPreset)) return filters;
+  const { from, to } = getPeriodDates(filters.periodPreset, now);
+  if (from === filters.dateFrom && to === filters.dateTo) return filters;
+  return { ...filters, dateFrom: from, dateTo: to };
 }
 
 const DemandFilters = ({ filters, onChange, assignees, clients }: DemandFiltersProps) => {
