@@ -11,7 +11,7 @@ import { differenceInHours } from "date-fns";
 import { getProcessedDemands, extractClientName, subscribeToSync } from "@/data/demandsLoader";
 import { SlackDemand, DemandPriority, PRIORITY_CONFIG, ClosureFields, DemandCategory, SupportLevel, ExpirationReason, CATEGORY_OPTIONS, EXPIRATION_REASON_OPTIONS, DemandArea, areaOf } from "@/types/demand";
 import type { DemandOverride } from "@/data/demandsPipeline";
-import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
+import { addBusinessHours, getSlaDueDate, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { setSyncedItem } from "@/lib/stateSync";
 
 function parseResponseSla(sla: string): number {
@@ -512,7 +512,9 @@ const Demandas = () => {
             break;
           case "vencendo": {
             if (d.status === "concluida" || d.status === "expirada") return false;
-            const hoursLeft = differenceInHours(new Date(d.dueDate), now);
+            const due = getSlaDueDate(d);
+            if (!due) return false;
+            const hoursLeft = differenceInHours(due, now);
             if (hoursLeft < 0 || hoursLeft > 24) return false;
             break;
           }

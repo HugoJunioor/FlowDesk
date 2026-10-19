@@ -695,12 +695,16 @@ const DemandDetailSheet = ({
                 <p className="text-sm font-medium text-foreground">{demand.product}</p>
               </div>
             )}
-            {demand.dueDate && (
+            {demand.requestedDueDate && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock size={12} /> Data limite
+                  <Clock size={12} /> Data limite (cliente)
                 </p>
-                <p className="text-sm font-medium text-foreground">{formatDate(demand.dueDate)}</p>
+                {/* So informativo — o SLA segue a prioridade. Data sem horario:
+                    formatada direto da string pra nao deslocar de fuso. */}
+                <p className="text-sm font-medium text-foreground">
+                  {demand.requestedDueDate.split("-").reverse().join("/")}
+                </p>
               </div>
             )}
             {demand.replies > 0 && (

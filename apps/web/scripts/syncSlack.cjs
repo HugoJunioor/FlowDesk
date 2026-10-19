@@ -427,18 +427,12 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         });
       }
 
-      // dueDate fica sempre null aqui, de proposito. O prazo de SLA sai da
-      // prioridade (P1 4h, P2 8h, P3 24h uteis — PRIORITY_CONFIG) e e calculado
-      // por quem consome; todo consumidor prefere `dueDate` quando ele existe,
-      // entao qualquer valor gravado aqui SUBSTITUI o SLA.
-      //
-      // Antes, o campo "Data limite"/"Prazo" do formulario de remessa TEF virava
-      // dueDate. Mas ele e a data que o SOLICITANTE pediu, nao o prazo da Just —
-      // e ainda era lida como meia-noite UTC (o container do sync nao tem fuso),
-      // o que a empurrava pro fim do dia anterior em Brasilia: "21/10" virava
-      // terca 21h. Resultado: remessas P3 mostravam ~18h uteis em vez de 24h.
-      //
-      // A data pedida nao se perde: a linha "Data limite" continua na descricao.
+      // "Data limite"/"Prazo" do formulario e so informativo: o SLA e sempre o
+      // da prioridade (ver clientDeadlineAsInfo em demandsPipeline.ts). Guardamos
+      // a data como o cliente digitou — converter "2026-10-21" com new Date()
+      // dava meia-noite UTC, ou seja, 21h do dia anterior no Brasil.
+      const dueDateField = (fields['Data limite'] || fields['Prazo'] || '').trim();
+      const requestedDueDate = /^\d{4}-\d{2}-\d{2}/.test(dueDateField) ? dueDateField.slice(0, 10) : null;
       const dueDate = null;
 
       const isWorkflow = msg.subtype === 'bot_message' || !!msg.bot_id;
@@ -523,6 +517,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         createdAt: new Date(parseFloat(msg.ts) * 1000).toISOString(),
         serviceStartedAt,
         dueDate,
+        requestedDueDate,
         completedAt: null,
         hasTask,
         taskLink,

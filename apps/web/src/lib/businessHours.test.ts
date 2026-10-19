@@ -3,8 +3,9 @@ import {
   addBusinessHours,
   formatBusinessTime,
   getBusinessMinutesBetween,
-  getResolutionMinutes,
   getFirstResponseMinutes,
+  getResolutionMinutes,
+  getSlaDueDate,
 } from "./businessHours";
 
 describe("formatBusinessTime", () => {
@@ -223,5 +224,22 @@ describe("prazo P3 de uma remessa aberta na segunda de manha", () => {
   it("a data do formulario fica antes do prazo P3 calculado", () => {
     const dataDoFormulario = new Date(2026, 9, 20, 21, 0);
     expect(dataDoFormulario.getTime()).toBeLessThan(addBusinessHours(criada, 24).getTime());
+  });
+});
+
+describe("getSlaDueDate", () => {
+  it("usa o SLA da prioridade quando nao ha dueDate", () => {
+    const createdAt = "2026-09-10T12:00:00.000Z";
+    const due = getSlaDueDate({ dueDate: null, createdAt, priority: "p3" });
+    expect(due?.getTime()).toBe(addBusinessHours(new Date(createdAt), 24).getTime());
+  });
+
+  it("respeita dueDate explicito (demandas internas)", () => {
+    const due = getSlaDueDate({ dueDate: "2026-09-12T15:00:00.000Z", createdAt: "2026-09-10T12:00:00.000Z", priority: "p3" });
+    expect(due?.toISOString()).toBe("2026-09-12T15:00:00.000Z");
+  });
+
+  it("devolve null para prioridade sem SLA", () => {
+    expect(getSlaDueDate({ dueDate: null, createdAt: "2026-09-10T12:00:00.000Z", priority: "sem_classificacao" })).toBeNull();
   });
 });
