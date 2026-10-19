@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatBusinessTime, getResolutionMinutes, getFirstResponseMinutes } from "./businessHours";
+import { formatBusinessTime, getResolutionMinutes, getFirstResponseMinutes, getSlaDueDate, addBusinessHours } from "./businessHours";
 
 describe("formatBusinessTime", () => {
   it("formata 0 ou negativo como 0m", () => {
@@ -184,5 +184,22 @@ describe("getFirstResponseMinutes", () => {
       const r = getFirstResponseMinutes("2026-05-06T13:00:00Z", [], null, null);
       expect(r).toBeNull();
     });
+  });
+});
+
+describe("getSlaDueDate", () => {
+  it("usa o SLA da prioridade quando nao ha dueDate", () => {
+    const createdAt = "2026-09-10T12:00:00.000Z";
+    const due = getSlaDueDate({ dueDate: null, createdAt, priority: "p3" });
+    expect(due?.getTime()).toBe(addBusinessHours(new Date(createdAt), 24).getTime());
+  });
+
+  it("respeita dueDate explicito (demandas internas)", () => {
+    const due = getSlaDueDate({ dueDate: "2026-09-12T15:00:00.000Z", createdAt: "2026-09-10T12:00:00.000Z", priority: "p3" });
+    expect(due?.toISOString()).toBe("2026-09-12T15:00:00.000Z");
+  });
+
+  it("devolve null para prioridade sem SLA", () => {
+    expect(getSlaDueDate({ dueDate: null, createdAt: "2026-09-10T12:00:00.000Z", priority: "sem_classificacao" })).toBeNull();
   });
 });

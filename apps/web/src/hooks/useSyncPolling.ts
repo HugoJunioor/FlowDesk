@@ -20,8 +20,40 @@ const POLL_INTERVAL_MS = 30_000;
 const STATUS_URL = "/sync-status";
 const SNAPSHOT_URL = "/demands-snapshot";
 
+/** Mesmo teto do initStateSync: o preload tambem segura o primeiro render. */
+const PRELOAD_TIMEOUT_MS = 8_000;
+
+/** mtime do snapshot carregado no boot — o polling nao rebaixa o mesmo arquivo. */
+let preloadedMtime: number | null = null;
+
+/**
+ * Busca o snapshot ANTES do primeiro render (main.tsx, em paralelo com o
+ * initStateSync).
+ *
+ * Sem isto a tela abria com as demandas embutidas no bundle — congeladas no
+ * ultimo deploy, as vezes dias atras — e so 2s depois o polling trocava pelos
+ * dados reais: contadores e listas "pulavam" logo apos abrir. Se o servidor
+ * falhar ou demorar, segue com o bundle e o polling corrige depois.
+ */
+export async function preloadDemandsSnapshot(): Promise<void> {
+  try {
+    const res = await fetch(SNAPSHOT_URL, {
+      credentials: "include",
+      signal: AbortSignal.timeout(PRELOAD_TIMEOUT_MS),
+    });
+    if (!res.ok) return;
+    const { demands, mtime } = (await res.json()) as { demands: unknown[]; mtime?: number };
+    if (!Array.isArray(demands)) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updateRuntimeDemands(demands as any);
+    if (typeof mtime === "number") preloadedMtime = mtime;
+  } catch {
+    // Bundle fica como valor inicial; o polling tenta de novo.
+  }
+}
+
 export function useSyncPolling(): void {
-  const lastMtime = useRef<number | null>(null);
+  const lastMtime = useRef<number | null>(preloadedMtime);
   const stopped = useRef(false);
 
   useEffect(() => {

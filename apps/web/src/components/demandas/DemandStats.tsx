@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, Clock, CheckCircle2, Inbox, ShieldAlert, Zap, MessageCircleOff } from "lucide-react";
 import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 import { differenceInHours } from "date-fns";
-import { addBusinessHours, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
+import { addBusinessHours, getSlaDueDate, getFirstResponseMinutes, isExcludedFromFirstResponseSla } from "@/lib/businessHours";
 import { isStale } from "@/lib/staleInteraction";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -27,7 +27,9 @@ const DemandStats = ({ demands, activeFilter, onFilterClick }: DemandStatsProps)
   const urgent = demands.filter((d) => d.priority === "p1" && d.status !== "concluida").length;
   const dueSoon = demands.filter((d) => {
     if (d.status === "concluida" || d.status === "expirada") return false;
-    const hoursLeft = differenceInHours(new Date(d.dueDate), now);
+    const due = getSlaDueDate(d);
+    if (!due) return false;
+    const hoursLeft = differenceInHours(due, now);
     return hoursLeft >= 0 && hoursLeft <= 24;
   }).length;
   const concluidas = demands.filter((d) => d.status === "concluida").length;

@@ -427,13 +427,13 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         });
       }
 
-      const dueDateField = fields['Data limite'] || fields['Prazo'] || null;
-      let dueDate = null;
-      if (dueDateField) {
-        try {
-          dueDate = new Date(dueDateField).toISOString();
-        } catch {}
-      }
+      // "Data limite"/"Prazo" do formulario e so informativo: o SLA e sempre o
+      // da prioridade (ver clientDeadlineAsInfo em demandsPipeline.ts). Guardamos
+      // a data como o cliente digitou — converter "2026-10-21" com new Date()
+      // dava meia-noite UTC, ou seja, 21h do dia anterior no Brasil.
+      const dueDateField = (fields['Data limite'] || fields['Prazo'] || '').trim();
+      const requestedDueDate = /^\d{4}-\d{2}-\d{2}/.test(dueDateField) ? dueDateField.slice(0, 10) : null;
+      const dueDate = null;
 
       const isWorkflow = msg.subtype === 'bot_message' || !!msg.bot_id;
       const workflow = msg.username || (isWorkflow ? 'Fluxo de Trabalho' : 'Mensagem');
@@ -517,6 +517,7 @@ async function fetchChannelMessages(channelId, channelName, previousPriorities =
         createdAt: new Date(parseFloat(msg.ts) * 1000).toISOString(),
         serviceStartedAt,
         dueDate,
+        requestedDueDate,
         completedAt: null,
         hasTask,
         taskLink,

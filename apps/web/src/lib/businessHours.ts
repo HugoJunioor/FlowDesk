@@ -1,4 +1,4 @@
-import { SlackDemand } from "@/types/demand";
+import { SlackDemand, PRIORITY_CONFIG } from "@/types/demand";
 
 /**
  * Demandas Sitef/Conciliacao tem fluxo proprio de atendimento:
@@ -167,6 +167,16 @@ export function getBusinessMinutesBetween(start: Date, end: Date): number {
   total += getBusinessMinutesInDay(e, START_HOUR * 60, e.getHours() * 60 + e.getMinutes());
 
   return total;
+}
+
+/**
+ * Prazo de SLA da demanda: dueDate quando existe (demandas internas/SQL), senao
+ * criacao + horas uteis de resolucao da prioridade. null = prioridade sem SLA.
+ */
+export function getSlaDueDate(d: Pick<SlackDemand, "dueDate" | "createdAt" | "priority">): Date | null {
+  if (d.dueDate) return new Date(d.dueDate);
+  const sla = PRIORITY_CONFIG[d.priority]?.sla;
+  return sla ? addBusinessHours(new Date(d.createdAt), sla.resolutionHours) : null;
 }
 
 /**
