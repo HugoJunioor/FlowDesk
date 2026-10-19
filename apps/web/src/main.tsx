@@ -4,6 +4,7 @@ import "./index.css";
 import { branding } from "./config/brandingLoader";
 import { initStateSync, installLocalStorageInterceptor } from "./lib/stateSync";
 import { initSentry } from "./lib/observability/sentry";
+import { preloadDemandsSnapshot } from "./hooks/useSyncPolling";
 
 // Sentry primeiro — captura erros que ocorram no bootstrap.
 // No-op se VITE_SENTRY_DSN nao estiver setado.
@@ -38,6 +39,8 @@ installLocalStorageInterceptor();
 
 // Sincroniza estado (usuarios, overrides, grupos, regras) com servidor
 // antes de renderizar. Se offline, continua usando localStorage.
-initStateSync().finally(() => {
+// Em paralelo, as demandas atuais — sem isso a tela abre com as do bundle e
+// troca segundos depois (ver preloadDemandsSnapshot).
+Promise.allSettled([initStateSync(), preloadDemandsSnapshot()]).finally(() => {
   createRoot(document.getElementById("root")!).render(<App />);
 });

@@ -107,3 +107,26 @@ describe("processCurrentDemands", () => {
     expect(out.status).toBe("concluida");
   });
 });
+
+describe("Data limite do formulario", () => {
+  it("nao vira prazo de SLA: sai de dueDate e fica como informacao", () => {
+    // Formato gravado pelo sync antigo: "2026-10-21" lido como meia-noite UTC.
+    const [out] = processCurrentDemands(
+      [makeDemand({ dueDate: "2026-10-21T00:00:00.000Z" })],
+      { rules: [], overrides: {} },
+    );
+
+    expect(out.dueDate).toBeNull();
+    expect(out.requestedDueDate).toBe("2026-10-21");
+  });
+
+  it("preserva o requestedDueDate gravado pelo sync novo", () => {
+    const [out] = processCurrentDemands(
+      [makeDemand({ requestedDueDate: "2026-10-21" })],
+      { rules: [], overrides: {} },
+    );
+
+    expect(out.dueDate).toBeNull();
+    expect(out.requestedDueDate).toBe("2026-10-21");
+  });
+});

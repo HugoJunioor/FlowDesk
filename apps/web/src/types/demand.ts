@@ -259,7 +259,16 @@ export interface SlackDemand {
    * dentro do FlowDesk (separado do Slack).
    */
   chat?: InfraChatMessage[];
+  /**
+   * Prazo que conta para o SLA. Nas demandas do Slack fica sempre null: o
+   * prazo e o SLA da prioridade (PRIORITY_CONFIG), nunca a data do formulario.
+   */
   dueDate: string | null;
+  /**
+   * "Data limite"/"Prazo" preenchido pelo cliente no formulario do Slack
+   * (YYYY-MM-DD). Apenas informativo — nao entra no calculo do SLA.
+   */
+  requestedDueDate?: string | null;
   completedAt: string | null;
   hasTask: boolean;
   taskLink: string;

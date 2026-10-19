@@ -180,11 +180,27 @@ export function applyOverrides(demands: SlackDemand[], overrides: DemandOverride
  * Demandas atuais (vindas do sync) completamente processadas: classificadas,
  * com status analisado, closure e overrides — exatamente o que a UI mostra.
  */
+/**
+ * O SLA de uma demanda do Slack e sempre o da prioridade. A "Data limite" do
+ * formulario (remessa TEF, por exemplo) entrava em dueDate e passava a valer
+ * como prazo: duas P3 abertas com 11 minutos de diferenca mostravam prazos
+ * distintos. Pior, "2026-10-21" sem horario era lido como meia-noite UTC — 21h
+ * do dia anterior no Brasil.
+ *
+ * O sync ja grava a data em requestedDueDate; isto cobre arquivos gerados
+ * antes dessa mudanca, movendo o dueDate antigo (meia-noite UTC, entao os 10
+ * primeiros caracteres sao a data que o cliente digitou).
+ */
+export function clientDeadlineAsInfo(d: SlackDemand): SlackDemand {
+  if (!d.dueDate) return d;
+  return { ...d, requestedDueDate: d.requestedDueDate ?? d.dueDate.slice(0, 10), dueDate: null };
+}
+
 export function processCurrentDemands(
   demands: SlackDemand[],
   { rules, overrides }: { rules: AutoAssignRule[]; overrides: DemandOverrides },
 ): SlackDemand[] {
-  const classified = autoClassifyDemands(demands, rules);
+  const classified = autoClassifyDemands(demands.map(clientDeadlineAsInfo), rules);
   const analyzed = processDemandsStatus(classified);
   const withClosure = analyzed.map((d) => ({
     ...d,
