@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { formatBusinessTime, getResolutionMinutes, getFirstResponseMinutes } from "./businessHours";
+import {
+  addBusinessHours,
+  formatBusinessTime,
+  getBusinessMinutesBetween,
+  getResolutionMinutes,
+  getFirstResponseMinutes,
+} from "./businessHours";
 
 describe("formatBusinessTime", () => {
   it("formata 0 ou negativo como 0m", () => {
@@ -184,5 +190,38 @@ describe("getFirstResponseMinutes", () => {
       const r = getFirstResponseMinutes("2026-05-06T13:00:00Z", [], null, null);
       expect(r).toBeNull();
     });
+  });
+});
+
+describe("prazo P3 de uma remessa aberta na segunda de manha", () => {
+  // Datas em hora LOCAL: businessHours le getHours(), entao construir com o
+  // construtor local mantem o teste igual em qualquer fuso (CI roda em UTC).
+  const criada = new Date(2026, 9, 19, 9, 16); // seg 19/10 09:16
+  const agora = new Date(2026, 9, 19, 9, 53); // seg 19/10 09:53
+
+  it("24h uteis a partir de segunda 09:16 vencem na quarta 13:16", () => {
+    // seg 09:16-18:00 = 8h44; ter = 10h; faltam 5h16 -> qua 08:00 + 5h16
+    const prazo = addBusinessHours(criada, 24);
+    expect(prazo.getDay()).toBe(3); // quarta
+    expect(prazo.getHours()).toBe(13);
+    expect(prazo.getMinutes()).toBe(16);
+  });
+
+  it("restam 2d 3h as 09:53 — o que uma P3 normal mostra", () => {
+    const prazo = addBusinessHours(criada, 24);
+    expect(formatBusinessTime(getBusinessMinutesBetween(agora, prazo))).toBe("2d 3h");
+  });
+
+  it("uma data de formulario no fim de terca encurta o prazo pra 1d 8h", () => {
+    // Caso real: "Data limite: 21/10" era lida como meia-noite UTC, que em
+    // Brasilia e terca 21:00. Contando so horas uteis isso termina as 18:00
+    // de terca — cerca de 5h antes do prazo P3 de verdade.
+    const dataDoFormulario = new Date(2026, 9, 20, 21, 0);
+    expect(formatBusinessTime(getBusinessMinutesBetween(agora, dataDoFormulario))).toBe("1d 8h");
+  });
+
+  it("a data do formulario fica antes do prazo P3 calculado", () => {
+    const dataDoFormulario = new Date(2026, 9, 20, 21, 0);
+    expect(dataDoFormulario.getTime()).toBeLessThan(addBusinessHours(criada, 24).getTime());
   });
 });
