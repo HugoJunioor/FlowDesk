@@ -246,6 +246,7 @@ const TRANSLATIONS: Translations = {
     "demand.sla.breached_short": "SLA Estourado",
     // Demand detail sheet — thread actions / toasts
     "demand.thread.refresh_tooltip": "Buscar mensagens novas direto do Slack",
+    "demand.thread.empty": "Nenhuma resposta na thread ainda.",
     "demand.thread.edit_tooltip": "Editar mensagem",
     "demand.thread.delete_tooltip": "Excluir mensagem",
     "demand.thread.refreshing": "Atualizando...",
@@ -927,6 +928,7 @@ const TRANSLATIONS: Translations = {
     "demand.sla.breached_short": "SLA Breached",
     // Thread actions / toasts
     "demand.thread.refresh_tooltip": "Fetch new messages from Slack",
+    "demand.thread.empty": "No replies in the thread yet.",
     "demand.thread.edit_tooltip": "Edit message",
     "demand.thread.delete_tooltip": "Delete message",
     "demand.thread.refreshing": "Refreshing...",
@@ -1580,6 +1582,7 @@ const TRANSLATIONS: Translations = {
     "demand.sla.breached_short": "SLA Vencido",
     // Thread actions / toasts
     "demand.thread.refresh_tooltip": "Buscar mensajes nuevos en Slack",
+    "demand.thread.empty": "Aún no hay respuestas en el hilo.",
     "demand.thread.edit_tooltip": "Editar mensaje",
     "demand.thread.delete_tooltip": "Eliminar mensaje",
     "demand.thread.refreshing": "Actualizando...",

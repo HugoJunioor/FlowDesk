@@ -163,6 +163,19 @@ const DemandDetailSheet = ({
     }
   }, [demand?.id]);
 
+  // A lateral de conversa abre na mensagem mais recente e acompanha as novas
+  // (refresh do Slack, envio otimista), como um chat.
+  const repliesRef = useRef<HTMLDivElement>(null);
+  const replyCount = (demand?.threadReplies?.length ?? 0) + extraReplies.length + optimisticReplies.length;
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      const el = repliesRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open, demand?.id, replyCount]);
+
   if (!demand) return null;
 
   const priority = PRIORITY_CONFIG[demand.priority];
@@ -313,7 +326,7 @@ const DemandDetailSheet = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        className="max-w-[1400px] w-[96vw] h-[92vh] overflow-hidden flex flex-col p-0 gap-0"
         // Mantem o dialog aberto quando o pointerdown e em elementos do
         // mention dropdown (que vivem fora do dialog via portal). Sem isso
         // Radix detecta como "click outside" e fecha o modal antes do
@@ -331,8 +344,8 @@ const DemandDetailSheet = ({
           }
         }}
       >
-        {/* Header fixo (alinhado com a coluna de conteudo, nao stretches edge-to-edge) */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0 max-w-4xl w-full mx-auto">
+        {/* Header fixo, na largura toda do modal */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
           <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -403,10 +416,11 @@ const DemandDetailSheet = ({
           )}
           </div>
         </DialogHeader>
-        {/* Conteudo scrollavel — limitado a ~720px centralizado pra harmonia
-            (campos curtos como prioridade, status, badges nao precisam de
-            largura total). Composer abaixo continua full width. */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 max-w-4xl w-full mx-auto">
+        {/* Duas colunas a partir de lg: dados da demanda a esquerda (rolagem
+            propria) e a conversa na lateral direita. Abaixo de lg vira uma
+            coluna so, com a rolagem no conjunto. */}
+        <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
+        <div className="flex-1 min-w-0 px-6 py-4 lg:overflow-y-auto">
 
         <div className="space-y-3">
           {/* Layout 2-col: esq = Tempo + Responsavel + Status; dir = Prioridade + Deteccao */}
@@ -739,107 +753,6 @@ const DemandDetailSheet = ({
               )}
             </div>
           )}
-
-          <Separator />
-
-          {/* Thread replies + composer (apos descricao + detalhes pra contexto) */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground font-medium">
-                Respostas da thread ({mergedReplies.length})
-                {optimisticReplies.length > 0 && (
-                  <span className="ml-1.5 text-[10px] text-warning">
-                    · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""}
-                  </span>
-                )}
-                {extraReplies.length > 0 && (
-                  <span className="ml-1.5 text-[10px] text-success">
-                    · {extraReplies.length} novas
-                  </span>
-                )}
-              </p>
-              <button
-                type="button"
-                onClick={refreshThread}
-                disabled={refreshingThread}
-                className="text-[10px] flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                title={t("demand.thread.refresh_tooltip")}
-              >
-                <span className={refreshingThread ? "inline-block animate-spin" : ""}>↻</span>
-                {refreshingThread ? t("demand.thread.refreshing") : t("common.refresh")}
-              </button>
-            </div>
-            {mergedReplies.length > 0 && (
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1 mb-3">
-                {mergedReplies.map((reply, i) => {
-                  const isOptimistic = "pendingTs" in reply;
-                  const isOwn = reply.isTeamMember && reply.author === currentUserName;
-                  return (
-                    <div
-                      key={i}
-                      className={`group p-2.5 rounded-lg text-[11px] transition-opacity ${
-                        reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"
-                      } ${isOptimistic ? "opacity-70 ring-1 ring-warning/40" : ""}`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
-                          {reply.author}
-                          {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
-                          {isOptimistic && <span className="text-[9px] font-normal text-warning ml-1">(enviando...)</span>}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {/* Acoes em mensagens proprias enviadas pelo Slack */}
-                          {isOwn && !isOptimistic && (
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                type="button"
-                                className="text-[10px] text-muted-foreground hover:text-primary"
-                                onClick={() => handleEditReply(reply)}
-                                title={t("demand.thread.edit_tooltip")}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="text-[10px] text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeleteReply(reply)}
-                                title={t("demand.thread.delete_tooltip")}
-                              >
-                                Excluir
-                              </button>
-                            </div>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{reply.text}</p>
-                      {"files" in reply && reply.files && reply.files.length > 0 && (
-                        <SlackFilesList files={reply.files} compact />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <DemandReplyComposer
-                demand={demand}
-                onReplied={(text, ts) => {
-                  setOptimisticReplies((prev) => [...prev, {
-                    author: currentUserName,
-                    text,
-                    timestamp: new Date().toISOString(),
-                    isTeamMember: true,
-                    pendingTs: ts,
-                  }]);
-                  // Auto-refresh apos envio pra confirmar do Slack (~2s)
-                  setTimeout(() => { void refreshThread(); }, 2000);
-                }}
-              />
-            </div>
-          </div>
 
           <Separator />
 
@@ -1302,6 +1215,112 @@ const DemandDetailSheet = ({
             </div>
           </div>
         </div>
+        </div>
+
+        {/* Lateral de conversa: respostas da thread + composer, sempre a mao
+            enquanto se le o resto da demanda. No celular fica abaixo do conteudo. */}
+        <aside className="lg:w-[420px] xl:w-[480px] shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-muted/20 flex flex-col min-h-0 px-4 py-4">
+        <div className="flex items-center justify-between mb-2 shrink-0">
+          <p className="text-xs text-muted-foreground font-medium">
+            Respostas da thread ({mergedReplies.length})
+            {optimisticReplies.length > 0 && (
+              <span className="ml-1.5 text-[10px] text-warning">
+                · {optimisticReplies.length} pendente{optimisticReplies.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {extraReplies.length > 0 && (
+              <span className="ml-1.5 text-[10px] text-success">
+                · {extraReplies.length} novas
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={refreshThread}
+            disabled={refreshingThread}
+            className="text-[10px] flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+            title={t("demand.thread.refresh_tooltip")}
+          >
+            <span className={refreshingThread ? "inline-block animate-spin" : ""}>↻</span>
+            {refreshingThread ? t("demand.thread.refreshing") : t("common.refresh")}
+          </button>
+        </div>
+        {/* Ocupa a altura que sobra na lateral; o composer fica preso embaixo. */}
+        <div ref={repliesRef} className="space-y-2 max-h-80 lg:max-h-none lg:flex-1 min-h-0 overflow-y-auto pr-1 mb-3">
+        {mergedReplies.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-8">{t("demand.thread.empty")}</p>
+        ) : (
+          <>
+            {mergedReplies.map((reply, i) => {
+              const isOptimistic = "pendingTs" in reply;
+              const isOwn = reply.isTeamMember && reply.author === currentUserName;
+              return (
+                <div
+                  key={i}
+                  className={`group p-2.5 rounded-lg text-[11px] transition-opacity ${
+                    reply.isTeamMember ? "bg-primary/5 border-l-2 border-l-primary" : "bg-muted/50"
+                  } ${isOptimistic ? "opacity-70 ring-1 ring-warning/40" : ""}`}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={`font-semibold ${reply.isTeamMember ? "text-primary" : "text-foreground"}`}>
+                      {reply.author}
+                      {reply.isTeamMember && <span className="text-[9px] font-normal text-muted-foreground ml-1">(equipe)</span>}
+                      {isOptimistic && <span className="text-[9px] font-normal text-warning ml-1">(enviando...)</span>}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {/* Acoes em mensagens proprias enviadas pelo Slack */}
+                      {isOwn && !isOptimistic && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-primary"
+                            onClick={() => handleEditReply(reply)}
+                            title={t("demand.thread.edit_tooltip")}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteReply(reply)}
+                            title={t("demand.thread.delete_tooltip")}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">
+                        {format(new Date(reply.timestamp), "dd/MM HH:mm", { locale: ptBR })}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{reply.text}</p>
+                  {"files" in reply && reply.files && reply.files.length > 0 && (
+                    <SlackFilesList files={reply.files} compact />
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
+        </div>
+        <div className="rounded-lg border border-border overflow-hidden shrink-0 bg-background">
+          <DemandReplyComposer
+            demand={demand}
+            onReplied={(text, ts) => {
+              setOptimisticReplies((prev) => [...prev, {
+                author: currentUserName,
+                text,
+                timestamp: new Date().toISOString(),
+                isTeamMember: true,
+                pendingTs: ts,
+              }]);
+              // Auto-refresh apos envio pra confirmar do Slack (~2s)
+              setTimeout(() => { void refreshThread(); }, 2000);
+            }}
+          />
+        </div>
+        </aside>
         </div>
       </DialogContent>
     </Dialog>
